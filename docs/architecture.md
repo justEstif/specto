@@ -105,24 +105,28 @@ The Plugin Registry holds registered plugins and manages:
 - Per-plugin credential storage
 - Sync invocation and rate limiting
 
-#### Enrichment Pipeline
+#### Enrichment (two layers)
 
-Processes raw `MediaItem`s through a chain of enrichers:
+Enrichment is split between plugins and core:
+
+**Plugin enrichment** — Each plugin's `Enrich()` calls platform-specific APIs
+(Spotify plugin → Last.fm/MusicBrainz, Netflix plugin → TMDB). Plugins own their
+domain-specific enrichment. Adds authoritative genre/format tags.
+
+**Core enrichment** — Universal LLM-based classification via Genkit (Google's AI
+framework for Go). Runs on ALL items after plugin enrichment. Fills mood/topic gaps.
+Only assigns from a **fixed tag set** — no runtime tag creation.
 
 ```go
-type Enricher interface {
-    Name() string
-    CanEnrich(item MediaItem) bool                              // filter by type/platform
-    Enrich(ctx context.Context, items []MediaItem) ([]MediaItem, error)
-}
+// Core's LLM enricher uses Genkit for structured output
+result, _, err := genkit.GenerateData[TagResult](ctx, g,
+    ai.WithModel(model),
+    ai.WithPrompt(buildTagPrompt(item, existingTags)),
+)
 ```
 
-Built-in enrichers (MVP):
-- **Last.fm tags** — music genre/mood tagging via Last.fm API
-- **YouTube categories** — video category + channel topic from API metadata
-- **LLM classifier** — title/description → topic tags (works across all content types)
-
-Enrichers run in a defined order. Each enricher can add to `tags[]` and `raw_metadata`.
+See [enrichment.md](./enrichment.md) for the full pipeline, tag taxonomy, and
+enrichment source details.
 
 #### Insights / Query Engine
 
@@ -175,10 +179,16 @@ User clicks "Sync Spotify"
    Core: Store raw MediaItems (status: "pending")
         │
         ▼
-   Core: Run enrichment pipeline on new items
+   Plugin: plugin.Enrich(ctx, creds, items) — platform-specific (Last.fm, TMDB, etc.)
         │
-        ├── Enricher 1 (Last.fm tags)
-        ├── Enricher 2 (LLM classifier)
+        ▼
+   Core: Store items (status: "plugin-enriched")
+        │
+        ▼
+   Core: LLM enrichment via Genkit — universal mood/topic classification
+        │
+        ▼
+   Core: Validate tags against fixed set, resolve aliases
         │
         ▼
    Core: Update items (status: "enriched")
@@ -187,9 +197,9 @@ User clicks "Sync Spotify"
    Server: Return sync summary (items added, enriched, errors)
 ```
 
-**Enrichment is inline-after-sync for MVP** but decoupled in code. The sync handler
-calls `enrichmentPipeline.Process(items)` as a separate step. Moving to a background
-worker later means changing *when* it's called, not *how*.
+**Enrichment is inline-after-sync for MVP** but decoupled in code. Plugin enrichment
+runs first (platform-specific), then core LLM enrichment (universal). Moving to a
+background worker later means changing *when* it's called, not *how*.
 
 **Future: cron sync.** The plugin interface is trigger-agnostic — `Sync()` doesn't know
 or care if it was called by an HTTP handler or a scheduler. Adding cron is ~100-200 lines
@@ -301,7 +311,7 @@ media-consumption-analysis/
 |----------|--------|-----------|
 | Multi-tenant | Yes, from day one | Shared hosted service. All data scoped by `user_id`. |
 | Plugin interface | `Sync()` returns `[]MediaItem` | Simple, trigger-agnostic. Works for OAuth, file import, manual. |
-| Enrichment | Inline-after-sync, separate code path | Simple for MVP, easy to make async later. |
+| Enrichment | Two layers: plugin-specific + core LLM | Plugins own their domain, core is slim. Fixed tag set for deterministic insights. |
 | Sync trigger | User-initiated + rate limit | Simplest correct behavior. Cron drops in later without interface changes. |
 | Client coupling | JSON API boundary | Core doesn't know about HTTP. Server doesn't know about domain logic. Client is replaceable. |
 | Raw metadata | jsonb column | Platform-specific fields without schema bloat. Structured fields only for universal data. |
