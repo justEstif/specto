@@ -26,7 +26,7 @@ unified schema, and gives you insight into **what** you're consuming, **how much
 
 **The problem:** Your digital life is fragmented across dozens of platforms. Each one
 knows a slice of you, but you don't have a unified picture of your own consumption.
-You can't answer simple questions like:
+  You can't answer simple questions like:
 
 - "What topics have I been gravitating toward this month?"
 - "How much time am I spending on passive entertainment vs. learning?"
@@ -116,6 +116,7 @@ type SourcePlugin interface {
 ```
 
 **Why plugins:**
+
 - Add new platforms without touching core code
 - Each plugin owns its own auth flow, API quirks, and normalization logic
 - Plugins can be developed and released independently
@@ -132,44 +133,21 @@ type SourcePlugin interface {
 
 ### Architecture (MVP)
 
-```
-                    ┌─────────────────────────┐
-                    │     Plugin Registry      │
-                    │  register / discover /   │
-                    │  enable per user         │
-                    └────────────┬────────────┘
-                                 │
-          ┌──────────────────────┼──────────────────────┐
-          │                      │                      │
-          ▼                      ▼                      ▼
-   ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-   │   Plugin:   │       │   Plugin:   │       │   Plugin:   │
-   │   Spotify   │       │   YouTube   │       │   Netflix   │  ... more plugins
-   │  (OAuth)    │       │  (OAuth)    │       │ (file import)│
-   └──────┬──────┘       └──────┬──────┘       └──────┬──────┘
-          │                      │                      │
-          │         ┌────────────┘                      │
-          │         │    ┌─────────────────────────────┘
-          ▼         ▼    ▼
-   ┌─────────────────────────────────────────────────┐
-   │         Core: Normalized MediaItem Store         │
-   │              (PostgreSQL + jsonb)                 │
-   └─────────────────────┬───────────────────────────┘
-                         │
-                         ▼
-   ┌─────────────────────────────────────────────────┐
-   │           Enrichment Pipeline (pluggable)        │
-   │   (Last.fm, LLM tagging, category mapping)      │
-   └─────────────────────┬───────────────────────────┘
-                         │
-                         ▼
-   ┌─────────────────────────────────────────────────┐
-   │           Dashboard / Insights UI                │
-   │  - Timeline view                                 │
-   │  - Topic/genre breakdown                         │
-   │  - Platform distribution                         │
-   │  - Shareable profile page                        │
-   └─────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    PR["Plugin Registry<br/>register / discover / enable per user"]
+    PR --> SP["Plugin: Spotify<br/>(OAuth)"]
+    PR --> YT["Plugin: YouTube<br/>(OAuth)"]
+    PR --> NF["Plugin: Netflix<br/>(file import)"]
+    PR --> MORE["... more plugins"]
+
+    SP --> STORE["Core: Normalized MediaItem Store<br/>(PostgreSQL + jsonb)"]
+    YT --> STORE
+    NF --> STORE
+
+    STORE --> ENRICH["Enrichment Pipeline (pluggable)<br/>Last.fm, LLM tagging, category mapping"]
+
+    ENRICH --> DASH["Dashboard / Insights UI<br/>• Timeline view<br/>• Topic/genre breakdown<br/>• Platform distribution<br/>• Shareable profile page"]
 ```
 
 ---

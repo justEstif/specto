@@ -39,26 +39,12 @@ Based on the project's Go web template:
 
 ### Flow
 
-```
-User clicks "Sign in with Google"
-    │
-    ▼
-GET /auth/google/login
-    │ Generate state param, store in session
-    │ Redirect to Google's authorization URL
-    ▼
-Google prompts user to authorize
-    │
-    ▼
-GET /auth/google/callback?code=...&state=...
-    │ Validate state param against session
-    │ Exchange code for token
-    │ Fetch user info from provider's API
-    │ Upsert user in DB (by auth_provider + auth_subject)
-    │ Create session (store user_id in session)
-    │ Redirect to dashboard
-    ▼
-User is logged in
+```mermaid
+flowchart TD
+    A["User clicks 'Sign in with Google'"] --> B["GET /auth/google/login<br/>Generate state param, store in session<br/>Redirect to Google's authorization URL"]
+    B --> C["Google prompts user to authorize"]
+    C --> D["GET /auth/google/callback?code=...&state=...<br/>Validate state param against session<br/>Exchange code for token<br/>Fetch user info from provider's API<br/>Upsert user in DB (by auth_provider + auth_subject)<br/>Create session (store user_id in session)<br/>Redirect to dashboard"]
+    D --> E["User is logged in"]
 ```
 
 ### User Info Endpoints
@@ -176,27 +162,12 @@ r.Group(func(r chi.Router) {
 
 ### Flow
 
-```
-User clicks "Connect Spotify" (already logged in)
-    │
-    ▼
-GET /connect/spotify/login
-    │ Look up plugin from registry → get OAuthConfig
-    │ Generate state param (include plugin name), store in session
-    │ Redirect to Spotify's authorization URL with plugin's scopes
-    ▼
-Spotify prompts user to authorize
-    │
-    ▼
-GET /connect/spotify/callback?code=...&state=...
-    │ Validate state param
-    │ Exchange code for access + refresh tokens
-    │ Encrypt tokens with app encryption key
-    │ Store in plugin_credentials (user_id, plugin, encrypted_data)
-    │ Update plugin_states → status: "connected"
-    │ Redirect to settings page
-    ▼
-Plugin is connected, ready to sync
+```mermaid
+flowchart TD
+    A["User clicks 'Connect Spotify' (already logged in)"] --> B["GET /connect/spotify/login<br/>Look up plugin from registry → get OAuthConfig<br/>Generate state param (include plugin name), store in session<br/>Redirect to Spotify's authorization URL with plugin's scopes"]
+    B --> C["Spotify prompts user to authorize"]
+    C --> D["GET /connect/spotify/callback?code=...&state=...<br/>Validate state param<br/>Exchange code for access + refresh tokens<br/>Encrypt tokens with app encryption key<br/>Store in plugin_credentials (user_id, plugin, encrypted_data)<br/>Update plugin_states → status: 'connected'<br/>Redirect to settings page"]
+    D --> E["Plugin is connected, ready to sync"]
 ```
 
 ### Generic Plugin OAuth Handler
@@ -321,22 +292,14 @@ Decrypted only when:
 
 ### Token Refresh
 
-```
-Before sync:
-    │
-    ▼
-Load plugin_credentials → decrypt
-    │
-    ├── Token not expired → pass to plugin.Sync()
-    │
-    ├── Token expired, has refresh_token →
-    │       Exchange refresh_token for new access_token
-    │       Re-encrypt and update plugin_credentials
-    │       Pass new token to plugin.Sync()
-    │
-    └── Token expired, no refresh_token / refresh fails →
-            Update plugin_states → status: "disconnected"
-            Notify user to re-connect
+```mermaid
+flowchart TD
+    A["Before sync"] --> B["Load plugin_credentials → decrypt"]
+    B --> C{"Token expired?"}
+    C -->|No| D["Pass to plugin.Sync()"]
+    C -->|Yes| E{"Has refresh_token?"}
+    E -->|Yes| F["Exchange refresh_token for new access_token<br/>Re-encrypt and update plugin_credentials<br/>Pass new token to plugin.Sync()"]
+    E -->|"No / refresh fails"| G["Update plugin_states → status: 'disconnected'<br/>Notify user to re-connect"]
 ```
 
 ### Key Rotation

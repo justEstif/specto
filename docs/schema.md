@@ -14,20 +14,14 @@ PostgreSQL database with the following design principles:
 
 ## ER Diagram
 
-```
-users
-  │
-  ├──< plugin_states    (1 per user per plugin)
-  │
-  ├──< plugin_credentials  (encrypted OAuth tokens per user per plugin)
-  │
-  ├──< media_items      (all consumed media)
-  │     │
-  │     └──< media_item_tags  (join table)
-  │               │
-  │               └──> tags  (shared taxonomy)
-  │
-  └──< sync_log         (append-only audit trail)
+```mermaid
+erDiagram
+    users ||--o{ plugin_states : "1 per user per plugin"
+    users ||--o{ plugin_credentials : "encrypted OAuth tokens"
+    users ||--o{ media_items : "all consumed media"
+    users ||--o{ sync_log : "append-only audit trail"
+    media_items ||--o{ media_item_tags : "join table"
+    tags ||--o{ media_item_tags : "shared taxonomy"
 ```
 
 ---
@@ -85,13 +79,14 @@ CREATE INDEX idx_plugin_states_user ON plugin_states(user_id);
 ```
 
 **Status transitions:**
-```
-disconnected → connected    (user completes OAuth / uploads first file)
-connected    → syncing      (sync starts)
-syncing      → connected    (sync succeeds)
-syncing      → error        (sync fails — error_message populated)
-error        → syncing      (user retries)
-connected    → disconnected (user disconnects / token refresh fails permanently)
+```mermaid
+stateDiagram-v2
+    disconnected --> connected : user completes OAuth / uploads first file
+    connected --> syncing : sync starts
+    syncing --> connected : sync succeeds
+    syncing --> error : sync fails (error_message populated)
+    error --> syncing : user retries
+    connected --> disconnected : user disconnects / token refresh fails
 ```
 
 ### `plugin_credentials`

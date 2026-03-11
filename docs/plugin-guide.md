@@ -187,24 +187,12 @@ const (
 
 ### Partial Sync Flow
 
-```
-Sync(ctx, creds, cursor="page-token-abc")
-    │
-    ├── Fetches pages 1-5 successfully (500 items)
-    ├── Page 6 returns HTTP 500
-    │
-    └── Returns SyncResult{
-            Items:      [500 items from pages 1-5],
-            NextCursor: "page-token-for-page-6",
-            HasMore:    true,
-            Err:        &PluginError{Code: PartialSync, Retry: true},
-        }
-
-Core behavior:
-    1. Store the 500 items
-    2. Save "page-token-for-page-6" as the cursor
-    3. Log the error
-    4. On next sync, pass cursor="page-token-for-page-6" → plugin resumes at page 6
+```mermaid
+flowchart TD
+    A["Sync(ctx, creds, cursor='page-token-abc')"] --> B["Fetches pages 1-5 successfully (500 items)"]
+    B --> C["Page 6 returns HTTP 500"]
+    C --> D["Returns SyncResult{<br/>Items: 500 items from pages 1-5<br/>NextCursor: 'page-token-for-page-6'<br/>HasMore: true<br/>Err: PluginError{Code: PartialSync, Retry: true}}"]
+    D --> E["Core behavior:<br/>1. Store the 500 items<br/>2. Save 'page-token-for-page-6' as cursor<br/>3. Log the error<br/>4. On next sync, resume at page 6"]
 ```
 
 ---
@@ -231,22 +219,14 @@ and that OAuth plugins provide a valid `OAuthConfig`.
 
 ### Sync Lifecycle (per user)
 
-```
-1. User clicks "Sync Spotify" (or cron fires)
-2. Server calls Core.SyncPlugin(userID, "spotify")
-3. Core looks up:
-   - Plugin from registry
-   - User's credentials from plugin_configs (decrypted)
-   - Last cursor from sync_log
-4. Core calls plugin.Sync(ctx, creds, cursor)
-5. Plugin fetches from platform API, normalizes to []MediaItem
-6. Plugin returns SyncResult
-7. Core:
-   a. Deduplicates items against existing data (by platform + ExternalID)
-   b. Stores new items (status: "pending")
-   c. Updates sync_log (cursor, timestamp, item count, errors)
-   d. Runs enrichment pipeline on new items
-   e. Returns sync summary to server
+```mermaid
+flowchart TD
+    A["1. User clicks 'Sync Spotify' (or cron fires)"] --> B["2. Server calls Core.SyncPlugin(userID, 'spotify')"]
+    B --> C["3. Core looks up:<br/>• Plugin from registry<br/>• User's credentials (decrypted)<br/>• Last cursor from sync_log"]
+    C --> D["4. Core calls plugin.Sync(ctx, creds, cursor)"]
+    D --> E["5. Plugin fetches from platform API,<br/>normalizes to []MediaItem"]
+    E --> F["6. Plugin returns SyncResult"]
+    F --> G["7. Core:<br/>a. Deduplicates (by platform + ExternalID)<br/>b. Stores new items (status: 'pending')<br/>c. Updates sync_log<br/>d. Runs enrichment pipeline<br/>e. Returns sync summary to server"]
 ```
 
 ### Deduplication

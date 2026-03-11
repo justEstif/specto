@@ -35,31 +35,28 @@ Deployable as:
 
 ## System Layers
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         Client Layer                             │
-│              (Web UI, CLI, or any HTTP consumer)                 │
-│                  Talks to Server via JSON API                    │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │ HTTP (JSON)
-┌──────────────────────────▼───────────────────────────────────────┐
-│                         Server Layer                             │
-│               HTTP API — routes, auth, validation                │
-│             No domain logic — delegates to Core                  │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │ Go function calls
-┌──────────────────────────▼───────────────────────────────────────┐
-│                          Core Layer                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────────┐  │
-│  │   Plugin     │  │  Enrichment  │  │   Insights / Query     │  │
-│  │   System     │  │  Pipeline    │  │   Engine               │  │
-│  └──────┬──────┘  └──────┬───────┘  └────────────┬───────────┘  │
-│         │                │                        │              │
-│  ┌──────▼────────────────▼────────────────────────▼───────────┐  │
-│  │                    Store (DB layer)                         │  │
-│  │              PostgreSQL + jsonb + migrations                │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Client["Client Layer"]
+        CL["Web UI, CLI, or any HTTP consumer<br/>Talks to Server via JSON API"]
+    end
+
+    subgraph Server["Server Layer"]
+        SL["HTTP API — routes, auth, validation<br/>No domain logic — delegates to Core"]
+    end
+
+    subgraph Core["Core Layer"]
+        PS["Plugin System"]
+        EP["Enrichment Pipeline"]
+        IQ["Insights / Query Engine"]
+        ST["Store (DB layer)<br/>PostgreSQL + jsonb + migrations"]
+        PS --> ST
+        EP --> ST
+        IQ --> ST
+    end
+
+    CL -->|"HTTP (JSON)"| SL
+    SL -->|"Go function calls"| Core
 ```
 
 ### Client Layer
@@ -158,43 +155,20 @@ for data that's universal across platforms.
 
 ### Sync Flow (user-triggered)
 
-```
-User clicks "Sync Spotify"
-        │
-        ▼
-   Server: POST /api/sync/spotify
-        │
-        ▼
-   Core: Check rate limit (last sync timestamp)
-        │
-        ├── Too soon → 429 (rate limited)
-        │
-        ▼
-   Core: plugin.Sync(ctx, creds)
-        │
-        ▼
-   Plugin: Call Spotify API → normalize to []MediaItem
-        │
-        ▼
-   Core: Store raw MediaItems (status: "pending")
-        │
-        ▼
-   Plugin: plugin.Enrich(ctx, creds, items) — platform-specific (Last.fm, TMDB, etc.)
-        │
-        ▼
-   Core: Store items (status: "plugin-enriched")
-        │
-        ▼
-   Core: LLM enrichment via Genkit — universal mood/topic classification
-        │
-        ▼
-   Core: Validate tags against fixed set, resolve aliases
-        │
-        ▼
-   Core: Update items (status: "enriched")
-        │
-        ▼
-   Server: Return sync summary (items added, enriched, errors)
+```mermaid
+flowchart TD
+    A["User clicks 'Sync Spotify'"] --> B["Server: POST /api/sync/spotify"]
+    B --> C["Core: Check rate limit (last sync timestamp)"]
+    C -->|Too soon| D["429 (rate limited)"]
+    C --> E["Core: plugin.Sync(ctx, creds)"]
+    E --> F["Plugin: Call Spotify API → normalize to []MediaItem"]
+    F --> G["Core: Store raw MediaItems (status: 'pending')"]
+    G --> H["Plugin: plugin.Enrich(ctx, creds, items)<br/>platform-specific (Last.fm, TMDB, etc.)"]
+    H --> I["Core: Store items (status: 'plugin-enriched')"]
+    I --> J["Core: LLM enrichment via Genkit<br/>universal mood/topic classification"]
+    J --> K["Core: Validate tags against fixed set, resolve aliases"]
+    K --> L["Core: Update items (status: 'enriched')"]
+    L --> M["Server: Return sync summary (items added, enriched, errors)"]
 ```
 
 **Enrichment is inline-after-sync for MVP** but decoupled in code. Plugin enrichment
@@ -207,20 +181,12 @@ wrapping the same sync path with `robfig/cron` or similar.
 
 ### File Import Flow
 
-```
-User uploads Netflix CSV
-        │
-        ▼
-   Server: POST /api/import/netflix (multipart file)
-        │
-        ▼
-   Core: plugin.Sync(ctx, creds{File: uploadedFile})
-        │
-        ▼
-   Plugin: Parse CSV → normalize to []MediaItem
-        │
-        ▼
-   (same enrichment + store flow as above)
+```mermaid
+flowchart TD
+    A["User uploads Netflix CSV"] --> B["Server: POST /api/import/netflix (multipart file)"]
+    B --> C["Core: plugin.Sync(ctx, creds{File: uploadedFile})"]
+    C --> D["Plugin: Parse CSV → normalize to []MediaItem"]
+    D --> E["(same enrichment + store flow as above)"]
 ```
 
 File import plugins use the same `Sync()` interface — the "credentials" just include

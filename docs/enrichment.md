@@ -275,26 +275,14 @@ enrichment:
 
 ### Per-Item Flow
 
-```
-Plugin.Sync()
-    │
-    ▼
-Plugin.Enrich(items)              ← platform-specific (Last.fm, TMDB, etc.)
-    │                                adds authoritative genre/format tags
-    ▼
-Core stores items (status: "plugin-enriched")
-    │
-    ▼
-Core.LLMEnrich(items)             ← universal (Genkit + LLM)
-    │                                adds mood/topic tags, fills gaps
-    ▼
-Core validates tags against fixed set
-    │
-    ▼
-Core resolves aliases ("Hip Hop" → "hip-hop")
-    │
-    ▼
-Core stores tags + updates status: "enriched"
+```mermaid
+flowchart TD
+    A["Plugin.Sync()"] --> B["Plugin.Enrich(items)<br/>← platform-specific (Last.fm, TMDB, etc.)<br/>adds authoritative genre/format tags"]
+    B --> C["Core stores items (status: 'plugin-enriched')"]
+    C --> D["Core.LLMEnrich(items)<br/>← universal (Genkit + LLM)<br/>adds mood/topic tags, fills gaps"]
+    D --> E["Core validates tags against fixed set"]
+    E --> F["Core resolves aliases ('Hip Hop' → 'hip-hop')"]
+    F --> G["Core stores tags + updates status: 'enriched'"]
 ```
 
 ### Error Handling
