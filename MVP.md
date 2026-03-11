@@ -214,4 +214,4 @@ be addable without changing core code — if it isn't, fix the abstraction befor
 - [x] Self-hosted only or hosted service? — **Hosted multi-tenant.** You deploy, others sign up and use it.
 - [ ] How to handle platforms with no API (Prime Video)? Browser extension? Manual export?
 - [x] Privacy model — is all data local, or stored server-side? — **Server-side**, scoped per user, OAuth tokens encrypted at rest.
-- [ ] Sharing granularity — share everything, or curate what's public?
+- [x] Sharing granularity — share everything, or curate what's public? — **Curated.** Block-based composition, opt-in only. Aggregates over specifics. Platform/tag/item exclusions.
