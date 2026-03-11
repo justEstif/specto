@@ -10,6 +10,12 @@ Two separate auth layers:
 These are independent. A user logs in with GitHub (app auth) but connects their
 Google account for YouTube (plugin auth).
 
+This doc distinguishes between:
+- **HTML/navigation routes** owned by the server (`/login`, OAuth callbacks, public share pages)
+- **canonical JSON API routes** under `/api/v1` used for the client/server boundary
+
+See [api.md](./api.md) for the canonical API surface.
+
 ---
 
 ## Stack
@@ -59,14 +65,14 @@ After token exchange, fetch user info:
 ### Routes
 
 ```go
-r.Route("/auth", func(r chi.Router) {
-    // App login
-    r.Get("/google/login", handlers.GoogleLogin)
-    r.Get("/google/callback", handlers.GoogleCallback)
-    r.Get("/github/login", handlers.GithubLogin)
-    r.Get("/github/callback", handlers.GithubCallback)
-    r.Post("/logout", handlers.Logout)
-})
+// Public HTML login routes
+r.Get("/auth/google/login", handlers.GoogleLogin)
+r.Get("/auth/google/callback", handlers.GoogleCallback)
+r.Get("/auth/github/login", handlers.GithubLogin)
+r.Get("/auth/github/callback", handlers.GithubCallback)
+
+// Canonical JSON API logout route
+r.Delete("/api/v1/session", handlers.Logout)
 ```
 
 ### Session Management
@@ -120,40 +126,50 @@ func RequireAuth(sessionStore SessionStore) func(http.Handler) http.Handler {
 
 ```go
 r.Group(func(r chi.Router) {
-    // Public routes
+    // Public HTML / navigation routes
     r.Get("/login", handlers.LoginPage)
     r.Get("/auth/google/login", handlers.GoogleLogin)
     r.Get("/auth/google/callback", handlers.GoogleCallback)
     r.Get("/auth/github/login", handlers.GithubLogin)
     r.Get("/auth/github/callback", handlers.GithubCallback)
-    r.Get("/share/{slug}", handlers.PublicProfile)      // shareable profiles (no auth)
+    r.Get("/share/{slug}", handlers.PublicProfile)
 })
 
 r.Group(func(r chi.Router) {
-    // Authenticated routes
+    // Authenticated HTML routes
     r.Use(RequireAuth(sessionStore))
     r.Use(csrfMw)
 
     r.Get("/", handlers.Dashboard)
     r.Get("/settings", handlers.Settings)
-    r.Post("/auth/logout", handlers.Logout)
+    r.Get("/settings/share", handlers.ShareSettings)
+})
 
-    // Plugin connection routes
-    r.Get("/connect/{plugin}/login", handlers.PluginOAuthLogin)
-    r.Get("/connect/{plugin}/callback", handlers.PluginOAuthCallback)
-    r.Post("/connect/{plugin}/import", handlers.PluginFileImport)
-    r.Post("/connect/{plugin}/disconnect", handlers.PluginDisconnect)
+r.Group(func(r chi.Router) {
+    // Authenticated JSON API
+    r.Use(RequireAuth(sessionStore))
+    r.Use(csrfMw)
 
-    // Sync
-    r.Post("/sync/{plugin}", handlers.SyncPlugin)
+    r.Route("/api/v1", func(r chi.Router) {
+        r.Delete("/session", handlers.Logout)
 
-    // API (JSON responses for HTMX)
-    r.Route("/api", func(r chi.Router) {
-        r.Get("/insights", handlers.Insights)
+        r.Get("/plugins", handlers.ListPlugins)
+        r.Get("/plugins/{plugin}", handlers.GetPlugin)
+        r.Post("/plugins/{plugin}/connect", handlers.PluginOAuthStart)
+        r.Post("/plugins/{plugin}/import", handlers.PluginFileImport)
+        r.Delete("/plugins/{plugin}/disconnect", handlers.PluginDisconnect)
+        r.Post("/plugins/{plugin}/sync", handlers.SyncPlugin)
+
         r.Get("/timeline", handlers.Timeline)
-        // ...
+        r.Get("/insights/summary", handlers.InsightsSummary)
+        r.Get("/insights/platform-breakdown", handlers.PlatformBreakdown)
+        r.Get("/insights/tags", handlers.TagInsights)
+        r.Get("/insights/timeline", handlers.InsightsTimeline)
     })
 })
+
+// Server-owned OAuth callback route used after provider redirect
+r.Get("/connect/{plugin}/callback", handlers.PluginOAuthCallback)
 ```
 
 ---
@@ -164,18 +180,19 @@ r.Group(func(r chi.Router) {
 
 ```mermaid
 flowchart TD
-    A["User clicks 'Connect Spotify' (already logged in)"] --> B["GET /connect/spotify/login<br/>Look up plugin from registry → get OAuthConfig<br/>Generate state param (include plugin name), store in session<br/>Redirect to Spotify's authorization URL with plugin's scopes"]
-    B --> C["Spotify prompts user to authorize"]
+    A["User clicks 'Connect Spotify' (already logged in)"] --> B["POST /api/v1/plugins/spotify/connect<br/>Look up plugin from registry → get OAuthConfig<br/>Generate state param (include plugin name), store in session<br/>Return provider redirect URL"]
+    B --> C["Browser navigates to provider authorization URL"]
     C --> D["GET /connect/spotify/callback?code=...&state=...<br/>Validate state param<br/>Exchange code for access + refresh tokens<br/>Encrypt tokens with app encryption key<br/>Store in plugin_credentials (user_id, plugin, encrypted_data)<br/>Update plugin_states → status: 'connected'<br/>Redirect to settings page"]
     D --> E["Plugin is connected, ready to sync"]
 ```
 
 ### Generic Plugin OAuth Handler
 
-The server doesn't know about individual providers — it uses the plugin's `OAuthConfig()`:
+The server doesn't know about individual providers — it uses the plugin's `OAuthConfig()`.
+The client-facing API starts the flow, while the callback remains server-owned:
 
 ```go
-func PluginOAuthLogin(w http.ResponseWriter, r *http.Request) {
+func PluginOAuthStart(w http.ResponseWriter, r *http.Request) {
     pluginName := chi.URLParam(r, "plugin")
     plugin := registry.Get(pluginName)
 
@@ -198,16 +215,21 @@ func PluginOAuthLogin(w http.ResponseWriter, r *http.Request) {
 
     state := generateState(pluginName)
     storeStateInSession(r, state)
-    http.Redirect(w, r, cfg.AuthCodeURL(state), http.StatusFound)
+
+    writeJSON(w, http.StatusOK, map[string]any{
+        "data": map[string]any{
+            "redirect_url": cfg.AuthCodeURL(state),
+        },
+    })
 }
 ```
 
 ### File Import Plugins
 
-No OAuth flow. User uploads a file directly:
+No OAuth flow. User uploads a file through the canonical API:
 
 ```go
-// POST /connect/{plugin}/import
+// POST /api/v1/plugins/{plugin}/import
 func PluginFileImport(w http.ResponseWriter, r *http.Request) {
     pluginName := chi.URLParam(r, "plugin")
     file, _, err := r.FormFile("file")

@@ -69,7 +69,9 @@ type OAuthConfig struct {
     AuthURL      string   // Authorization endpoint
     TokenURL     string   // Token exchange endpoint
     Scopes       []string // Required OAuth scopes
-    // CallbackPath is handled by core: /api/auth/callback/{plugin-name}
+    // OAuth callback is handled by a server-owned route such as:
+    // /connect/{plugin-name}/callback
+    // Client-facing initiation goes through /api/v1/plugins/{plugin-name}/connect.
 }
 ```
 

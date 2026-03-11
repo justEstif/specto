@@ -66,6 +66,8 @@ For MVP: Templ + HTMX. Templ gives type-safe, component-based HTML that compiles
 no runtime template errors. But the API contract means we can swap to a SPA, CLI,
 or mobile app without touching Core or Server.
 
+The canonical client/server API surface is documented in [api.md](./api.md).
+
 ### Server Layer
 
 Thin HTTP layer. Responsibilities:
@@ -157,7 +159,7 @@ for data that's universal across platforms.
 
 ```mermaid
 flowchart TD
-    A["User clicks 'Sync Spotify'"] --> B["Server: POST /api/sync/spotify"]
+    A["User clicks 'Sync Spotify'"] --> B["Server: POST /api/v1/plugins/spotify/sync"]
     B --> C["Core: Check rate limit (last sync timestamp)"]
     C -->|Too soon| D["429 (rate limited)"]
     C --> E["Core: plugin.Sync(ctx, creds)"]
@@ -183,7 +185,7 @@ wrapping the same sync path with `robfig/cron` or similar.
 
 ```mermaid
 flowchart TD
-    A["User uploads Netflix CSV"] --> B["Server: POST /api/import/netflix (multipart file)"]
+    A["User uploads Netflix CSV"] --> B["Server: POST /api/v1/plugins/netflix/import (multipart file)"]
     B --> C["Core: plugin.Sync(ctx, creds{File: uploadedFile})"]
     C --> D["Plugin: Parse CSV → normalize to []MediaItem"]
     D --> E["(same enrichment + store flow as above)"]

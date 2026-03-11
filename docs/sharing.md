@@ -190,31 +190,35 @@ func TopGenres(ctx context.Context, userID uuid.UUID, cfg BlockConfig, exclusion
 
 ### Preview
 
-Before publishing, users see an exact preview of their share page:
+Before publishing, users see an exact preview of their share page via the canonical JSON API:
 
 ```
-GET /settings/share/preview    (authenticated, shows exactly what /share/{slug} will show)
+GET /api/v1/share-profile/preview    (authenticated, returns exactly what /share/{slug} will show)
 ```
+
+The settings page itself can still live at `/settings/share`, but the client/server data
+boundary should use the API documented in [`api.md`](./api.md).
 
 ---
 
 ## Routes
 
 ```go
-// Public (no auth)
+// Public HTML route (no auth)
 r.Get("/share/{slug}", handlers.PublicProfile)
 
-// Authenticated
-r.Route("/settings/share", func(r chi.Router) {
-    r.Get("/", handlers.ShareSettings)            // configure blocks
-    r.Put("/", handlers.UpdateShareSettings)       // save config
-    r.Get("/preview", handlers.SharePreview)       // preview public page
-    r.Post("/enable", handlers.EnableProfile)      // publish
-    r.Post("/disable", handlers.DisableProfile)    // unpublish
+// Authenticated HTML settings page
+r.Get("/settings/share", handlers.ShareSettings)
+
+// Canonical JSON API
+r.Route("/api/v1/share-profile", func(r chi.Router) {
+    r.Get("/", handlers.GetShareProfile)
+    r.Put("/", handlers.UpdateShareProfile)
+    r.Get("/preview", handlers.SharePreview)
 })
 
 // Item privacy (from timeline view)
-r.Post("/api/items/{id}/private", handlers.ToggleItemPrivate)
+r.Post("/api/v1/items/{id}/privacy", handlers.ToggleItemPrivate)
 ```
 
 ---
