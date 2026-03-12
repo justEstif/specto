@@ -38,6 +38,8 @@ type mockQuerier struct {
 	getTagByAliasFn           func(ctx context.Context, alias string) (database.Tag, error)
 	addMediaItemTagFn         func(ctx context.Context, arg database.AddMediaItemTagParams) error
 	listMediaItemTagsFn       func(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
+	platformBreakdownFn       func(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
+	tagDistributionFn         func(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
 }
 
 var _ Querier = (*mockQuerier)(nil)
@@ -229,4 +231,18 @@ func (m *mockQuerier) ListMediaItemTags(ctx context.Context, mediaItemID pgtype.
 		return m.listMediaItemTagsFn(ctx, mediaItemID)
 	}
 	return nil, fmt.Errorf("ListMediaItemTags not mocked")
+}
+
+func (m *mockQuerier) PlatformBreakdown(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error) {
+	if m.platformBreakdownFn != nil {
+		return m.platformBreakdownFn(ctx, arg)
+	}
+	return nil, fmt.Errorf("PlatformBreakdown not mocked")
+}
+
+func (m *mockQuerier) TagDistribution(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error) {
+	if m.tagDistributionFn != nil {
+		return m.tagDistributionFn(ctx, arg)
+	}
+	return nil, fmt.Errorf("TagDistribution not mocked")
 }

@@ -115,7 +115,65 @@ type UserStore interface {
 	UpdateProfile(ctx context.Context, id uuid.UUID, displayName string, avatarURL, profileSlug *string) (*UserInfo, error)
 }
 
+// InsightsStore provides pre-aggregated analytics data.
+type InsightsStore interface {
+	// PlatformBreakdown returns item counts and total duration grouped by
+	// platform and media type for the given date range.
+	PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]PlatformBreakdownEntry, error)
+
+	// TagDistribution returns tag usage counts for the given date range,
+	// limited to tags with confidence >= minConfidence (or authoritative tags
+	// where confidence is NULL). Results are ordered by count descending.
+	TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32) ([]TagDistributionEntry, error)
+
+	// ListMediaItems returns media items for a user within a date range
+	// (used internally by InsightsService for timeline aggregation).
+	ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
+}
+
 // --- Domain types used by store interfaces ---
+
+// PlatformBreakdownEntry represents consumption stats for a single
+// platform + media type combination.
+type PlatformBreakdownEntry struct {
+	Platform         string
+	MediaType        string
+	Count            int64
+	TotalDurationSec int64
+}
+
+// TagDistributionEntry represents how often a tag appears across
+// media items within a date range.
+type TagDistributionEntry struct {
+	Name     string
+	Category string
+	Count    int64
+}
+
+// Summary is the top-level insights overview for a user.
+type Summary struct {
+	TotalItems       int64
+	TotalDurationSec int64
+	TopPlatform      string
+	TopMediaType     string
+}
+
+// TimelineEntry represents aggregated consumption data for a single
+// time bucket (day, week, or month).
+type TimelineEntry struct {
+	Bucket           time.Time
+	Count            int64
+	TotalDurationSec int64
+}
+
+// TimeBucket defines the granularity for timeline aggregation.
+type TimeBucket string
+
+const (
+	BucketDay   TimeBucket = "day"
+	BucketWeek  TimeBucket = "week"
+	BucketMonth TimeBucket = "month"
+)
 
 // PluginStateInfo is the domain representation of a plugin's state.
 type PluginStateInfo struct {

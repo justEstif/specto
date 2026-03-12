@@ -48,6 +48,10 @@ type Querier interface {
 	GetTagByAlias(ctx context.Context, alias string) (database.Tag, error)
 	AddMediaItemTag(ctx context.Context, arg database.AddMediaItemTagParams) error
 	ListMediaItemTags(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
+
+	// Insights / analytics
+	PlatformBreakdown(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
+	TagDistribution(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
 }
 
 // Compile-time assertion that database.Queries satisfies Querier.
