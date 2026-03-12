@@ -41,6 +41,12 @@ Thumbs.db
 node_modules/
 bun.lockb
 
+# Tailwind/DaisyUI standalone binary
+tailwindcss
+
+# Built CSS
+static/css/tailwind.css
+
 # Database
 *.db
 *.sqlite
