@@ -10,8 +10,8 @@ go = "latest"
 DATABASE_URL = "postgres://postgres:postgres@localhost:5432/specto_dev?sslmode=disable"
 PORT = "3000"
 # TODO openssl rand -base64 32 | tr -d '=' | cut -c1-32
-CSRF_KEY = "32-byte-long-auth-key-change-me"
-SESSION_SECRET = "32-byte-long-session-secret-key!"
+CSRF_KEY = "g1PIdKZepyCk/DsajiskTluSIj5f4oXD"
+SESSION_SECRET = "vw83Upzl22O1MVwpufGA2leD+pGIE5qj"
 
 [tasks.dev]
 description = "Start development server with live reload"
@@ -48,4 +48,5 @@ run = "go build -o bin/app cmd/web/main.go"
 
 [tasks.api-test]
 description = "Run httpyac API tests against local server"
-run = "httpyac send http/*.http --all -e local"
+run = "httpyac send *.http --all -e local"
+dir = "http"
