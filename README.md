@@ -9,7 +9,7 @@ See [docs/MVP.md](docs/MVP.md) for the full product scope.
 - **[Go](https://go.dev/)** + **[Chi](https://github.com/go-chi/chi)** — HTTP router
 - **[Templ](https://templ.guide/)** — Type-safe Go templating
 - **[HTMX](https://htmx.org/)** — Dynamic interactions
-- **[missing.css](https://missing.style/)** — Classless CSS framework
+- **[DaisyUI](https://daisyui.com/)** + **[Tailwind CSS](https://tailwindcss.com/)** — UI components & utility CSS
 - **[PostgreSQL](https://www.postgresql.org/)** — Database
 - **[sqlc](https://sqlc.dev/)** — Compile-time type-safe SQL
 - **[golang-migrate](https://github.com/golang-migrate/migrate)** — Database migrations
