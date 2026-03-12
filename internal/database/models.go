@@ -97,4 +97,5 @@ type User struct {
 	ProfileSlug  pgtype.Text        `json:"profile_slug"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	PasswordHash pgtype.Text        `json:"password_hash"`
 }

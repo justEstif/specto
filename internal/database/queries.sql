@@ -12,6 +12,11 @@ INSERT INTO users (email, display_name, avatar_url, auth_provider, auth_subject)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
+-- name: CreateUserWithPassword :one
+INSERT INTO users (email, display_name, auth_provider, auth_subject, password_hash)
+VALUES ($1, $2, 'email', $1, $3)
+RETURNING *;
+
 -- name: UpdateUserProfile :one
 UPDATE users SET display_name = $2, avatar_url = $3, profile_slug = $4, updated_at = now()
 WHERE id = $1

@@ -210,7 +210,7 @@ func (q *Queries) CreateTagAlias(ctx context.Context, arg CreateTagAliasParams) 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, display_name, avatar_url, auth_provider, auth_subject)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at
+RETURNING id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash
 `
 
 type CreateUserParams struct {
@@ -240,6 +240,37 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.ProfileSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordHash,
+	)
+	return i, err
+}
+
+const createUserWithPassword = `-- name: CreateUserWithPassword :one
+INSERT INTO users (email, display_name, auth_provider, auth_subject, password_hash)
+VALUES ($1, $2, 'email', $1, $3)
+RETURNING id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash
+`
+
+type CreateUserWithPasswordParams struct {
+	Email        string      `json:"email"`
+	DisplayName  string      `json:"display_name"`
+	PasswordHash pgtype.Text `json:"password_hash"`
+}
+
+func (q *Queries) CreateUserWithPassword(ctx context.Context, arg CreateUserWithPasswordParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUserWithPassword, arg.Email, arg.DisplayName, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.AuthProvider,
+		&i.AuthSubject,
+		&i.ProfileSlug,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PasswordHash,
 	)
 	return i, err
 }
@@ -401,7 +432,7 @@ func (q *Queries) GetTagByName(ctx context.Context, name string) (Tag, error) {
 }
 
 const getUserByAuth = `-- name: GetUserByAuth :one
-SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at FROM users WHERE auth_provider = $1 AND auth_subject = $2
+SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash FROM users WHERE auth_provider = $1 AND auth_subject = $2
 `
 
 type GetUserByAuthParams struct {
@@ -422,12 +453,13 @@ func (q *Queries) GetUserByAuth(ctx context.Context, arg GetUserByAuthParams) (U
 		&i.ProfileSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordHash,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at FROM users WHERE email = $1
+SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -443,12 +475,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ProfileSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordHash,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -464,6 +497,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.ProfileSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordHash,
 	)
 	return i, err
 }
@@ -880,7 +914,7 @@ func (q *Queries) UpdatePluginStateSynced(ctx context.Context, arg UpdatePluginS
 const updateUserProfile = `-- name: UpdateUserProfile :one
 UPDATE users SET display_name = $2, avatar_url = $3, profile_slug = $4, updated_at = now()
 WHERE id = $1
-RETURNING id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at
+RETURNING id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash
 `
 
 type UpdateUserProfileParams struct {
@@ -908,6 +942,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.ProfileSlug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PasswordHash,
 	)
 	return i, err
 }

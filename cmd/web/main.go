@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/justestif/specto/internal/auth"
 	"github.com/justestif/specto/internal/database"
 	"github.com/justestif/specto/internal/handlers"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
@@ -18,6 +19,13 @@ func main() {
 	if err := database.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+
+	// Initialize sessions
+	sessionSecret := []byte(os.Getenv("SESSION_SECRET"))
+	if len(sessionSecret) < 32 {
+		log.Fatal("SESSION_SECRET must be at least 32 bytes long")
+	}
+	auth.InitSessions(sessionSecret)
 
 	r := chi.NewRouter()
 
@@ -37,7 +45,7 @@ func main() {
 	// Static files (no CSRF needed)
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	// Protected routes with CSRF
+	// Protected HTML routes with CSRF
 	r.Group(func(r chi.Router) {
 		r.Use(csrfMw)
 		r.Get("/", handlers.Home)
@@ -46,6 +54,17 @@ func main() {
 	// JSON API (v1)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", handlers.Health)
+
+		// Auth (public)
+		r.Post("/auth/register", handlers.Register)
+		r.Post("/auth/login", handlers.Login)
+
+		// Authenticated routes
+		r.Group(func(r chi.Router) {
+			r.Use(customMiddleware.RequireAuth)
+			r.Get("/session", handlers.Session)
+			r.Delete("/session", handlers.Logout)
+		})
 	})
 
 	port := os.Getenv("PORT")
