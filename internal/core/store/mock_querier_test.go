@@ -33,6 +33,11 @@ type mockQuerier struct {
 	createUserFn              func(ctx context.Context, arg database.CreateUserParams) (database.User, error)
 	createUserWithPasswordFn  func(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)
 	updateUserProfileFn       func(ctx context.Context, arg database.UpdateUserProfileParams) (database.User, error)
+	getOrCreateTagFn          func(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error)
+	getTagByNameFn            func(ctx context.Context, name string) (database.Tag, error)
+	getTagByAliasFn           func(ctx context.Context, alias string) (database.Tag, error)
+	addMediaItemTagFn         func(ctx context.Context, arg database.AddMediaItemTagParams) error
+	listMediaItemTagsFn       func(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
 }
 
 var _ Querier = (*mockQuerier)(nil)
@@ -189,4 +194,39 @@ func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg database.Update
 		return m.updateUserProfileFn(ctx, arg)
 	}
 	return database.User{}, fmt.Errorf("UpdateUserProfile not mocked")
+}
+
+func (m *mockQuerier) GetOrCreateTag(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error) {
+	if m.getOrCreateTagFn != nil {
+		return m.getOrCreateTagFn(ctx, arg)
+	}
+	return database.Tag{}, fmt.Errorf("GetOrCreateTag not mocked")
+}
+
+func (m *mockQuerier) GetTagByName(ctx context.Context, name string) (database.Tag, error) {
+	if m.getTagByNameFn != nil {
+		return m.getTagByNameFn(ctx, name)
+	}
+	return database.Tag{}, fmt.Errorf("GetTagByName not mocked")
+}
+
+func (m *mockQuerier) GetTagByAlias(ctx context.Context, alias string) (database.Tag, error) {
+	if m.getTagByAliasFn != nil {
+		return m.getTagByAliasFn(ctx, alias)
+	}
+	return database.Tag{}, fmt.Errorf("GetTagByAlias not mocked")
+}
+
+func (m *mockQuerier) AddMediaItemTag(ctx context.Context, arg database.AddMediaItemTagParams) error {
+	if m.addMediaItemTagFn != nil {
+		return m.addMediaItemTagFn(ctx, arg)
+	}
+	return fmt.Errorf("AddMediaItemTag not mocked")
+}
+
+func (m *mockQuerier) ListMediaItemTags(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error) {
+	if m.listMediaItemTagsFn != nil {
+		return m.listMediaItemTagsFn(ctx, mediaItemID)
+	}
+	return nil, fmt.Errorf("ListMediaItemTags not mocked")
 }

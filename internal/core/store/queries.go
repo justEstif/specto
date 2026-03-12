@@ -41,6 +41,13 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.User, error)
 	CreateUserWithPassword(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)
 	UpdateUserProfile(ctx context.Context, arg database.UpdateUserProfileParams) (database.User, error)
+
+	// Tags
+	GetOrCreateTag(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error)
+	GetTagByName(ctx context.Context, name string) (database.Tag, error)
+	GetTagByAlias(ctx context.Context, alias string) (database.Tag, error)
+	AddMediaItemTag(ctx context.Context, arg database.AddMediaItemTagParams) error
+	ListMediaItemTags(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
 }
 
 // Compile-time assertion that database.Queries satisfies Querier.
