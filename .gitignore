@@ -43,6 +43,8 @@ bun.lockb
 
 # Tailwind/DaisyUI standalone binary
 tailwindcss
+daisyui-theme.mjs
+daisyui.mjs
 
 # Built CSS
 static/css/tailwind.css
