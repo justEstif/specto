@@ -22,7 +22,7 @@ type loginRequest struct {
 }
 
 // Register handles POST /api/v1/auth/register
-func Register(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "validation_error", "Invalid request body")
@@ -39,7 +39,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := auth.Register(r.Context(), database.DB, req.Email, req.DisplayName, req.Password)
+	user, err := auth.Register(r.Context(), h.DB, req.Email, req.DisplayName, req.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrEmailTaken) {
 			writeError(w, http.StatusConflict, "validation_error", "Email already registered")
@@ -62,7 +62,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 }
 
 // Login handles POST /api/v1/auth/login
-func Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "validation_error", "Invalid request body")
@@ -74,7 +74,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := auth.Login(r.Context(), database.DB, req.Email, req.Password)
+	user, err := auth.Login(r.Context(), h.DB, req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "Invalid email or password")
@@ -96,13 +96,13 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles DELETE /api/v1/session
-func Logout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	auth.ClearSession(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // Session handles GET /api/v1/session
-func Session(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Session(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.UserFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
@@ -130,15 +130,4 @@ func userResponse(u *database.User) map[string]any {
 		resp["profile_slug"] = u.ProfileSlug.String
 	}
 	return resp
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]any{
-		"error": map[string]string{
-			"code":    code,
-			"message": message,
-		},
-	})
 }

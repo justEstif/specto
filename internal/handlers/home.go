@@ -6,6 +6,7 @@ import (
 	"github.com/justestif/specto/components"
 )
 
-func Home(w http.ResponseWriter, r *http.Request) {
+// Home renders the landing page.
+func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	components.Home().Render(r.Context(), w)
 }

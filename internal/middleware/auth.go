@@ -8,24 +8,27 @@ import (
 	"github.com/justestif/specto/internal/database"
 )
 
-// RequireAuth is middleware that ensures the user is authenticated.
-func RequireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, err := auth.GetUserIDFromSession(r)
-		if err != nil {
-			writeUnauthorized(w, r)
-			return
-		}
+// RequireAuth returns middleware that ensures the user is authenticated.
+// The database.Queries instance is injected rather than using a global.
+func RequireAuth(db *database.Queries) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, err := auth.GetUserIDFromSession(r)
+			if err != nil {
+				writeUnauthorized(w, r)
+				return
+			}
 
-		user, err := auth.GetUserByID(r.Context(), database.DB, userID)
-		if err != nil {
-			writeUnauthorized(w, r)
-			return
-		}
+			user, err := auth.GetUserByID(r.Context(), db, userID)
+			if err != nil {
+				writeUnauthorized(w, r)
+				return
+			}
 
-		ctx := auth.ContextWithUser(r.Context(), user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			ctx := auth.ContextWithUser(r.Context(), user)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func writeUnauthorized(w http.ResponseWriter, r *http.Request) {
