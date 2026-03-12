@@ -1,0 +1,50 @@
+[tools]
+go = "latest"
+"go:github.com/a-h/templ/cmd/templ" = "latest"
+"go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "latest"
+"go:github.com/golang-migrate/migrate/v4/cmd/migrate" = { version = "latest", tags = "postgres" }
+"go:github.com/air-verse/air" = "latest"
+"npm:httpyac" = "latest"
+
+[env]
+DATABASE_URL = "postgres://postgres:postgres@localhost:5432/specto_dev?sslmode=disable"
+PORT = "3000"
+# TODO openssl rand -base64 32 | tr -d '=' | cut -c1-32
+CSRF_KEY = "32-byte-long-auth-key-change-me"
+
+[tasks.dev]
+description = "Start development server with live reload"
+run = "air"
+
+[tasks.templ]
+description = "Generate templ files"
+run = "templ generate"
+
+[tasks.db-migrate]
+description = "Run database migrations"
+run = "migrate -path migrations -database ${DATABASE_URL} up"
+
+[tasks.db-rollback]
+description = "Rollback last migration"
+run = "migrate -path migrations -database ${DATABASE_URL} down 1"
+
+[tasks.sqlc]
+description = "Generate type-safe Go from SQL"
+run = "sqlc generate"
+
+[tasks.setup]
+description = "Initial project setup (install deps, setup DB, generate code)"
+run = """
+migrate -path migrations -database ${DATABASE_URL} up
+templ generate
+sqlc generate
+"""
+dir = "."
+
+[tasks.build]
+description = "Build production binary"
+run = "go build -o bin/app cmd/web/main.go"
+
+[tasks.api-test]
+description = "Run httpyac API tests against local server"
+run = "httpyac send http/*.http --all -e local"

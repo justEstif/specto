@@ -256,14 +256,68 @@ When changing persisted fields that affect API responses:
 
 ---
 
-## Initial Action Items
+## Tool Management
 
-Before active API implementation begins, we should add:
+This project uses **[mise](https://mise.jdx.dev/)** for all tool and task management.
 
-- an `http/` directory
-- a small starter set of `.http` files for the canonical routes in `docs/api.md`
-- one local environment file for running against the dev server
-- a short README in `http/` explaining how to run the requests
+### Installing tools
+
+```bash
+mise install
+```
+
+This installs Go, templ, sqlc, golang-migrate, air, and httpyac — all pinned in `mise.toml`.
+
+### Common tasks
+
+```bash
+mise run dev          # Start dev server with live reload (air)
+mise run templ        # Generate templ files
+mise run db-migrate   # Run database migrations
+mise run db-rollback  # Rollback last migration
+mise run sqlc         # Generate type-safe SQL from queries
+mise run setup        # Full setup (migrate + templ + sqlc)
+mise run build        # Build production binary
+mise run api-test     # Run httpyac requests against local server
+```
+
+### Environment variables
+
+Defined in `mise.toml` under `[env]`:
+- `DATABASE_URL` — PostgreSQL connection string
+- `PORT` — HTTP server port (default `3000`)
+- `CSRF_KEY` — 32-byte CSRF secret
+
+Override locally with `mise.local.toml` (gitignored).
+
+---
+
+## httpyac Setup
+
+API request files live in `http/` with environment configs in `http/environments/`:
+
+```
+http/
+  environments/
+    local.env.json      # baseUrl = http://localhost:3000
+  health.http           # Health check
+  session.http          # Login/logout/session (future)
+  plugins.http          # Plugin operations (future)
+  timeline.http         # Timeline queries (future)
+  insights.http         # Insight aggregates (future)
+```
+
+Run requests:
+```bash
+# All requests
+mise run api-test
+
+# Single file
+httpyac send http/health.http -e local
+
+# Single request by name
+httpyac send http/health.http --name "Health check" -e local
+```
 
 ---
 

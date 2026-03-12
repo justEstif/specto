@@ -1,0 +1,20 @@
+package components
+
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title }</title>
+		<link rel="stylesheet" href="https://unpkg.com/missing.css@1.2.0"/>
+		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+	</head>
+	<body>
+		@Navbar()
+		<main>
+			{ children... }
+		</main>
+	</body>
+	</html>
+}

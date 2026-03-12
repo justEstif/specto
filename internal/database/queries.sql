@@ -1,0 +1,2 @@
+-- Queries will be added as schema is implemented.
+-- See docs/schema.md for the target data model.
