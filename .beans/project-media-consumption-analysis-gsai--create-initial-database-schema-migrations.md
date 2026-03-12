@@ -1,11 +1,11 @@
 ---
 # project-media-consumption-analysis-gsai
 title: Create initial database schema & migrations
-status: todo
+status: in-progress
 type: task
 priority: high
 created_at: 2026-03-12T02:37:25Z
-updated_at: 2026-03-12T02:37:29Z
+updated_at: 2026-03-12T02:47:46Z
 parent: project-media-consumption-analysis-hj33
 blocked_by:
     - project-media-consumption-analysis-w1nk
