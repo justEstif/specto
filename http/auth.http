@@ -1,17 +1,24 @@
 ### Register a new user
+# @name register
+{{
+  const timestamp = Date.now();
+  exports.testEmail = `test_${timestamp}@example.com`;
+  exports.testDisplayName = "Test User";
+  exports.testPassword = "password123";
+}}
 POST {{baseUrl}}/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
-  "display_name": "Test User",
-  "password": "password123"
+  "email": "{{testEmail}}",
+  "display_name": "{{testDisplayName}}",
+  "password": "{{testPassword}}"
 }
 
 ?? status == 201
 ?? header content-type includes json
-?? body data.email == test@example.com
-?? body data.display_name == Test User
+?? body data.email == {{testEmail}}
+?? body data.display_name == {{testDisplayName}}
 
 ### Register - missing fields (expect 422)
 POST {{baseUrl}}/api/v1/auth/register
@@ -38,30 +45,18 @@ Content-Type: application/json
 ?? body error.code == validation_error
 
 ### Register - duplicate email (expect 409)
+# @ref register
 POST {{baseUrl}}/api/v1/auth/register
 Content-Type: application/json
 
 {
-  "email": "test@example.com",
-  "display_name": "Test User",
-  "password": "password123"
+  "email": "{{testEmail}}",
+  "display_name": "{{testDisplayName}}",
+  "password": "{{testPassword}}"
 }
 
 ?? status == 409
 ?? body error.code == validation_error
-
-### Login
-POST {{baseUrl}}/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "test@example.com",
-  "password": "password123"
-}
-
-?? status == 200
-?? header content-type includes json
-?? body data.email == test@example.com
 
 ### Login - wrong password (expect 401)
 POST {{baseUrl}}/api/v1/auth/login
@@ -87,11 +82,19 @@ Content-Type: application/json
 ?? status == 401
 ?? body error.code == unauthorized
 
-### Get session (unauthenticated - expect 401)
-GET {{baseUrl}}/api/v1/session
+### Login
+# @ref register
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
 
-?? status == 401
-?? body error.code == unauthorized
+{
+  "email": "{{testEmail}}",
+  "password": "{{testPassword}}"
+}
+
+?? status == 200
+?? header content-type includes json
+?? body data.email == {{testEmail}}
 
 ### Logout
 DELETE {{baseUrl}}/api/v1/session

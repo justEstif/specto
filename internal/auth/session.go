@@ -1,11 +1,16 @@
 package auth
 
 import (
+	"encoding/gob"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/gorilla/sessions"
 )
+
+func init() {
+	gob.Register([16]byte{})
+}
 
 const (
 	SessionName   = "specto_session"

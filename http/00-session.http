@@ -1,0 +1,5 @@
+### Get session (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/session
+
+?? status == 401
+?? body error.code == unauthorized
