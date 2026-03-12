@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/database"
 )
 
@@ -19,9 +20,9 @@ func NewUserStore(q Querier) *PgUserStore {
 	return &PgUserStore{q: q}
 }
 
-var _ UserStore = (*PgUserStore)(nil)
+var _ core.UserStore = (*PgUserStore)(nil)
 
-func (s *PgUserStore) GetByID(ctx context.Context, id uuid.UUID) (*UserInfo, error) {
+func (s *PgUserStore) GetByID(ctx context.Context, id uuid.UUID) (*core.UserInfo, error) {
 	row, err := s.q.GetUserByID(ctx, uuidToPgx(id))
 	if err != nil {
 		return nil, fmt.Errorf("getting user by ID: %w", err)
@@ -31,7 +32,7 @@ func (s *PgUserStore) GetByID(ctx context.Context, id uuid.UUID) (*UserInfo, err
 	return &info, nil
 }
 
-func (s *PgUserStore) GetByEmail(ctx context.Context, email string) (*UserInfo, error) {
+func (s *PgUserStore) GetByEmail(ctx context.Context, email string) (*core.UserInfo, error) {
 	row, err := s.q.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("getting user by email: %w", err)
@@ -41,7 +42,7 @@ func (s *PgUserStore) GetByEmail(ctx context.Context, email string) (*UserInfo, 
 	return &info, nil
 }
 
-func (s *PgUserStore) GetByAuth(ctx context.Context, provider, subject string) (*UserInfo, error) {
+func (s *PgUserStore) GetByAuth(ctx context.Context, provider, subject string) (*core.UserInfo, error) {
 	row, err := s.q.GetUserByAuth(ctx, database.GetUserByAuthParams{
 		AuthProvider: provider,
 		AuthSubject:  subject,
@@ -54,7 +55,7 @@ func (s *PgUserStore) GetByAuth(ctx context.Context, provider, subject string) (
 	return &info, nil
 }
 
-func (s *PgUserStore) Create(ctx context.Context, email, displayName string, avatarURL *string, provider, subject string) (*UserInfo, error) {
+func (s *PgUserStore) Create(ctx context.Context, email, displayName string, avatarURL *string, provider, subject string) (*core.UserInfo, error) {
 	row, err := s.q.CreateUser(ctx, database.CreateUserParams{
 		Email:        email,
 		DisplayName:  displayName,
@@ -70,7 +71,7 @@ func (s *PgUserStore) Create(ctx context.Context, email, displayName string, ava
 	return &info, nil
 }
 
-func (s *PgUserStore) CreateWithPassword(ctx context.Context, email, displayName, passwordHash string) (*UserInfo, error) {
+func (s *PgUserStore) CreateWithPassword(ctx context.Context, email, displayName, passwordHash string) (*core.UserInfo, error) {
 	row, err := s.q.CreateUserWithPassword(ctx, database.CreateUserWithPasswordParams{
 		Email:        email,
 		DisplayName:  displayName,
@@ -84,7 +85,7 @@ func (s *PgUserStore) CreateWithPassword(ctx context.Context, email, displayName
 	return &info, nil
 }
 
-func (s *PgUserStore) UpdateProfile(ctx context.Context, id uuid.UUID, displayName string, avatarURL, profileSlug *string) (*UserInfo, error) {
+func (s *PgUserStore) UpdateProfile(ctx context.Context, id uuid.UUID, displayName string, avatarURL, profileSlug *string) (*core.UserInfo, error) {
 	row, err := s.q.UpdateUserProfile(ctx, database.UpdateUserProfileParams{
 		ID:          uuidToPgx(id),
 		DisplayName: displayName,

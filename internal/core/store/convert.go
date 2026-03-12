@@ -141,9 +141,9 @@ func ptrValFromText(t pgtype.Text) string {
 	return t.String
 }
 
-// pluginStateFromDB converts a database.PluginState to a PluginStateInfo.
-func pluginStateFromDB(ps database.PluginState) PluginStateInfo {
-	return PluginStateInfo{
+// pluginStateFromDB converts a database.PluginState to a core.PluginStateInfo.
+func pluginStateFromDB(ps database.PluginState) core.PluginStateInfo {
+	return core.PluginStateInfo{
 		ID:           pgxToUUID(ps.ID),
 		UserID:       pgxToUUID(ps.UserID),
 		Plugin:       ps.Plugin,
@@ -157,9 +157,9 @@ func pluginStateFromDB(ps database.PluginState) PluginStateInfo {
 	}
 }
 
-// syncLogFromDB converts a database.SyncLog to a SyncLogEntry.
-func syncLogFromDB(sl database.SyncLog) SyncLogEntry {
-	return SyncLogEntry{
+// syncLogFromDB converts a database.SyncLog to a core.SyncLogEntry.
+func syncLogFromDB(sl database.SyncLog) core.SyncLogEntry {
+	return core.SyncLogEntry{
 		ID:           pgxToUUID(sl.ID),
 		UserID:       pgxToUUID(sl.UserID),
 		Plugin:       sl.Plugin,
@@ -175,9 +175,9 @@ func syncLogFromDB(sl database.SyncLog) SyncLogEntry {
 	}
 }
 
-// userFromDB converts a database.User to a UserInfo.
-func userFromDB(u database.User) UserInfo {
-	return UserInfo{
+// userFromDB converts a database.User to a core.UserInfo.
+func userFromDB(u database.User) core.UserInfo {
+	return core.UserInfo{
 		ID:           pgxToUUID(u.ID),
 		Email:        u.Email,
 		DisplayName:  u.DisplayName,

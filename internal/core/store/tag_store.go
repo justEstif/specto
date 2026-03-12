@@ -11,35 +11,7 @@ import (
 	"github.com/justestif/specto/internal/database"
 )
 
-// TagStore manages tag persistence, alias resolution, and media item tagging.
-type TagStore interface {
-	// ResolveTag resolves a tag string to a canonical tag UUID.
-	// It first checks if the tag exists by name in the fixed set,
-	// then falls back to alias lookup. Returns the tag UUID and the
-	// canonical tag name, or an error if the tag is unknown.
-	ResolveTag(ctx context.Context, tag string) (uuid.UUID, string, error)
-
-	// GetOrCreate ensures a tag exists in the database and returns its UUID.
-	// The tag must be in the fixed tag set. The category is looked up automatically.
-	GetOrCreate(ctx context.Context, tag string) (uuid.UUID, error)
-
-	// AddMediaItemTag associates a tag with a media item.
-	// source is "plugin" or "llm". confidence is nil for authoritative (plugin) tags.
-	AddMediaItemTag(ctx context.Context, itemID, tagID uuid.UUID, source string, confidence *float32) error
-
-	// ListMediaItemTags returns all tags for a media item.
-	ListMediaItemTags(ctx context.Context, itemID uuid.UUID) ([]MediaItemTagInfo, error)
-}
-
-// MediaItemTagInfo is the domain representation of a tag attached to a media item.
-type MediaItemTagInfo struct {
-	Name       string
-	Category   string
-	Source     string
-	Confidence *float32
-}
-
-// PgTagStore implements TagStore using sqlc-generated queries.
+// PgTagStore implements core.TagStore using sqlc-generated queries.
 type PgTagStore struct {
 	q Querier
 }
@@ -49,7 +21,7 @@ func NewTagStore(q Querier) *PgTagStore {
 	return &PgTagStore{q: q}
 }
 
-var _ TagStore = (*PgTagStore)(nil)
+var _ core.TagStore = (*PgTagStore)(nil)
 
 func (s *PgTagStore) ResolveTag(ctx context.Context, tag string) (uuid.UUID, string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(tag))
@@ -107,20 +79,20 @@ func (s *PgTagStore) AddMediaItemTag(ctx context.Context, itemID, tagID uuid.UUI
 	return nil
 }
 
-func (s *PgTagStore) ListMediaItemTags(ctx context.Context, itemID uuid.UUID) ([]MediaItemTagInfo, error) {
+func (s *PgTagStore) ListMediaItemTags(ctx context.Context, itemID uuid.UUID) ([]core.MediaItemTagInfo, error) {
 	rows, err := s.q.ListMediaItemTags(ctx, uuidToPgx(itemID))
 	if err != nil {
 		return nil, fmt.Errorf("listing media item tags: %w", err)
 	}
 
-	tags := make([]MediaItemTagInfo, len(rows))
+	tags := make([]core.MediaItemTagInfo, len(rows))
 	for i, row := range rows {
 		var conf *float32
 		if row.Confidence.Valid {
 			c := row.Confidence.Float32
 			conf = &c
 		}
-		tags[i] = MediaItemTagInfo{
+		tags[i] = core.MediaItemTagInfo{
 			Name:       row.Name,
 			Category:   ptrValFromText(row.Category),
 			Source:     row.Source,

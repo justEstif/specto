@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/database"
 )
 
@@ -66,7 +67,7 @@ func TestSyncLogStore_Complete(t *testing.T) {
 	}
 
 	store := NewSyncLogStore(mock)
-	err := store.Complete(context.Background(), logID, SyncLogResult{
+	err := store.Complete(context.Background(), logID, core.SyncLogResult{
 		ItemsAdded:   10,
 		ItemsSkipped: 2,
 		ItemsUpdated: 3,
@@ -98,7 +99,7 @@ func TestSyncLogStore_Fail(t *testing.T) {
 	}
 
 	store := NewSyncLogStore(mock)
-	err := store.Fail(context.Background(), logID, SyncLogResult{
+	err := store.Fail(context.Background(), logID, core.SyncLogResult{
 		ItemsAdded:   5,
 		ErrorCode:    &errCode,
 		ErrorMessage: &errMsg,

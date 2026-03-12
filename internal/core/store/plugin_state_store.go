@@ -24,9 +24,9 @@ func NewPluginStateStore(q Querier, encKey string) *PgPluginStateStore {
 	return &PgPluginStateStore{q: q, encKey: encKey}
 }
 
-var _ PluginStateStore = (*PgPluginStateStore)(nil)
+var _ core.PluginStateStore = (*PgPluginStateStore)(nil)
 
-func (s *PgPluginStateStore) GetState(ctx context.Context, userID uuid.UUID, plugin string) (*PluginStateInfo, error) {
+func (s *PgPluginStateStore) GetState(ctx context.Context, userID uuid.UUID, plugin string) (*core.PluginStateInfo, error) {
 	row, err := s.q.GetPluginState(ctx, database.GetPluginStateParams{
 		UserID: uuidToPgx(userID),
 		Plugin: plugin,
@@ -39,7 +39,7 @@ func (s *PgPluginStateStore) GetState(ctx context.Context, userID uuid.UUID, plu
 	return &info, nil
 }
 
-func (s *PgPluginStateStore) UpsertState(ctx context.Context, userID uuid.UUID, plugin, status string, enabled bool) (*PluginStateInfo, error) {
+func (s *PgPluginStateStore) UpsertState(ctx context.Context, userID uuid.UUID, plugin, status string, enabled bool) (*core.PluginStateInfo, error) {
 	row, err := s.q.UpsertPluginState(ctx, database.UpsertPluginStateParams{
 		UserID:  uuidToPgx(userID),
 		Plugin:  plugin,
@@ -54,7 +54,7 @@ func (s *PgPluginStateStore) UpsertState(ctx context.Context, userID uuid.UUID, 
 	return &info, nil
 }
 
-func (s *PgPluginStateStore) UpdateStatus(ctx context.Context, userID uuid.UUID, plugin, status string, errMsg *string) (*PluginStateInfo, error) {
+func (s *PgPluginStateStore) UpdateStatus(ctx context.Context, userID uuid.UUID, plugin, status string, errMsg *string) (*core.PluginStateInfo, error) {
 	row, err := s.q.UpdatePluginStateStatus(ctx, database.UpdatePluginStateStatusParams{
 		UserID:       uuidToPgx(userID),
 		Plugin:       plugin,
@@ -69,7 +69,7 @@ func (s *PgPluginStateStore) UpdateStatus(ctx context.Context, userID uuid.UUID,
 	return &info, nil
 }
 
-func (s *PgPluginStateStore) UpdateSynced(ctx context.Context, userID uuid.UUID, plugin string, cursor *string) (*PluginStateInfo, error) {
+func (s *PgPluginStateStore) UpdateSynced(ctx context.Context, userID uuid.UUID, plugin string, cursor *string) (*core.PluginStateInfo, error) {
 	row, err := s.q.UpdatePluginStateSynced(ctx, database.UpdatePluginStateSyncedParams{
 		UserID: uuidToPgx(userID),
 		Plugin: plugin,
@@ -83,13 +83,13 @@ func (s *PgPluginStateStore) UpdateSynced(ctx context.Context, userID uuid.UUID,
 	return &info, nil
 }
 
-func (s *PgPluginStateStore) ListStates(ctx context.Context, userID uuid.UUID) ([]PluginStateInfo, error) {
+func (s *PgPluginStateStore) ListStates(ctx context.Context, userID uuid.UUID) ([]core.PluginStateInfo, error) {
 	rows, err := s.q.ListPluginStates(ctx, uuidToPgx(userID))
 	if err != nil {
 		return nil, fmt.Errorf("listing plugin states: %w", err)
 	}
 
-	states := make([]PluginStateInfo, len(rows))
+	states := make([]core.PluginStateInfo, len(rows))
 	for i, row := range rows {
 		states[i] = pluginStateFromDB(row)
 	}

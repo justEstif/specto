@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/database"
 )
 
@@ -18,7 +19,7 @@ func NewSyncLogStore(q Querier) *PgSyncLogStore {
 	return &PgSyncLogStore{q: q}
 }
 
-var _ SyncLogStore = (*PgSyncLogStore)(nil)
+var _ core.SyncLogStore = (*PgSyncLogStore)(nil)
 
 func (s *PgSyncLogStore) Begin(ctx context.Context, userID uuid.UUID, plugin string) (uuid.UUID, error) {
 	row, err := s.q.CreateSyncLog(ctx, database.CreateSyncLogParams{
@@ -32,7 +33,7 @@ func (s *PgSyncLogStore) Begin(ctx context.Context, userID uuid.UUID, plugin str
 	return pgxToUUID(row.ID), nil
 }
 
-func (s *PgSyncLogStore) Complete(ctx context.Context, logID uuid.UUID, result SyncLogResult) error {
+func (s *PgSyncLogStore) Complete(ctx context.Context, logID uuid.UUID, result core.SyncLogResult) error {
 	_, err := s.q.CompleteSyncLog(ctx, database.CompleteSyncLogParams{
 		ID:           uuidToPgx(logID),
 		ItemsAdded:   int4(result.ItemsAdded),
@@ -49,7 +50,7 @@ func (s *PgSyncLogStore) Complete(ctx context.Context, logID uuid.UUID, result S
 	return nil
 }
 
-func (s *PgSyncLogStore) Fail(ctx context.Context, logID uuid.UUID, result SyncLogResult) error {
+func (s *PgSyncLogStore) Fail(ctx context.Context, logID uuid.UUID, result core.SyncLogResult) error {
 	_, err := s.q.CompleteSyncLog(ctx, database.CompleteSyncLogParams{
 		ID:           uuidToPgx(logID),
 		ItemsAdded:   int4(result.ItemsAdded),
@@ -66,7 +67,7 @@ func (s *PgSyncLogStore) Fail(ctx context.Context, logID uuid.UUID, result SyncL
 	return nil
 }
 
-func (s *PgSyncLogStore) List(ctx context.Context, userID uuid.UUID, plugin string, limit int32) ([]SyncLogEntry, error) {
+func (s *PgSyncLogStore) List(ctx context.Context, userID uuid.UUID, plugin string, limit int32) ([]core.SyncLogEntry, error) {
 	rows, err := s.q.ListSyncLogs(ctx, database.ListSyncLogsParams{
 		UserID: uuidToPgx(userID),
 		Plugin: plugin,
@@ -76,7 +77,7 @@ func (s *PgSyncLogStore) List(ctx context.Context, userID uuid.UUID, plugin stri
 		return nil, fmt.Errorf("listing sync logs: %w", err)
 	}
 
-	entries := make([]SyncLogEntry, len(rows))
+	entries := make([]core.SyncLogEntry, len(rows))
 	for i, row := range rows {
 		entries[i] = syncLogFromDB(row)
 	}
