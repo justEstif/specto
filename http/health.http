@@ -1,2 +1,6 @@
 ### Health check
 GET {{baseUrl}}/api/v1/health
+
+?? status == 200
+?? header content-type includes json
+?? body status == ok

@@ -8,6 +8,11 @@ Content-Type: application/json
   "password": "password123"
 }
 
+?? status == 201
+?? header content-type includes json
+?? body data.email == test@example.com
+?? body data.display_name == Test User
+
 ### Register - missing fields (expect 422)
 POST {{baseUrl}}/api/v1/auth/register
 Content-Type: application/json
@@ -15,6 +20,9 @@ Content-Type: application/json
 {
   "email": "test@example.com"
 }
+
+?? status == 422
+?? body error.code == validation_error
 
 ### Register - short password (expect 422)
 POST {{baseUrl}}/api/v1/auth/register
@@ -26,6 +34,22 @@ Content-Type: application/json
   "password": "short"
 }
 
+?? status == 422
+?? body error.code == validation_error
+
+### Register - duplicate email (expect 409)
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "display_name": "Test User",
+  "password": "password123"
+}
+
+?? status == 409
+?? body error.code == validation_error
+
 ### Login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
@@ -34,6 +58,10 @@ Content-Type: application/json
   "email": "test@example.com",
   "password": "password123"
 }
+
+?? status == 200
+?? header content-type includes json
+?? body data.email == test@example.com
 
 ### Login - wrong password (expect 401)
 POST {{baseUrl}}/api/v1/auth/login
@@ -44,8 +72,28 @@ Content-Type: application/json
   "password": "wrongpassword"
 }
 
-### Get current session (requires auth)
+?? status == 401
+?? body error.code == unauthorized
+
+### Login - nonexistent user (expect 401)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@example.com",
+  "password": "password123"
+}
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Get session (unauthenticated - expect 401)
 GET {{baseUrl}}/api/v1/session
+
+?? status == 401
+?? body error.code == unauthorized
 
 ### Logout
 DELETE {{baseUrl}}/api/v1/session
+
+?? status == 204
