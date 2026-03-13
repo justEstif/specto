@@ -1,12 +1,28 @@
 package components
 
-templ Layout(title string) {
+import "github.com/justestif/specto/internal/core"
+
+// Layout renders the base HTML document shell. Every page uses this as
+// its outermost wrapper. The user parameter controls navbar state:
+// nil = unauthenticated (logo + sign-in), non-nil = full nav + avatar.
+//
+// When authenticated, the body is wrapped in a DaisyUI drawer for the
+// mobile hamburger menu. The drawer-content holds the navbar + main,
+// and the drawer-side holds the slide-out navigation.
+templ Layout(title string, user *core.UserInfo) {
 	<!DOCTYPE html>
 	<html lang="en" data-theme="specto-dark">
 	<head>
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<title>{ title }</title>
+		<!-- Fonts: Playfair Display (display), DM Sans (body), JetBrains Mono (data) -->
+		<link rel="preconnect" href="https://fonts.googleapis.com"/>
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+		<link
+			href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+			rel="stylesheet"
+		/>
 		<link rel="stylesheet" href="/static/css/tailwind.css"/>
 		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
 		<!-- Enable View Transitions API globally for all htmx swaps -->
@@ -17,10 +33,25 @@ templ Layout(title string) {
 		hx-boost="true">
 		<!-- Global loading bar — visible during any htmx request -->
 		<div id="page-loader"></div>
-		@Navbar()
-		<main class="vt-main mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-			{ children... }
-		</main>
+		if user != nil {
+			<!-- Drawer wrapper for mobile nav (authenticated) -->
+			<div class="drawer">
+				<input id="nav-drawer" type="checkbox" class="drawer-toggle"/>
+				<div class="drawer-content">
+					@navbarBar(user)
+					<main class="vt-main mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+						{ children... }
+					</main>
+				</div>
+				@drawerSidebar(user)
+			</div>
+		} else {
+			<!-- No drawer needed for unauthenticated pages -->
+			@navbarBar(nil)
+			<main class="vt-main mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+				{ children... }
+			</main>
+		}
 	</body>
 	</html>
 }

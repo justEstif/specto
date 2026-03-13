@@ -1,0 +1,342 @@
+package components
+
+import "github.com/justestif/specto/internal/core"
+
+// SettingsData holds data for the settings page.
+type SettingsData struct {
+	User      *core.UserInfo
+	ActiveTab string // "account", "appearance", "sharing"
+	CSRFToken string
+	Message   string // success or error message
+}
+
+// SettingsPage renders the full settings page with tab navigation.
+templ SettingsPage(data SettingsData) {
+	@Layout("Settings — Specto", data.User) {
+		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-6">Settings</h1>
+		<!-- Tab navigation -->
+		@settingsTabs(data.ActiveTab)
+		<!-- Tab content -->
+		<div id="settings-content" class="mt-6">
+			switch data.ActiveTab {
+			case "appearance":
+				@SettingsAppearance(data)
+			case "sharing":
+				@SettingsSharing(data)
+			default:
+				@SettingsAccount(data)
+			}
+		</div>
+	}
+}
+
+templ settingsTabs(active string) {
+	<div role="tablist" class="tabs tabs-box bg-base-200">
+		@settingsTab("Account", "account", "/settings", active)
+		@settingsTab("Appearance", "appearance", "/settings/appearance", active)
+		@settingsTab("Sharing", "sharing", "/settings/sharing", active)
+	</div>
+}
+
+templ settingsTab(label, value, href, active string) {
+	<a
+		role="tab"
+		href={ templ.SafeURL(href) }
+		class={ "tab", templ.KV("tab-active", value == active) }
+		hx-get={ "/partials/settings/" + value }
+		hx-target="#settings-content"
+		hx-swap="innerHTML"
+		hx-push-url={ href }
+	>
+		{ label }
+	</a>
+}
+
+// SettingsAccount renders the Account tab content.
+templ SettingsAccount(data SettingsData) {
+	if data.Message != "" {
+		<div class="alert alert-success text-sm mb-4">
+			<span>{ data.Message }</span>
+		</div>
+	}
+	<!-- Profile -->
+	<form
+		hx-put="/settings/account"
+		hx-target="#settings-content"
+		hx-swap="innerHTML"
+	>
+		<input type="hidden" name="gorilla.csrf.Token" value={ data.CSRFToken }/>
+		<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+			<legend class="fieldset-legend text-base font-semibold">Profile</legend>
+			<div class="space-y-4">
+				<div>
+					<label class="label text-base-content/70 text-sm">Display name</label>
+					<input
+						type="text"
+						name="display_name"
+						value={ data.User.DisplayName }
+						required
+						class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+					/>
+				</div>
+				<div>
+					<label class="label text-base-content/70 text-sm">Email</label>
+					<input
+						type="email"
+						value={ data.User.Email }
+						disabled
+						class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px] opacity-50"
+					/>
+				</div>
+				<div>
+					<label class="label text-base-content/70 text-sm">Profile slug (for share URL)</label>
+					<input
+						type="text"
+						name="profile_slug"
+						value={ derefStr(data.User.ProfileSlug) }
+						pattern="[a-z0-9-]+"
+						class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+						placeholder="your-slug"
+					/>
+					if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
+						<p class="text-xs text-base-content/40 mt-1">/share/{ *data.User.ProfileSlug }</p>
+					}
+				</div>
+				<button type="submit" class="btn btn-primary btn-sm mt-2 min-h-[44px]">
+					Save changes
+				</button>
+			</div>
+		</fieldset>
+	</form>
+	<!-- Connected accounts -->
+	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+		<legend class="fieldset-legend text-base font-semibold">Connected accounts</legend>
+		<div class="space-y-3">
+			@connectedAccount("Google", data.User.AuthProvider == "google")
+			@connectedAccount("GitHub", data.User.AuthProvider == "github")
+		</div>
+	</fieldset>
+	<!-- Danger zone -->
+	<fieldset class="fieldset bg-neutral border border-error/20 rounded-box p-6">
+		<legend class="fieldset-legend text-base font-semibold text-error">Danger zone</legend>
+		<p class="text-sm text-base-content/50 mb-4">
+			Permanently delete your account and all associated data. This action cannot be undone.
+		</p>
+		<button
+			class="btn btn-error btn-outline btn-sm min-h-[44px]"
+			onclick="document.getElementById('delete-modal').showModal()"
+		>
+			Delete account
+		</button>
+		<dialog id="delete-modal" class="modal">
+			<div class="modal-box bg-neutral border border-base-300">
+				<h3 class="text-lg font-bold text-error">Delete account?</h3>
+				<p class="py-4 text-sm text-base-content/70">
+					This will permanently delete your account, all connected plugins, and all synced data.
+					This cannot be undone.
+				</p>
+				<div class="modal-action">
+					<form method="dialog">
+						<button class="btn btn-ghost btn-sm">Cancel</button>
+					</form>
+					<form method="post" action="/settings/delete-account">
+						<input type="hidden" name="gorilla.csrf.Token" value={ data.CSRFToken }/>
+						<button type="submit" class="btn btn-error btn-sm">Delete my account</button>
+					</form>
+				</div>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+	</fieldset>
+}
+
+templ connectedAccount(provider string, connected bool) {
+	<div class="flex items-center justify-between">
+		<div class="flex items-center gap-2">
+			<span class="text-sm text-base-content/80">{ provider }</span>
+			if connected {
+				<span class="status status-success"></span>
+				<span class="text-xs text-base-content/50">Connected</span>
+			} else {
+				<span class="status status-neutral"></span>
+				<span class="text-xs text-base-content/40">Not connected</span>
+			}
+		</div>
+		if !connected {
+			<a
+				href={ templ.SafeURL("/auth/" + toLower(provider) + "/login") }
+				class="btn btn-ghost btn-xs text-primary"
+			>
+				Link account
+			</a>
+		}
+	</div>
+}
+
+// SettingsAppearance renders the Appearance tab content.
+templ SettingsAppearance(data SettingsData) {
+	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6">
+		<legend class="fieldset-legend text-base font-semibold">Theme</legend>
+		<p class="text-sm text-base-content/50 mb-4">Choose your preferred color scheme.</p>
+		<div class="flex gap-4">
+			<label class="flex items-center gap-2 cursor-pointer">
+				<input
+					type="radio"
+					name="theme"
+					value="specto-dark"
+					class="radio radio-primary theme-controller"
+					checked
+				/>
+				<span class="text-sm text-base-content/80">Dark</span>
+			</label>
+			<label class="flex items-center gap-2 cursor-pointer">
+				<input
+					type="radio"
+					name="theme"
+					value="specto-light"
+					class="radio radio-primary theme-controller"
+				/>
+				<span class="text-sm text-base-content/80">Light</span>
+			</label>
+		</div>
+	</fieldset>
+}
+
+// SettingsSharing renders the Sharing tab with public profile toggle,
+// block configuration, and exclusion settings.
+templ SettingsSharing(data SettingsData) {
+	<!-- Public profile toggle -->
+	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+		<legend class="fieldset-legend text-base font-semibold">Public profile</legend>
+		<div class="flex items-center justify-between">
+			<div>
+				<label class="flex items-center gap-3 cursor-pointer">
+					<input type="checkbox" class="toggle toggle-primary" name="profile_enabled"/>
+					<span class="text-sm text-base-content/80">Enable public profile</span>
+				</label>
+			</div>
+		</div>
+		if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
+			<div class="flex items-center gap-2 mt-3">
+				<span class="text-sm text-base-content/50">/share/{ *data.User.ProfileSlug }</span>
+				<button
+					type="button"
+					class="btn btn-ghost btn-xs text-primary"
+					onclick="navigator.clipboard.writeText(window.location.origin + '/share/' + this.previousElementSibling.textContent.trim().replace('/share/', ''))"
+				>
+					Copy link
+				</button>
+			</div>
+		} else {
+			<p class="text-xs text-base-content/40 mt-2">Set a profile slug in the Account tab first.</p>
+		}
+	</fieldset>
+	<!-- Blocks -->
+	<div class="mb-6">
+		<h3 class="text-display text-lg font-semibold mb-2">Blocks</h3>
+		<p class="text-sm text-base-content/50 mb-4">Toggle and reorder the sections on your public profile.</p>
+		<div class="bg-neutral border border-base-300 rounded-box divide-y divide-base-300">
+			@shareBlockRow("top_genres", "Top Genres", true, "30d", "")
+			@shareBlockRow("mood_profile", "Mood Profile", true, "30d", "")
+			@shareBlockRow("top_creators", "Top Creators", true, "30d", "")
+			@shareBlockRow("platform_mix", "Platform Mix", false, "30d", "")
+			@shareBlockRow("currently_into", "Currently Into", true, "", "")
+		</div>
+	</div>
+	<!-- Exclusions -->
+	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+		<legend class="fieldset-legend text-base font-semibold">Exclusions</legend>
+		<p class="text-sm text-base-content/50 mb-4">Content matching these filters is excluded from all share calculations.</p>
+		<div class="space-y-4">
+			<div>
+				<label class="label text-base-content/70 text-sm">Exclude platforms</label>
+				<input
+					type="text"
+					name="excluded_platforms"
+					placeholder="e.g. netflix, tiktok"
+					class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+				/>
+				<p class="text-xs text-base-content/40 mt-1">Comma-separated platform names</p>
+			</div>
+			<div>
+				<label class="label text-base-content/70 text-sm">Exclude tags</label>
+				<input
+					type="text"
+					name="excluded_tags"
+					placeholder="e.g. romance, reality-tv"
+					class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+				/>
+				<p class="text-xs text-base-content/40 mt-1">Comma-separated tag names</p>
+			</div>
+		</div>
+	</fieldset>
+	<!-- Actions -->
+	<div class="flex gap-3">
+		<button class="btn btn-primary btn-sm min-h-[44px]" disabled>
+			Save &amp; publish
+		</button>
+		<a href={ templ.SafeURL(sharePreviewURL(data.User)) } class="btn btn-ghost btn-sm border-base-300 min-h-[44px]">
+			Preview profile
+		</a>
+	</div>
+	<p class="text-xs text-base-content/40 mt-2">Share profile API not yet implemented. UI is ready for wiring.</p>
+}
+
+// shareBlockRow renders a single block configuration row.
+templ shareBlockRow(blockType, label string, enabled bool, timeRange, platform string) {
+	<div class="flex items-center gap-3 px-4 py-3">
+		<!-- Drag handle -->
+		<span class="text-base-content/30 cursor-grab" title="Drag to reorder">=</span>
+		<!-- Enable toggle -->
+		<input
+			type="checkbox"
+			class="checkbox checkbox-primary checkbox-sm"
+			checked?={ enabled }
+			name={ "block_" + blockType + "_enabled" }
+		/>
+		<!-- Block name -->
+		<span class="flex-1 text-sm text-base-content/80">{ label }</span>
+		<!-- Time range (if applicable) -->
+		if timeRange != "" {
+			<select
+				name={ "block_" + blockType + "_range" }
+				class="select select-bordered select-xs bg-base-100 border-base-300"
+			>
+				<option value="7d" selected?={ timeRange == "7d" }>7d</option>
+				<option value="30d" selected?={ timeRange == "30d" }>30d</option>
+				<option value="90d" selected?={ timeRange == "90d" }>90d</option>
+				<option value="all" selected?={ timeRange == "all" }>All</option>
+			</select>
+		}
+	</div>
+}
+
+func sharePreviewURL(user *core.UserInfo) string {
+	if user.ProfileSlug != nil && *user.ProfileSlug != "" {
+		return "/share/" + *user.ProfileSlug
+	}
+	return "#"
+}
+
+// --- Helpers ---
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := range s {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 32
+		}
+		result[i] = c
+	}
+	return string(result)
+}

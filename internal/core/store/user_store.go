@@ -32,6 +32,16 @@ func (s *PgUserStore) GetByID(ctx context.Context, id uuid.UUID) (*core.UserInfo
 	return &info, nil
 }
 
+func (s *PgUserStore) GetByProfileSlug(ctx context.Context, slug string) (*core.UserInfo, error) {
+	row, err := s.q.GetUserByProfileSlug(ctx, pgtype.Text{String: slug, Valid: true})
+	if err != nil {
+		return nil, fmt.Errorf("getting user by profile slug: %w", err)
+	}
+
+	info := userFromDB(row)
+	return &info, nil
+}
+
 func (s *PgUserStore) GetByEmail(ctx context.Context, email string) (*core.UserInfo, error) {
 	row, err := s.q.GetUserByEmail(ctx, email)
 	if err != nil {

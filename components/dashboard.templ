@@ -1,0 +1,336 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// DashboardData holds all pre-fetched data for the dashboard page.
+type DashboardData struct {
+	User              *core.UserInfo
+	Summary           *core.Summary
+	RecentItems       []core.MediaItem
+	Tags              []core.TagDistributionEntry
+	PlatformBreakdown []core.PlatformBreakdownEntry
+	ActiveRange       string // "7d", "30d", "90d"
+	Timeline          []core.TimelineEntry
+}
+
+// Dashboard renders the authenticated dashboard page.
+templ Dashboard(data DashboardData) {
+	@Layout("Dashboard — Specto", data.User) {
+		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-8">Dashboard</h1>
+		<!-- Summary stats -->
+		@dashboardStats(data.Summary)
+		<!-- Activity chart with range tabs -->
+		@dashboardActivity(data.Timeline, data.ActiveRange)
+		<!-- Recent items -->
+		@dashboardRecent(data.RecentItems)
+		<!-- Bottom row: tags + platform breakdown -->
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+			@dashboardTags(data.Tags)
+			@dashboardPlatforms(data.PlatformBreakdown)
+		</div>
+	}
+}
+
+// dashboardStats renders the 4-column stat grid.
+templ dashboardStats(summary *core.Summary) {
+	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+		@statCard("Total items", formatCount(summary.TotalItems), "")
+		@statCard("Total time", formatDuration(summary.TotalDurationSec), "")
+		@statCard("Top source", summary.TopPlatform, "")
+		@statCard("Top type", summary.TopMediaType, "")
+	</div>
+}
+
+templ statCard(label, value, desc string) {
+	<div class="stat bg-neutral border border-base-300 rounded-box p-4">
+		<div class="stat-title text-base-content/50 text-xs uppercase tracking-wider">{ label }</div>
+		<div class="stat-value text-2xl font-bold text-base-content font-mono">{ value }</div>
+		if desc != "" {
+			<div class="stat-desc text-base-content/40">{ desc }</div>
+		}
+	</div>
+}
+
+// dashboardActivity renders the activity chart section with time range tabs.
+templ dashboardActivity(timeline []core.TimelineEntry, activeRange string) {
+	<div class="mb-8">
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-display text-xl font-semibold">Activity</h2>
+			<div role="tablist" class="tabs tabs-box tabs-sm bg-base-200">
+				@rangeTab("7d", activeRange)
+				@rangeTab("30d", activeRange)
+				@rangeTab("90d", activeRange)
+			</div>
+		</div>
+		<div id="activity-chart">
+			@ActivityChart(timeline)
+		</div>
+	</div>
+}
+
+templ rangeTab(value, active string) {
+	<button
+		role="tab"
+		class={ "tab", templ.KV("tab-active", value == active) }
+		hx-get={ "/partials/activity-chart?range=" + value }
+		hx-target="#activity-chart"
+		hx-swap="innerHTML"
+	>
+		{ value }
+	</button>
+}
+
+// ActivityChart renders just the bar chart (swap target for range tabs).
+templ ActivityChart(timeline []core.TimelineEntry) {
+	if len(timeline) == 0 {
+		<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+			No activity data yet. Connect a plugin and sync to see your consumption chart.
+		</div>
+	} else {
+		<div class="bg-neutral border border-base-300 rounded-box p-4 overflow-x-auto">
+			<div class="flex items-end gap-px h-32 min-w-0">
+				for _, entry := range timeline {
+					@chartBar(entry, maxCount(timeline))
+				}
+			</div>
+		</div>
+	}
+}
+
+templ chartBar(entry core.TimelineEntry, max int64) {
+	<div
+		class="flex-1 min-w-1 bg-primary/60 hover:bg-primary transition-colors rounded-t cursor-default"
+		style={ barHeight(entry.Count, max) }
+		title={ fmt.Sprintf("%s: %d items", entry.Bucket.Format("Jan 2"), entry.Count) }
+	></div>
+}
+
+// dashboardRecent renders the recent items list.
+templ dashboardRecent(items []core.MediaItem) {
+	<div>
+		<h2 class="text-display text-xl font-semibold mb-4">Recent</h2>
+		if len(items) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+				No items yet. Connect a plugin and sync your history.
+			</div>
+		} else {
+			<div id="recent-items" class="bg-neutral border border-base-300 rounded-box divide-y divide-base-300">
+				for _, item := range items {
+					@TimelineRow(item)
+				}
+			</div>
+			if len(items) >= 5 {
+				<div class="mt-3 text-center">
+					<button
+						class="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content"
+						hx-get="/partials/timeline?offset=5&limit=5"
+						hx-target="#recent-items"
+						hx-swap="beforeend"
+					>
+						Show more
+					</button>
+				</div>
+			}
+		}
+	</div>
+}
+
+// TimelineRow renders a single media item row (shared between dashboard
+// recent list and timeline page). Exported for use by partials.
+templ TimelineRow(item core.MediaItem) {
+	<div class="flex items-center gap-3 px-4 py-3">
+		<!-- Media type icon -->
+		<span class="text-base-content/40 text-lg shrink-0 w-6 text-center">
+			{ mediaIcon(string(item.Type)) }
+		</span>
+		<!-- Title + creator -->
+		<div class="flex-1 min-w-0">
+			<div class="font-medium text-sm text-base-content truncate">{ item.Title }</div>
+			<div class="text-xs text-base-content/50 truncate">
+				{ item.Creator }
+				<span class="badge badge-sm badge-outline ml-1 text-xs">{ item.Platform }</span>
+			</div>
+		</div>
+		<!-- Duration + timestamp -->
+		<div class="text-right shrink-0">
+			if item.Duration != nil {
+				<div class="text-xs text-base-content/60 font-mono">{ formatItemDuration(*item.Duration) }</div>
+			}
+			<div class="text-xs text-base-content/40">{ relativeTime(item.ConsumedAt) }</div>
+		</div>
+	</div>
+}
+
+// dashboardTags renders the top tags list.
+templ dashboardTags(tags []core.TagDistributionEntry) {
+	<div>
+		<h2 class="text-display text-xl font-semibold mb-4">Top Tags</h2>
+		if len(tags) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-6 text-center text-base-content/40 text-sm">
+				No tags yet.
+			</div>
+		} else {
+			<div class="bg-neutral border border-base-300 rounded-box divide-y divide-base-300">
+				for _, tag := range tags {
+					<div class="flex items-center justify-between px-4 py-2.5">
+						<span class="text-sm text-base-content/80">{ tag.Name }</span>
+						<span class="text-sm text-base-content/40 font-mono">{ formatCount(tag.Count) }</span>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// dashboardPlatforms renders the platform breakdown bars.
+templ dashboardPlatforms(entries []core.PlatformBreakdownEntry) {
+	<div>
+		<h2 class="text-display text-xl font-semibold mb-4">Platform Breakdown</h2>
+		if len(entries) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-6 text-center text-base-content/40 text-sm">
+				No data yet.
+			</div>
+		} else {
+			<div class="bg-neutral border border-base-300 rounded-box p-4 space-y-3">
+				for _, entry := range aggregatePlatforms(entries) {
+					<div>
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-base-content/80">{ entry.name }</span>
+							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", entry.pct) }</span>
+						</div>
+						<div class="w-full bg-base-300 rounded-full h-2">
+							<div class="bg-primary h-2 rounded-full" style={ fmt.Sprintf("width: %d%%", entry.pct) }></div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// --- Helper functions ---
+
+type platformAgg struct {
+	name  string
+	count int64
+	pct   int
+}
+
+func aggregatePlatforms(entries []core.PlatformBreakdownEntry) []platformAgg {
+	totals := make(map[string]int64)
+	var total int64
+	for _, e := range entries {
+		totals[e.Platform] += e.Count
+		total += e.Count
+	}
+	result := make([]platformAgg, 0, len(totals))
+	for name, count := range totals {
+		pct := 0
+		if total > 0 {
+			pct = int(count * 100 / total)
+		}
+		result = append(result, platformAgg{name: name, count: count, pct: pct})
+	}
+	// Sort by count descending (simple bubble sort for small N).
+	for i := range result {
+		for j := i + 1; j < len(result); j++ {
+			if result[j].count > result[i].count {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+	return result
+}
+
+func formatCount(n int64) string {
+	if n >= 1_000_000 {
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	}
+	if n >= 1_000 {
+		return fmt.Sprintf("%.1fK", float64(n)/1_000)
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+func formatDuration(totalSec int64) string {
+	if totalSec == 0 {
+		return "0m"
+	}
+	hours := totalSec / 3600
+	minutes := (totalSec % 3600) / 60
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dm", minutes)
+}
+
+func formatItemDuration(d time.Duration) string {
+	m := int(d.Minutes())
+	s := int(d.Seconds()) % 60
+	return fmt.Sprintf("%d:%02d", m, s)
+}
+
+func mediaIcon(mediaType string) string {
+	switch strings.ToLower(mediaType) {
+	case "music":
+		return "\u266b" // ♫
+	case "video":
+		return "\u25b6" // ▶
+	case "podcast":
+		return "\U0001f3a7" // 🎧
+	case "article":
+		return "\U0001f4d6" // 📖
+	default:
+		return "\u2022" // •
+	}
+}
+
+func relativeTime(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		m := int(d.Minutes())
+		return fmt.Sprintf("%dm ago", m)
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		return fmt.Sprintf("%dh ago", h)
+	default:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1d ago"
+		}
+		return fmt.Sprintf("%dd ago", days)
+	}
+}
+
+func maxCount(entries []core.TimelineEntry) int64 {
+	var m int64
+	for _, e := range entries {
+		if e.Count > m {
+			m = e.Count
+		}
+	}
+	if m == 0 {
+		return 1 // avoid division by zero
+	}
+	return m
+}
+
+func barHeight(count, max int64) string {
+	if max == 0 {
+		return "height: 2px"
+	}
+	pct := float64(count) / float64(max) * 100
+	if pct < 2 && count > 0 {
+		pct = 2 // minimum visible height
+	}
+	return fmt.Sprintf("height: %.0f%%", pct)
+}

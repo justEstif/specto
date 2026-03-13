@@ -105,6 +105,9 @@ type UserStore interface {
 	// GetByEmail retrieves a user by email.
 	GetByEmail(ctx context.Context, email string) (*UserInfo, error)
 
+	// GetByProfileSlug retrieves a user by their public profile slug.
+	GetByProfileSlug(ctx context.Context, slug string) (*UserInfo, error)
+
 	// GetByAuth retrieves a user by auth provider and subject.
 	GetByAuth(ctx context.Context, provider, subject string) (*UserInfo, error)
 

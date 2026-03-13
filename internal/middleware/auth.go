@@ -7,6 +7,31 @@ import (
 	"github.com/justestif/specto/internal/auth"
 )
 
+// OptionalAuth returns middleware that loads the user into context if a valid
+// session exists, but does not reject unauthenticated requests. Use this on
+// pages that render differently for logged-in vs anonymous visitors (e.g. the
+// landing page navbar).
+func OptionalAuth(authSvc *auth.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, err := authSvc.Sessions.GetUserIDFromSession(r)
+			if err != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			user, err := authSvc.GetUserByID(r.Context(), userID)
+			if err != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			ctx := auth.ContextWithUser(r.Context(), user)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // RequireAuth returns middleware that ensures the user is authenticated.
 // It uses the auth.Service for session and user lookup.
 func RequireAuth(authSvc *auth.Service) func(http.Handler) http.Handler {

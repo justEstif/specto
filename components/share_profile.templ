@@ -1,0 +1,170 @@
+package components
+
+import "fmt"
+
+// ShareProfileData holds all data for the public share profile page.
+type ShareProfileData struct {
+	DisplayName string
+	Slug        string
+	Blocks      []ShareBlock
+}
+
+// ShareBlock represents a single block on the public profile.
+type ShareBlock struct {
+	Type    string // "top_genres", "mood_profile", "top_creators", "platform_mix", "currently_into"
+	Enabled bool
+	// Data varies by type — use the typed fields below.
+	Bars    []ShareBar    // for genres, mood, platform_mix
+	Entries []ShareEntry  // for top_creators
+	Text    string        // for currently_into
+	Summary string        // for mood_profile summary line
+}
+
+// ShareBar represents a labeled bar with percentage.
+type ShareBar struct {
+	Label string
+	Pct   int
+}
+
+// ShareEntry represents a numbered list entry (e.g. top creators).
+type ShareEntry struct {
+	Rank     int
+	Name     string
+	Icon     string // media type icon
+	Platform string
+}
+
+// ShareProfilePage renders the standalone public profile (no navbar, no HTMX).
+templ ShareProfilePage(data ShareProfileData) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme="specto-dark">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ data.DisplayName } — Specto</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com"/>
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+		<link
+			href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/static/css/tailwind.css"/>
+	</head>
+	<body class="bg-base-100 text-base-content min-h-screen font-sans antialiased">
+		<div class="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
+			<!-- Header -->
+			<header class="text-center mb-12 grain relative overflow-hidden rounded-box p-8 bg-neutral border border-base-300">
+				<h1 class="text-display text-4xl sm:text-5xl font-bold tracking-tight relative z-10">
+					{ data.DisplayName }
+				</h1>
+				<p class="text-base-content/40 text-sm mt-2 relative z-10">{ "@" + data.Slug }</p>
+			</header>
+			<!-- Blocks -->
+			<div class="space-y-6">
+				for _, block := range data.Blocks {
+					if block.Enabled {
+						switch block.Type {
+						case "top_genres":
+							@shareBarBlock("Top Genres", block.Bars)
+						case "mood_profile":
+							@shareMoodBlock(block.Summary, block.Bars)
+						case "top_creators":
+							@shareCreatorsBlock(block.Entries)
+						case "platform_mix":
+							@shareBarBlock("Platform Mix", block.Bars)
+						case "currently_into":
+							@shareCurrentlyInto(block.Text)
+						}
+					}
+				}
+			</div>
+			<!-- Footer -->
+			<footer class="text-center mt-16 pb-8">
+				<a href="/" class="text-base-content/30 text-xs hover:text-base-content/50 transition-colors">
+					powered by Specto
+				</a>
+			</footer>
+		</div>
+	</body>
+	</html>
+}
+
+// shareBarBlock renders a block with horizontal bars (genres, platform mix).
+templ shareBarBlock(title string, bars []ShareBar) {
+	<div class="card bg-neutral border border-base-300 p-6">
+		<h2 class="text-display text-lg font-semibold mb-4">{ title }</h2>
+		if len(bars) == 0 {
+			<p class="text-base-content/40 text-sm">No data yet.</p>
+		} else {
+			<div class="space-y-3">
+				for _, bar := range bars {
+					<div>
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-base-content/80">{ bar.Label }</span>
+							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
+						</div>
+						<div class="w-full bg-base-300 rounded-full h-2">
+							<div class="bg-primary h-2 rounded-full" style={ fmt.Sprintf("width: %d%%", bar.Pct) }></div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// shareMoodBlock renders the mood profile block with summary text + bars.
+templ shareMoodBlock(summary string, bars []ShareBar) {
+	<div class="card bg-neutral border border-base-300 p-6">
+		<h2 class="text-display text-lg font-semibold mb-2">Mood Profile</h2>
+		if summary != "" {
+			<p class="text-base-content/60 text-sm mb-4 italic">{ summary }</p>
+		}
+		if len(bars) > 0 {
+			<div class="space-y-3">
+				for _, bar := range bars {
+					<div>
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-base-content/80">{ bar.Label }</span>
+							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
+						</div>
+						<div class="w-full bg-base-300 rounded-full h-2">
+							<div class="bg-secondary h-2 rounded-full" style={ fmt.Sprintf("width: %d%%", bar.Pct) }></div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// shareCreatorsBlock renders the top creators numbered list.
+templ shareCreatorsBlock(entries []ShareEntry) {
+	<div class="card bg-neutral border border-base-300 p-6">
+		<h2 class="text-display text-lg font-semibold mb-4">Top Creators</h2>
+		if len(entries) == 0 {
+			<p class="text-base-content/40 text-sm">No data yet.</p>
+		} else {
+			<div class="space-y-2">
+				for _, entry := range entries {
+					<div class="flex items-center gap-3">
+						<span class="text-base-content/40 font-mono text-sm w-6 text-right">{ fmt.Sprintf("%d.", entry.Rank) }</span>
+						<span class="text-base-content/40">{ entry.Icon }</span>
+						<span class="text-sm text-base-content/80 flex-1">{ entry.Name }</span>
+						<span class="badge badge-sm badge-outline text-xs">{ entry.Platform }</span>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// shareCurrentlyInto renders the quoted free-text block.
+templ shareCurrentlyInto(text string) {
+	<div class="card bg-neutral border border-base-300 p-6">
+		<h2 class="text-display text-lg font-semibold mb-3">Currently Into</h2>
+		<blockquote class="text-base-content/70 text-sm italic border-l-2 border-primary/40 pl-4">
+			"{ text }"
+		</blockquote>
+	</div>
+}

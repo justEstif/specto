@@ -535,6 +535,28 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	return i, err
 }
 
+const getUserByProfileSlug = `-- name: GetUserByProfileSlug :one
+SELECT id, email, display_name, avatar_url, auth_provider, auth_subject, profile_slug, created_at, updated_at, password_hash FROM users WHERE profile_slug = $1
+`
+
+func (q *Queries) GetUserByProfileSlug(ctx context.Context, profileSlug pgtype.Text) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByProfileSlug, profileSlug)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.AuthProvider,
+		&i.AuthSubject,
+		&i.ProfileSlug,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PasswordHash,
+	)
+	return i, err
+}
+
 const listMediaItemTags = `-- name: ListMediaItemTags :many
 SELECT t.name, t.category, mit.source, mit.confidence
 FROM media_item_tags mit

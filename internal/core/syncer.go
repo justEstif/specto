@@ -14,18 +14,31 @@ import (
 // DefaultMinSyncInterval is the minimum time between syncs per user per plugin.
 const DefaultMinSyncInterval = 15 * time.Minute
 
+// TokenRefreshResult holds the result of a token refresh.
+type TokenRefreshResult struct {
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int
+}
+
+// TokenRefresher refreshes OAuth tokens for a plugin. Implemented by auth.OAuthService.
+type TokenRefresher interface {
+	RefreshPluginToken(pluginName string, cfg *OAuthConfig, refreshToken string) (*TokenRefreshResult, error)
+}
+
 // SyncService orchestrates the full sync flow for a plugin.
 // It coordinates between the plugin registry, credential store,
 // media item store, enricher, tag store, and sync log.
 type SyncService struct {
-	Registry    *PluginRegistry
-	Plugins     PluginStateStore
-	Media       MediaItemStore
-	SyncLogs    SyncLogStore
-	Tags        TagStore
-	Enricher    Enricher
-	MinInterval time.Duration // minimum interval between syncs; defaults to DefaultMinSyncInterval
-	Logger      *slog.Logger
+	Registry       *PluginRegistry
+	Plugins        PluginStateStore
+	Media          MediaItemStore
+	SyncLogs       SyncLogStore
+	Tags           TagStore
+	Enricher       Enricher
+	TokenRefresher TokenRefresher // optional — if set, auto-refreshes expired tokens
+	MinInterval    time.Duration  // minimum interval between syncs; defaults to DefaultMinSyncInterval
+	Logger         *slog.Logger
 }
 
 // NewSyncService creates a SyncService with the given dependencies.
@@ -107,6 +120,16 @@ func (s *SyncService) SyncPlugin(ctx context.Context, userID uuid.UUID, pluginNa
 	creds, err := s.Plugins.GetCredentials(ctx, userID, pluginName)
 	if err != nil {
 		return nil, fmt.Errorf("loading credentials for %q: %w", pluginName, err)
+	}
+
+	// Step 3b: Auto-refresh token if plugin uses OAuth and a refresher is configured
+	if plugin.AuthType() == AuthOAuth && s.TokenRefresher != nil && creds.RefreshToken != "" {
+		refreshedCreds, refreshErr := s.tryRefreshToken(ctx, userID, pluginName, plugin, creds, log)
+		if refreshErr != nil {
+			log.Warn("token refresh failed, proceeding with existing token", "error", refreshErr)
+		} else if refreshedCreds != nil {
+			creds = refreshedCreds
+		}
 	}
 
 	// Step 4: Get cursor from plugin state
@@ -282,6 +305,53 @@ func (s *SyncService) SyncPluginWithFile(ctx context.Context, userID uuid.UUID, 
 	)
 
 	return summary, nil
+}
+
+// tryRefreshToken attempts to refresh an OAuth token and update stored credentials.
+// Returns updated credentials if refresh succeeded, nil if skipped, or an error.
+func (s *SyncService) tryRefreshToken(
+	ctx context.Context,
+	userID uuid.UUID,
+	pluginName string,
+	plugin SourcePlugin,
+	creds *Credentials,
+	log *slog.Logger,
+) (*Credentials, error) {
+	cfg := plugin.AuthConfig()
+	if cfg == nil {
+		return nil, nil
+	}
+
+	result, err := s.TokenRefresher.RefreshPluginToken(pluginName, cfg, creds.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("token refreshed successfully", "plugin", pluginName)
+
+	newCreds := &Credentials{
+		AccessToken:  result.AccessToken,
+		RefreshToken: result.RefreshToken,
+	}
+	// Keep old refresh token if provider didn't issue a new one
+	if newCreds.RefreshToken == "" {
+		newCreds.RefreshToken = creds.RefreshToken
+	}
+
+	// Compute new expiry
+	var expiresAt *time.Time
+	if result.ExpiresIn > 0 {
+		t := time.Now().Add(time.Duration(result.ExpiresIn) * time.Second)
+		expiresAt = &t
+	}
+
+	// Persist refreshed credentials
+	if err := s.Plugins.UpsertCredentials(ctx, userID, pluginName, AuthOAuth, *newCreds, expiresAt); err != nil {
+		log.Error("failed to persist refreshed credentials", "error", err)
+		// Still use the new token for this sync even if persist fails
+	}
+
+	return newCreds, nil
 }
 
 // checkRateLimit verifies enough time has passed since the last sync.

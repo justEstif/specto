@@ -74,6 +74,78 @@ func (s *OAuthService) RedirectURI(pluginName string) string {
 	return fmt.Sprintf("%s/api/v1/plugins/%s/callback", s.BaseURL, pluginName)
 }
 
+// AppAuthRedirectURI returns the callback URL for app-level OAuth login.
+func (s *OAuthService) AppAuthRedirectURI(provider string) string {
+	return fmt.Sprintf("%s/auth/%s/callback", s.BaseURL, provider)
+}
+
+// appAuthConfigs defines the OAuth configurations for app-level login providers.
+var appAuthConfigs = map[string]*core.OAuthConfig{
+	"google": {
+		ProviderName: "Google",
+		AuthURL:      "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:     "https://oauth2.googleapis.com/token",
+		Scopes:       []string{"openid", "email", "profile"},
+	},
+	"github": {
+		ProviderName: "GitHub",
+		AuthURL:      "https://github.com/login/oauth/authorize",
+		TokenURL:     "https://github.com/login/oauth/access_token",
+		Scopes:       []string{"read:user", "user:email"},
+	},
+}
+
+// AppAuthConfig returns the OAuth config for an app-level login provider.
+// Returns nil if the provider is not configured (no client credentials).
+func (s *OAuthService) AppAuthConfig(provider string) *core.OAuthConfig {
+	if _, ok := s.Clients[provider]; !ok {
+		return nil
+	}
+	return appAuthConfigs[provider]
+}
+
+// BuildAppAuthURL constructs the full OAuth authorization URL for app login.
+// Uses the app auth redirect URI pattern (/auth/{provider}/callback).
+func (s *OAuthService) BuildAppAuthURL(provider string, cfg *core.OAuthConfig, state string) (string, error) {
+	creds, ok := s.Clients[provider]
+	if !ok {
+		return "", ErrMissingOAuthClient
+	}
+
+	u, err := url.Parse(cfg.AuthURL)
+	if err != nil {
+		return "", fmt.Errorf("parsing auth URL: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("client_id", creds.ClientID)
+	q.Set("redirect_uri", s.AppAuthRedirectURI(provider))
+	q.Set("response_type", "code")
+	q.Set("scope", strings.Join(cfg.Scopes, " "))
+	q.Set("state", state)
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
+}
+
+// ExchangeAppAuthCode exchanges an authorization code for tokens using the app auth redirect URI.
+func (s *OAuthService) ExchangeAppAuthCode(provider string, cfg *core.OAuthConfig, code string) (*TokenResponse, error) {
+	creds, ok := s.Clients[provider]
+	if !ok {
+		return nil, ErrMissingOAuthClient
+	}
+
+	data := url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {s.AppAuthRedirectURI(provider)},
+		"client_id":     {creds.ClientID},
+		"client_secret": {creds.ClientSecret},
+	}
+
+	return s.postTokenRequest(cfg.TokenURL, data)
+}
+
 // BuildAuthURL constructs the full OAuth authorization URL with all required
 // query parameters: client_id, redirect_uri, response_type, scope, and state.
 func (s *OAuthService) BuildAuthURL(pluginName string, cfg *core.OAuthConfig, state string) (string, error) {
@@ -134,9 +206,30 @@ func (s *OAuthService) RefreshToken(pluginName string, cfg *core.OAuthConfig, re
 	return s.postTokenRequest(cfg.TokenURL, data)
 }
 
+// RefreshPluginToken implements core.TokenRefresher. It delegates to RefreshToken
+// and adapts the response to the core.TokenRefreshResult type.
+func (s *OAuthService) RefreshPluginToken(pluginName string, cfg *core.OAuthConfig, refreshToken string) (*core.TokenRefreshResult, error) {
+	resp, err := s.RefreshToken(pluginName, cfg, refreshToken)
+	if err != nil {
+		return nil, err
+	}
+	return &core.TokenRefreshResult{
+		AccessToken:  resp.AccessToken,
+		RefreshToken: resp.RefreshToken,
+		ExpiresIn:    resp.ExpiresIn,
+	}, nil
+}
+
 // postTokenRequest sends a POST to the token endpoint and parses the response.
 func (s *OAuthService) postTokenRequest(tokenURL string, data url.Values) (*TokenResponse, error) {
-	resp, err := s.HTTPClient.PostForm(tokenURL, data)
+	req, reqErr := http.NewRequest(http.MethodPost, tokenURL, strings.NewReader(data.Encode()))
+	if reqErr != nil {
+		return nil, fmt.Errorf("building token request: %w", reqErr)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json") // Required for GitHub
+
+	resp, err := s.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("posting token request: %w", err)
 	}

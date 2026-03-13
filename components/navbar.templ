@@ -1,19 +1,135 @@
 package components
 
-templ Navbar() {
+import (
+	"context"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// csrfTokenFromCtx extracts the gorilla/csrf masked token from the request
+// context. The CSRF middleware stores it under the string key
+// "gorilla.csrf.Token" via context.WithValue.
+func csrfTokenFromCtx(ctx context.Context) string {
+	if tok, ok := ctx.Value("gorilla.csrf.Token").(string); ok {
+		return tok
+	}
+	return ""
+}
+
+// navLink is a navigation destination shown in the navbar and mobile drawer.
+type navLink struct {
+	Href  string
+	Label string
+}
+
+var authedLinks = []navLink{
+	{Href: "/timeline", Label: "Timeline"},
+	{Href: "/plugins", Label: "Plugins"},
+}
+
+// navbarBar renders the sticky top navigation bar. Auth state determines which
+// variant is shown: authenticated (nav links + avatar dropdown) or minimal
+// (logo + Sign in).
+templ navbarBar(user *core.UserInfo) {
 	<nav class="vt-navbar navbar bg-base-200/60 backdrop-blur-md border-b border-base-300 sticky top-0 z-50">
-		<div class="flex-1">
+		<div class="flex-1 gap-2">
+			<!-- Hamburger toggle (mobile only, authenticated) -->
+			if user != nil {
+				<label for="nav-drawer" class="btn btn-ghost btn-square sm:hidden min-h-[44px] min-w-[44px]" aria-label="open menu">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+					</svg>
+				</label>
+			}
 			<a href="/" class="text-display text-xl font-bold tracking-tight text-primary hover:text-primary/80 transition-colors">
 				Specto
 			</a>
 		</div>
-		<div class="flex-none gap-2">
-			<a href="/dashboard" class="btn btn-ghost btn-sm text-base-content/70 hover:text-base-content">
-				Dashboard
-			</a>
-			<a href="/timeline" class="btn btn-ghost btn-sm text-base-content/70 hover:text-base-content">
-				Timeline
-			</a>
+		<div class="flex-none flex items-center gap-1">
+			if user != nil {
+				<!-- Desktop nav links (hidden on mobile) -->
+				<div class="hidden sm:flex gap-1">
+					for _, link := range authedLinks {
+						<a
+							href={ templ.SafeURL(link.Href) }
+							class="btn btn-ghost btn-sm text-base-content/70 hover:text-base-content min-h-[44px]"
+						>
+							{ link.Label }
+						</a>
+					}
+				</div>
+				<!-- Avatar dropdown -->
+				<div class="dropdown dropdown-end">
+					<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar min-h-[44px] min-w-[44px]">
+						<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+							<span class="text-primary text-sm font-semibold select-none">
+								{ userInitial(user) }
+							</span>
+						</div>
+					</div>
+					<ul tabindex="0" class="dropdown-content menu bg-base-200 border border-base-300 rounded-box z-[1] w-52 p-2 shadow-lg mt-2">
+						<li class="menu-title px-2 pb-1">
+							<span class="text-base-content/50 text-xs font-normal">{ user.DisplayName }</span>
+						</li>
+						<li><a href="/settings" class="text-base-content/80 hover:text-base-content">Settings</a></li>
+						<li><a href="/settings/sharing" class="text-base-content/80 hover:text-base-content">Share profile</a></li>
+						<li class="border-t border-base-300 mt-1 pt-1">
+							<form method="post" action="/logout">
+								<input type="hidden" name="gorilla.csrf.Token" value={ csrfTokenFromCtx(ctx) }/>
+								<button type="submit" class="text-base-content/80 hover:text-base-content w-full text-left">
+									Sign out
+								</button>
+							</form>
+						</li>
+					</ul>
+				</div>
+			} else {
+				<a href="/login" class="btn btn-ghost btn-sm text-base-content/70 hover:text-base-content min-h-[44px]">
+					Sign in
+				</a>
+			}
 		</div>
 	</nav>
+}
+
+// drawerSidebar renders the mobile slide-out menu (authenticated only).
+templ drawerSidebar(user *core.UserInfo) {
+	<div class="drawer-side z-[60]">
+		<label for="nav-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+		<ul class="menu bg-base-200 min-h-full w-64 p-4 pt-20 gap-1">
+			for _, link := range authedLinks {
+				<li>
+					<a href={ templ.SafeURL(link.Href) } class="text-base-content/80 hover:text-base-content text-base">
+						{ link.Label }
+					</a>
+				</li>
+			}
+			<li class="border-t border-base-300 mt-2 pt-2">
+				<a href="/settings" class="text-base-content/80 hover:text-base-content text-base">Settings</a>
+			</li>
+			<li>
+				<a href="/settings/sharing" class="text-base-content/80 hover:text-base-content text-base">Share profile</a>
+			</li>
+			<li class="border-t border-base-300 mt-2 pt-2">
+				<form method="post" action="/logout">
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfTokenFromCtx(ctx) }/>
+					<button type="submit" class="text-base-content/80 hover:text-base-content text-base w-full text-left">
+						Sign out
+					</button>
+				</form>
+			</li>
+		</ul>
+	</div>
+}
+
+// userInitial returns the first character of the user's display name (or email
+// fallback) for the avatar circle.
+func userInitial(user *core.UserInfo) string {
+	if user.DisplayName != "" {
+		return string([]rune(user.DisplayName)[0:1])
+	}
+	if user.Email != "" {
+		return string([]rune(user.Email)[0:1])
+	}
+	return "?"
 }

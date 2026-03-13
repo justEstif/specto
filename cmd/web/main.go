@@ -47,6 +47,25 @@ func main() {
 			ClientSecret: secret,
 		}
 	}
+	if id, secret := os.Getenv("YOUTUBE_CLIENT_ID"), os.Getenv("YOUTUBE_CLIENT_SECRET"); id != "" && secret != "" {
+		oauthClients["youtube-api"] = app.OAuthClientConfig{
+			ClientID:     id,
+			ClientSecret: secret,
+		}
+	}
+	// App-level OAuth login providers (Google, GitHub)
+	if id, secret := os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"); id != "" && secret != "" {
+		oauthClients["google"] = app.OAuthClientConfig{
+			ClientID:     id,
+			ClientSecret: secret,
+		}
+	}
+	if id, secret := os.Getenv("GITHUB_CLIENT_ID"), os.Getenv("GITHUB_CLIENT_SECRET"); id != "" && secret != "" {
+		oauthClients["github"] = app.OAuthClientConfig{
+			ClientID:     id,
+			ClientSecret: secret,
+		}
+	}
 
 	// Initialize core application layer
 	application := app.New(database.DB, app.Config{
@@ -65,6 +84,9 @@ func main() {
 	}
 	if err := application.Registry.Register(youtube.New()); err != nil {
 		log.Fatalf("Failed to register youtube plugin: %v", err)
+	}
+	if err := application.Registry.Register(youtube.NewAPI()); err != nil {
+		log.Fatalf("Failed to register youtube-api plugin: %v", err)
 	}
 
 	// Wire handlers with dependencies
@@ -88,10 +110,53 @@ func main() {
 	// Static files (no CSRF needed)
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	// Protected HTML routes with CSRF
+	// HTML routes with CSRF + optional auth (for navbar state)
 	r.Group(func(r chi.Router) {
 		r.Use(csrfMw)
+		r.Use(customMiddleware.OptionalAuth(application.Auth))
+
+		// Public pages (auth-aware for navbar state)
 		r.Get("/", h.Home)
+		r.Get("/login", h.LoginPage)
+		r.Post("/login", h.LoginSubmit)
+		r.Get("/register", h.RegisterPage)
+		r.Post("/register", h.RegisterSubmit)
+		r.Post("/logout", h.LogoutSubmit)
+
+		// OAuth app login (Google, GitHub)
+		r.Get("/auth/google/login", h.GoogleLogin)
+		r.Get("/auth/google/callback", h.GoogleCallback)
+		r.Get("/auth/github/login", h.GithubLogin)
+		r.Get("/auth/github/callback", h.GithubCallback)
+
+		// Public share profile (no auth required, standalone page)
+		r.Get("/share/{slug}", h.ShareProfilePage)
+	})
+
+	// Authenticated HTML pages
+	r.Group(func(r chi.Router) {
+		r.Use(csrfMw)
+		r.Use(customMiddleware.RequireAuth(application.Auth))
+
+		r.Get("/timeline", h.TimelinePage)
+		r.Get("/plugins", h.PluginsPage)
+		r.Get("/settings", h.SettingsPage)
+		r.Get("/settings/appearance", h.SettingsAppearancePage)
+		r.Get("/settings/sharing", h.SettingsSharingPage)
+		r.Put("/settings/account", h.SettingsAccountUpdate)
+	})
+
+	// Authenticated HTML partials (for HTMX swaps)
+	r.Group(func(r chi.Router) {
+		r.Use(csrfMw)
+		r.Use(customMiddleware.RequireAuth(application.Auth))
+
+		r.Get("/partials/activity-chart", h.ActivityChartPartial)
+		r.Get("/partials/timeline", h.RecentItemsPartial)
+		r.Get("/partials/timeline-page", h.TimelinePagePartial)
+		r.Get("/partials/settings/account", h.SettingsAccountPartial)
+		r.Get("/partials/settings/appearance", h.SettingsAppearancePartial)
+		r.Get("/partials/settings/sharing", h.SettingsSharingPartial)
 	})
 
 	// JSON API (v1)

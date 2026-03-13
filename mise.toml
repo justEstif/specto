@@ -9,14 +9,21 @@ go = "latest"
 [env]
 DATABASE_URL = "postgres://postgres:postgres@localhost:5432/specto_dev?sslmode=disable"
 PORT = "3000"
-# TODO openssl rand -base64 32 | tr -d '=' | cut -c1-32
 CSRF_KEY = "g1PIdKZepyCk/DsajiskTluSIj5f4oXD"
 SESSION_SECRET = "vw83Upzl22O1MVwpufGA2leD+pGIE5qj"
 ENCRYPTION_KEY = "bd16b89d47f0e82c5d7eb7965a4074bda2352d0a064211a3e65e0ad774fc9c81"
-BASE_URL = "http://localhost:3000"
-# OAuth credentials (optional — leave empty to skip OAuth plugin registration)
+BASE_URL = "http://127.0.0.1:3000"
+# OAuth credentials (optional — leave empty to skip OAuth plugin/provider registration)
+# Plugin OAuth (platform connections)
 # SPOTIFY_CLIENT_ID = ""
 # SPOTIFY_CLIENT_SECRET = ""
+# YOUTUBE_CLIENT_ID = ""
+# YOUTUBE_CLIENT_SECRET = ""
+# App OAuth (user login)
+# GOOGLE_CLIENT_ID = ""
+# GOOGLE_CLIENT_SECRET = ""
+# GITHUB_CLIENT_ID = ""
+# GITHUB_CLIENT_SECRET = ""
 
 [tasks.dev]
 description = "Start development server with live reload"

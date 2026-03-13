@@ -11,36 +11,37 @@ import (
 // mockQuerier is a configurable mock of the Querier interface for unit tests.
 // Each method field, when set, overrides the default behavior.
 type mockQuerier struct {
-	createMediaItemFn              func(ctx context.Context, arg database.CreateMediaItemParams) (database.MediaItem, error)
-	getMediaItemByIDFn             func(ctx context.Context, arg database.GetMediaItemByIDParams) (database.MediaItem, error)
-	getMediaItemByExternalIDFn     func(ctx context.Context, arg database.GetMediaItemByExternalIDParams) (database.MediaItem, error)
-	listMediaItemsFn          func(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error)
-	updateEnrichmentStatusFn  func(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
-	listPendingEnrichmentFn   func(ctx context.Context, limit int32) ([]database.MediaItem, error)
-	getPluginStateFn          func(ctx context.Context, arg database.GetPluginStateParams) (database.PluginState, error)
-	upsertPluginStateFn       func(ctx context.Context, arg database.UpsertPluginStateParams) (database.PluginState, error)
-	updatePluginStateStatusFn func(ctx context.Context, arg database.UpdatePluginStateStatusParams) (database.PluginState, error)
-	updatePluginStateSyncedFn func(ctx context.Context, arg database.UpdatePluginStateSyncedParams) (database.PluginState, error)
-	listPluginStatesFn        func(ctx context.Context, userID pgtype.UUID) ([]database.PluginState, error)
-	getPluginCredentialsFn    func(ctx context.Context, arg database.GetPluginCredentialsParams) (database.PluginCredential, error)
-	upsertPluginCredentialsFn func(ctx context.Context, arg database.UpsertPluginCredentialsParams) (database.PluginCredential, error)
-	deletePluginCredentialsFn func(ctx context.Context, arg database.DeletePluginCredentialsParams) error
-	createSyncLogFn           func(ctx context.Context, arg database.CreateSyncLogParams) (database.SyncLog, error)
-	completeSyncLogFn         func(ctx context.Context, arg database.CompleteSyncLogParams) (database.SyncLog, error)
-	listSyncLogsFn            func(ctx context.Context, arg database.ListSyncLogsParams) ([]database.SyncLog, error)
-	getUserByIDFn             func(ctx context.Context, id pgtype.UUID) (database.User, error)
-	getUserByEmailFn          func(ctx context.Context, email string) (database.User, error)
-	getUserByAuthFn           func(ctx context.Context, arg database.GetUserByAuthParams) (database.User, error)
-	createUserFn              func(ctx context.Context, arg database.CreateUserParams) (database.User, error)
-	createUserWithPasswordFn  func(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)
-	updateUserProfileFn       func(ctx context.Context, arg database.UpdateUserProfileParams) (database.User, error)
-	getOrCreateTagFn          func(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error)
-	getTagByNameFn            func(ctx context.Context, name string) (database.Tag, error)
-	getTagByAliasFn           func(ctx context.Context, alias string) (database.Tag, error)
-	addMediaItemTagFn         func(ctx context.Context, arg database.AddMediaItemTagParams) error
-	listMediaItemTagsFn       func(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
-	platformBreakdownFn       func(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
-	tagDistributionFn         func(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
+	createMediaItemFn          func(ctx context.Context, arg database.CreateMediaItemParams) (database.MediaItem, error)
+	getMediaItemByIDFn         func(ctx context.Context, arg database.GetMediaItemByIDParams) (database.MediaItem, error)
+	getMediaItemByExternalIDFn func(ctx context.Context, arg database.GetMediaItemByExternalIDParams) (database.MediaItem, error)
+	listMediaItemsFn           func(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error)
+	updateEnrichmentStatusFn   func(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
+	listPendingEnrichmentFn    func(ctx context.Context, limit int32) ([]database.MediaItem, error)
+	getPluginStateFn           func(ctx context.Context, arg database.GetPluginStateParams) (database.PluginState, error)
+	upsertPluginStateFn        func(ctx context.Context, arg database.UpsertPluginStateParams) (database.PluginState, error)
+	updatePluginStateStatusFn  func(ctx context.Context, arg database.UpdatePluginStateStatusParams) (database.PluginState, error)
+	updatePluginStateSyncedFn  func(ctx context.Context, arg database.UpdatePluginStateSyncedParams) (database.PluginState, error)
+	listPluginStatesFn         func(ctx context.Context, userID pgtype.UUID) ([]database.PluginState, error)
+	getPluginCredentialsFn     func(ctx context.Context, arg database.GetPluginCredentialsParams) (database.PluginCredential, error)
+	upsertPluginCredentialsFn  func(ctx context.Context, arg database.UpsertPluginCredentialsParams) (database.PluginCredential, error)
+	deletePluginCredentialsFn  func(ctx context.Context, arg database.DeletePluginCredentialsParams) error
+	createSyncLogFn            func(ctx context.Context, arg database.CreateSyncLogParams) (database.SyncLog, error)
+	completeSyncLogFn          func(ctx context.Context, arg database.CompleteSyncLogParams) (database.SyncLog, error)
+	listSyncLogsFn             func(ctx context.Context, arg database.ListSyncLogsParams) ([]database.SyncLog, error)
+	getUserByIDFn              func(ctx context.Context, id pgtype.UUID) (database.User, error)
+	getUserByEmailFn           func(ctx context.Context, email string) (database.User, error)
+	getUserByProfileSlugFn     func(ctx context.Context, profileSlug pgtype.Text) (database.User, error)
+	getUserByAuthFn            func(ctx context.Context, arg database.GetUserByAuthParams) (database.User, error)
+	createUserFn               func(ctx context.Context, arg database.CreateUserParams) (database.User, error)
+	createUserWithPasswordFn   func(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)
+	updateUserProfileFn        func(ctx context.Context, arg database.UpdateUserProfileParams) (database.User, error)
+	getOrCreateTagFn           func(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error)
+	getTagByNameFn             func(ctx context.Context, name string) (database.Tag, error)
+	getTagByAliasFn            func(ctx context.Context, alias string) (database.Tag, error)
+	addMediaItemTagFn          func(ctx context.Context, arg database.AddMediaItemTagParams) error
+	listMediaItemTagsFn        func(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
+	platformBreakdownFn        func(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
+	tagDistributionFn          func(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
 }
 
 var _ Querier = (*mockQuerier)(nil)
@@ -169,6 +170,13 @@ func (m *mockQuerier) GetUserByID(ctx context.Context, id pgtype.UUID) (database
 		return m.getUserByIDFn(ctx, id)
 	}
 	return database.User{}, fmt.Errorf("GetUserByID not mocked")
+}
+
+func (m *mockQuerier) GetUserByProfileSlug(ctx context.Context, profileSlug pgtype.Text) (database.User, error) {
+	if m.getUserByProfileSlugFn != nil {
+		return m.getUserByProfileSlugFn(ctx, profileSlug)
+	}
+	return database.User{}, fmt.Errorf("GetUserByProfileSlug not mocked")
 }
 
 func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (database.User, error) {

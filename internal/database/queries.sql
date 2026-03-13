@@ -7,6 +7,9 @@ SELECT * FROM users WHERE auth_provider = $1 AND auth_subject = $2;
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1;
 
+-- name: GetUserByProfileSlug :one
+SELECT * FROM users WHERE profile_slug = $1;
+
 -- name: CreateUser :one
 INSERT INTO users (email, display_name, avatar_url, auth_provider, auth_subject)
 VALUES ($1, $2, $3, $4, $5)

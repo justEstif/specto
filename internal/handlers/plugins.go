@@ -10,6 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
+
+	"github.com/justestif/specto/components"
 	"github.com/justestif/specto/internal/auth"
 	"github.com/justestif/specto/internal/core"
 )
@@ -215,12 +219,8 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"plugin": pluginName,
-			"status": "connected",
-		},
-	})
+	// Redirect back to the plugins page after successful OAuth connection.
+	http.Redirect(w, r, "/plugins", http.StatusSeeOther)
 }
 
 // ImportPlugin handles POST /api/v1/plugins/{plugin}/import
@@ -277,6 +277,10 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.renderPluginCard(w, r, user.ID, pluginName) {
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"plugin":        pluginName,
@@ -314,6 +318,10 @@ func (h *Handler) DisconnectPlugin(w http.ResponseWriter, r *http.Request) {
 	_, err := h.App.PluginStates.UpdateStatus(r.Context(), user.ID, pluginName, "disconnected", nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update plugin state")
+		return
+	}
+
+	if h.renderPluginCard(w, r, user.ID, pluginName) {
 		return
 	}
 
@@ -369,6 +377,10 @@ func (h *Handler) SyncPlugin(w http.ResponseWriter, r *http.Request) {
 
 	// Get updated state for last_synced_at
 	state, _ := h.App.PluginStates.GetState(r.Context(), user.ID, pluginName)
+
+	if h.renderPluginCard(w, r, user.ID, pluginName) {
+		return
+	}
 
 	resp := map[string]any{
 		"plugin":        pluginName,
@@ -489,4 +501,30 @@ func pluginDisplayName(p core.SourcePlugin) string {
 	}
 	// Capitalize first letter
 	return strings.ToUpper(name[:1]) + name[1:]
+}
+
+// renderPluginCard re-renders a single PluginCard for HTMX responses.
+// Returns true if it handled the response (HTMX request), false if the
+// caller should fall back to JSON.
+func (h *Handler) renderPluginCard(w http.ResponseWriter, r *http.Request, userID uuid.UUID, pluginName string) bool {
+	if r.Header.Get("HX-Request") != "true" {
+		return false
+	}
+
+	p := h.App.Registry.Get(pluginName)
+	if p == nil {
+		return false
+	}
+
+	state, _ := h.App.PluginStates.GetState(r.Context(), userID, pluginName)
+	var stateInfo *core.PluginStateInfo
+	if state != nil {
+		stateInfo = state
+	}
+	view := buildPluginView(p, stateInfo)
+	csrfToken := csrf.Token(r)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	components.PluginCard(view, csrfToken).Render(r.Context(), w)
+	return true
 }

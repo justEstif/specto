@@ -654,17 +654,12 @@ func TestOAuthCallback(t *testing.T) {
 	callbackW := httptest.NewRecorder()
 	h.OAuthCallback(callbackW, callbackReq)
 
-	if callbackW.Code != http.StatusOK {
-		t.Fatalf("OAuthCallback: expected 200, got %d: %s", callbackW.Code, callbackW.Body.String())
+	if callbackW.Code != http.StatusSeeOther {
+		t.Fatalf("OAuthCallback: expected 303, got %d: %s", callbackW.Code, callbackW.Body.String())
 	}
 
-	callbackResp := parseResponse(t, callbackW)
-	data := callbackResp["data"].(map[string]any)
-	if data["plugin"] != "spotify" {
-		t.Errorf("plugin = %q, want spotify", data["plugin"])
-	}
-	if data["status"] != "connected" {
-		t.Errorf("status = %q, want connected", data["status"])
+	if loc := callbackW.Header().Get("Location"); loc != "/plugins" {
+		t.Errorf("redirect location = %q, want /plugins", loc)
 	}
 	if !upsertCredsCalled {
 		t.Error("expected UpsertCredentials to be called")

@@ -38,6 +38,7 @@ type Querier interface {
 	// Users
 	GetUserByID(ctx context.Context, id pgtype.UUID) (database.User, error)
 	GetUserByEmail(ctx context.Context, email string) (database.User, error)
+	GetUserByProfileSlug(ctx context.Context, profileSlug pgtype.Text) (database.User, error)
 	GetUserByAuth(ctx context.Context, arg database.GetUserByAuthParams) (database.User, error)
 	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.User, error)
 	CreateUserWithPassword(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)

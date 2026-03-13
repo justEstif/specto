@@ -1,7 +1,11 @@
 package components
 
-templ Home() {
-	@Layout("Specto") {
+import "github.com/justestif/specto/internal/core"
+
+// Home renders the landing page for unauthenticated visitors.
+templ Home(user *core.UserInfo) {
+	@Layout("Specto", user) {
+		<!-- Hero -->
 		<section class="py-16 sm:py-24">
 			<h1 class="text-display text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-balance animate-fade-in-up">
 				Know what you
@@ -20,5 +24,20 @@ templ Home() {
 				</a>
 			</div>
 		</section>
+		<!-- Feature grid -->
+		<section class="pb-16 sm:pb-24">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 animate-fade-in-up" style="animation-delay: 0.3s">
+				@featureCard("Unified Feed", "Pull history from every platform into a single chronological timeline. Spotify, YouTube, Netflix — all in one place.")
+				@featureCard("Insights & Tags", "See what patterns dominate your attention. Auto-tagged genres, moods, and topics surface your habits.")
+				@featureCard("Shareable Profiles", "Curate your media identity page. Choose what to show, what to hide, and share it with a link.")
+			</div>
+		</section>
 	}
+}
+
+templ featureCard(title, description string) {
+	<div class="card bg-neutral border border-base-300 p-6">
+		<h3 class="text-display text-lg font-semibold text-base-content mb-2">{ title }</h3>
+		<p class="text-base-content/60 text-sm leading-relaxed">{ description }</p>
+	</div>
 }

@@ -69,6 +69,8 @@ func New(db *database.Queries, cfg Config) *App {
 		nil, // use default logger
 	)
 
+	// Wire token refresher after OAuth service is created (set below)
+
 	insights := core.NewInsightsService(insightsStore)
 
 	// Build auth service
@@ -84,6 +86,9 @@ func New(db *database.Queries, cfg Config) *App {
 		}
 	}
 	oauthSvc := auth.NewOAuthService(cfg.BaseURL, oauthClients, nil)
+
+	// Wire token refresher so SyncService auto-refreshes expired OAuth tokens
+	syncer.TokenRefresher = oauthSvc
 
 	return &App{
 		Auth:         authSvc,
