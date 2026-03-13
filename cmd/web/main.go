@@ -12,6 +12,7 @@ import (
 	"github.com/justestif/specto/internal/database"
 	"github.com/justestif/specto/internal/handlers"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
+	"github.com/justestif/specto/internal/plugins/spotify"
 )
 
 func main() {
@@ -37,6 +38,11 @@ func main() {
 		EncryptionKey: encKey,
 		SessionSecret: sessionSecret,
 	})
+
+	// Register plugins
+	if err := application.Registry.Register(spotify.New()); err != nil {
+		log.Fatalf("Failed to register spotify plugin: %v", err)
+	}
 
 	// Wire handlers with dependencies
 	h := handlers.New(application)

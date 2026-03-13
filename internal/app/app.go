@@ -9,11 +9,19 @@ import (
 	"github.com/justestif/specto/internal/database"
 )
 
+// OAuthClientConfig holds the client credentials for an OAuth provider.
+type OAuthClientConfig struct {
+	ClientID     string
+	ClientSecret string
+}
+
 // Config holds all configuration values needed by the application.
 // Loaded once in main() and passed in — no env reads inside app.
 type Config struct {
-	EncryptionKey string // 64 hex chars for AES-256 credential encryption
-	SessionSecret []byte // at least 32 bytes for session cookie signing
+	EncryptionKey string                       // 64 hex chars for AES-256 credential encryption
+	SessionSecret []byte                       // at least 32 bytes for session cookie signing
+	BaseURL       string                       // server's public base URL (e.g., "http://localhost:3000")
+	OAuthClients  map[string]OAuthClientConfig // keyed by plugin name
 }
 
 // App holds all core dependencies. It is created once at startup and
@@ -21,6 +29,7 @@ type Config struct {
 type App struct {
 	// Core services
 	Auth     *auth.Service
+	OAuth    *auth.OAuthService
 	Registry *core.PluginRegistry
 	Syncer   *core.SyncService
 	Insights *core.InsightsService
@@ -66,8 +75,19 @@ func New(db *database.Queries, cfg Config) *App {
 	sessions := auth.NewSessionManager(cfg.SessionSecret)
 	authSvc := auth.NewService(userStore, sessions)
 
+	// Build OAuth service
+	oauthClients := make(map[string]auth.OAuthClientCredentials, len(cfg.OAuthClients))
+	for name, oc := range cfg.OAuthClients {
+		oauthClients[name] = auth.OAuthClientCredentials{
+			ClientID:     oc.ClientID,
+			ClientSecret: oc.ClientSecret,
+		}
+	}
+	oauthSvc := auth.NewOAuthService(cfg.BaseURL, oauthClients, nil)
+
 	return &App{
 		Auth:         authSvc,
+		OAuth:        oauthSvc,
 		Registry:     registry,
 		Syncer:       syncer,
 		Insights:     insights,

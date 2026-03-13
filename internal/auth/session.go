@@ -13,8 +13,10 @@ func init() {
 }
 
 const (
-	SessionName   = "specto_session"
-	sessionUserID = "user_id"
+	SessionName        = "specto_session"
+	sessionUserID      = "user_id"
+	sessionOAuthState  = "oauth_state"
+	sessionOAuthPlugin = "oauth_plugin"
 )
 
 // SessionManager wraps a session store, eliminating the package-level global.
@@ -67,4 +69,37 @@ func (sm *SessionManager) ClearSession(w http.ResponseWriter, r *http.Request) e
 	}
 	session.Options.MaxAge = -1
 	return session.Save(r, w)
+}
+
+// SetOAuthState stores the OAuth state token and associated plugin name
+// in the session. Used for CSRF protection during the OAuth flow.
+func (sm *SessionManager) SetOAuthState(w http.ResponseWriter, r *http.Request, state, pluginName string) error {
+	session, err := sm.store.Get(r, SessionName)
+	if err != nil {
+		return err
+	}
+	session.Values[sessionOAuthState] = state
+	session.Values[sessionOAuthPlugin] = pluginName
+	return session.Save(r, w)
+}
+
+// GetOAuthState retrieves and clears the OAuth state and plugin name
+// from the session. Returns empty strings if not found.
+func (sm *SessionManager) GetOAuthState(w http.ResponseWriter, r *http.Request) (state, pluginName string, err error) {
+	session, err := sm.store.Get(r, SessionName)
+	if err != nil {
+		return "", "", err
+	}
+
+	s, _ := session.Values[sessionOAuthState].(string)
+	p, _ := session.Values[sessionOAuthPlugin].(string)
+
+	// Clear the OAuth state after reading (one-time use)
+	delete(session.Values, sessionOAuthState)
+	delete(session.Values, sessionOAuthPlugin)
+	if err := session.Save(r, w); err != nil {
+		return "", "", err
+	}
+
+	return s, p, nil
 }

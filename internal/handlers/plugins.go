@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -73,6 +74,12 @@ func (h *Handler) GetPlugin(w http.ResponseWriter, r *http.Request) {
 // ConnectPlugin handles POST /api/v1/plugins/{plugin}/connect
 // Starts an OAuth connection flow for OAuth plugins.
 func (h *Handler) ConnectPlugin(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return
+	}
+
 	pluginName := chi.URLParam(r, "plugin")
 	p := h.App.Registry.Get(pluginName)
 	if p == nil {
@@ -91,13 +98,127 @@ func (h *Handler) ConnectPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build the OAuth authorization URL.
-	// The actual state parameter and redirect_uri handling will be
-	// implemented when OAuth login providers are built. For now, return
-	// the base auth URL so the client knows where to redirect.
+	// Generate a cryptographically random state for CSRF protection.
+	state, err := auth.GenerateState()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to generate OAuth state")
+		return
+	}
+
+	// Store the state in the user's session so the callback can validate it.
+	if err := h.App.Auth.Sessions.SetOAuthState(w, r, state, pluginName); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to save OAuth state")
+		return
+	}
+
+	// Build the full OAuth authorization URL with all query parameters.
+	redirectURL, err := h.App.OAuth.BuildAuthURL(pluginName, cfg, state)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", fmt.Sprintf("Failed to build OAuth URL: %s", err.Error()))
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]string{
-			"redirect_url": cfg.AuthURL,
+			"redirect_url": redirectURL,
+		},
+	})
+}
+
+// OAuthCallback handles GET /api/v1/plugins/{plugin}/callback
+// Processes the OAuth provider's redirect after user authorization.
+func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return
+	}
+
+	pluginName := chi.URLParam(r, "plugin")
+	p := h.App.Registry.Get(pluginName)
+	if p == nil {
+		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
+		return
+	}
+
+	if p.AuthType() != core.AuthOAuth {
+		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not use OAuth", pluginName))
+		return
+	}
+
+	cfg := p.AuthConfig()
+	if cfg == nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Plugin OAuth config is missing")
+		return
+	}
+
+	// Check for provider-side errors (e.g., user denied consent).
+	if errCode := r.URL.Query().Get("error"); errCode != "" {
+		errDesc := r.URL.Query().Get("error_description")
+		if errDesc == "" {
+			errDesc = errCode
+		}
+		writeError(w, http.StatusBadRequest, "oauth_error", fmt.Sprintf("OAuth provider error: %s", errDesc))
+		return
+	}
+
+	// Extract the authorization code and state from the query string.
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	if code == "" || state == "" {
+		writeError(w, http.StatusBadRequest, "validation_error", "Missing code or state parameter")
+		return
+	}
+
+	// Validate the state parameter against the session-stored value.
+	expectedState, expectedPlugin, err := h.App.Auth.Sessions.GetOAuthState(w, r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to read OAuth state from session")
+		return
+	}
+	if expectedState == "" || state != expectedState {
+		writeError(w, http.StatusBadRequest, "validation_error", "Invalid OAuth state parameter")
+		return
+	}
+	if pluginName != expectedPlugin {
+		writeError(w, http.StatusBadRequest, "validation_error", "OAuth callback plugin mismatch")
+		return
+	}
+
+	// Exchange the authorization code for tokens.
+	tokenResp, err := h.App.OAuth.ExchangeCode(pluginName, cfg, code)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "oauth_error", fmt.Sprintf("Token exchange failed: %s", err.Error()))
+		return
+	}
+
+	// Compute expiry time from expires_in.
+	var expiresAt *time.Time
+	if tokenResp.ExpiresIn > 0 {
+		t := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+		expiresAt = &t
+	}
+
+	// Store the OAuth credentials.
+	creds := core.Credentials{
+		AccessToken:  tokenResp.AccessToken,
+		RefreshToken: tokenResp.RefreshToken,
+	}
+	if err := h.App.PluginStates.UpsertCredentials(r.Context(), user.ID, pluginName, core.AuthOAuth, creds, expiresAt); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to store credentials")
+		return
+	}
+
+	// Mark plugin as connected.
+	if _, err := h.App.PluginStates.UpsertState(r.Context(), user.ID, pluginName, "connected", true); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update plugin state")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"plugin": pluginName,
+			"status": "connected",
 		},
 	})
 }

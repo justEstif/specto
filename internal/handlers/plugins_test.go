@@ -3,8 +3,10 @@ package handlers_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -24,6 +26,18 @@ func newTestHandler(registry *core.PluginRegistry, pluginStates core.PluginState
 		Registry:     registry,
 		PluginStates: pluginStates,
 		SyncLogs:     syncLogs,
+	}
+	return handlers.New(application)
+}
+
+func newTestHandlerWithOAuth(registry *core.PluginRegistry, pluginStates core.PluginStateStore, oauthSvc *auth.OAuthService) *handlers.Handler {
+	sessions := auth.NewSessionManager([]byte("test-session-secret-that-is-32b!"))
+	authSvc := auth.NewService(nil, sessions)
+	application := &app.App{
+		Auth:         authSvc,
+		OAuth:        oauthSvc,
+		Registry:     registry,
+		PluginStates: pluginStates,
 	}
 	return handlers.New(application)
 }
@@ -308,7 +322,11 @@ func TestConnectPluginOAuth(t *testing.T) {
 		},
 	})
 
-	h := newTestHandler(registry, &mockPluginStateStore{}, nil)
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "test-client-id", ClientSecret: "test-secret"},
+	}, nil)
+
+	h := newTestHandlerWithOAuth(registry, &mockPluginStateStore{}, oauthSvc)
 	req := authenticatedRequest("POST", "/api/v1/plugins/spotify/connect", uuid.New())
 	req = withChiParam(req, "plugin", "spotify")
 	w := httptest.NewRecorder()
@@ -321,8 +339,33 @@ func TestConnectPluginOAuth(t *testing.T) {
 
 	resp := parseResponse(t, w)
 	data := resp["data"].(map[string]any)
-	if data["redirect_url"] != "https://accounts.spotify.com/authorize" {
-		t.Errorf("unexpected redirect_url: %s", data["redirect_url"])
+	redirectURL := data["redirect_url"].(string)
+
+	// The redirect URL should be the full OAuth URL with query params.
+	u, err := url.Parse(redirectURL)
+	if err != nil {
+		t.Fatalf("redirect_url is not a valid URL: %v", err)
+	}
+
+	if u.Host != "accounts.spotify.com" {
+		t.Errorf("unexpected host: %s", u.Host)
+	}
+
+	q := u.Query()
+	if q.Get("client_id") != "test-client-id" {
+		t.Errorf("client_id = %q, want test-client-id", q.Get("client_id"))
+	}
+	if q.Get("response_type") != "code" {
+		t.Errorf("response_type = %q, want code", q.Get("response_type"))
+	}
+	if q.Get("scope") != "user-read-recently-played" {
+		t.Errorf("scope = %q, want user-read-recently-played", q.Get("scope"))
+	}
+	if q.Get("state") == "" {
+		t.Error("state parameter is missing")
+	}
+	if q.Get("redirect_uri") != "http://localhost:3000/api/v1/plugins/spotify/callback" {
+		t.Errorf("redirect_uri = %q", q.Get("redirect_uri"))
 	}
 }
 
@@ -453,5 +496,351 @@ func TestSyncHistoryPluginNotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// --- OAuth callback tests ---
+
+// setupOAuthCallbackTest creates a handler with a mock token server and
+// returns the handler, a function to make an authenticated callback request
+// with the state already stored in the session, and a cleanup function.
+func setupOAuthCallbackTest(t *testing.T, tokenHandler http.HandlerFunc) (h *handlers.Handler, makeReq func(code, state string) (*http.Request, *httptest.ResponseRecorder), cleanup func()) {
+	t.Helper()
+
+	tokenServer := httptest.NewServer(tokenHandler)
+
+	registry := core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     tokenServer.URL + "/token",
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "test-client-id", ClientSecret: "test-secret"},
+	}, tokenServer.Client())
+
+	states := &mockPluginStateStore{}
+	h = newTestHandlerWithOAuth(registry, states, oauthSvc)
+
+	makeReq = func(code, state string) (*http.Request, *httptest.ResponseRecorder) {
+		callbackURL := fmt.Sprintf("/api/v1/plugins/spotify/callback?code=%s&state=%s",
+			url.QueryEscape(code), url.QueryEscape(state))
+		req := authenticatedRequest("GET", callbackURL, uuid.New())
+		req = withChiParam(req, "plugin", "spotify")
+		return req, httptest.NewRecorder()
+	}
+
+	return h, makeReq, func() { tokenServer.Close() }
+}
+
+func TestOAuthCallback(t *testing.T) {
+	tokenHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "new-access-token",
+			"refresh_token": "new-refresh-token",
+			"expires_in":    3600,
+		})
+	})
+
+	registry := core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     "", // will be set below
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	tokenServer := httptest.NewServer(tokenHandler)
+	defer tokenServer.Close()
+
+	// Reconfigure with the correct TokenURL.
+	registry = core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     tokenServer.URL + "/token",
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "test-client-id", ClientSecret: "test-secret"},
+	}, tokenServer.Client())
+
+	var upsertCredsCalled bool
+	var upsertStateCalled bool
+	states := &mockPluginStateStore{
+		upsertCredsFn: func(_ context.Context, _ uuid.UUID, plugin string, authType core.AuthType, creds core.Credentials, expiresAt *time.Time) error {
+			upsertCredsCalled = true
+			if plugin != "spotify" {
+				t.Errorf("upsert plugin = %q, want spotify", plugin)
+			}
+			if authType != core.AuthOAuth {
+				t.Errorf("authType = %v, want AuthOAuth", authType)
+			}
+			if creds.AccessToken != "new-access-token" {
+				t.Errorf("AccessToken = %q, want new-access-token", creds.AccessToken)
+			}
+			if creds.RefreshToken != "new-refresh-token" {
+				t.Errorf("RefreshToken = %q, want new-refresh-token", creds.RefreshToken)
+			}
+			if expiresAt == nil {
+				t.Error("expiresAt should not be nil when expires_in is set")
+			}
+			return nil
+		},
+		upsertStateFn: func(_ context.Context, _ uuid.UUID, plugin, status string, enabled bool) (*core.PluginStateInfo, error) {
+			upsertStateCalled = true
+			if status != "connected" {
+				t.Errorf("status = %q, want connected", status)
+			}
+			if !enabled {
+				t.Error("expected enabled = true")
+			}
+			return &core.PluginStateInfo{Status: "connected"}, nil
+		},
+	}
+
+	h := newTestHandlerWithOAuth(registry, states, oauthSvc)
+
+	// Step 1: Call ConnectPlugin to set the state in the session.
+	connectReq := authenticatedRequest("POST", "/api/v1/plugins/spotify/connect", uuid.New())
+	connectReq = withChiParam(connectReq, "plugin", "spotify")
+	connectW := httptest.NewRecorder()
+	h.ConnectPlugin(connectW, connectReq)
+
+	if connectW.Code != http.StatusOK {
+		t.Fatalf("ConnectPlugin: expected 200, got %d: %s", connectW.Code, connectW.Body.String())
+	}
+
+	// Extract the state from the redirect URL.
+	connectResp := parseResponse(t, connectW)
+	connectData := connectResp["data"].(map[string]any)
+	redirectURL := connectData["redirect_url"].(string)
+	u, err := url.Parse(redirectURL)
+	if err != nil {
+		t.Fatalf("parse redirect_url: %v", err)
+	}
+	state := u.Query().Get("state")
+	if state == "" {
+		t.Fatal("state parameter is empty")
+	}
+
+	// Step 2: Simulate the OAuth callback with the correct state.
+	// Transfer session cookies from connect response to callback request.
+	callbackURL := fmt.Sprintf("/api/v1/plugins/spotify/callback?code=test-auth-code&state=%s", url.QueryEscape(state))
+	callbackReq := authenticatedRequest("GET", callbackURL, uuid.New())
+	callbackReq = withChiParam(callbackReq, "plugin", "spotify")
+
+	// Copy cookies from connect response to callback request.
+	for _, cookie := range connectW.Result().Cookies() {
+		callbackReq.AddCookie(cookie)
+	}
+
+	callbackW := httptest.NewRecorder()
+	h.OAuthCallback(callbackW, callbackReq)
+
+	if callbackW.Code != http.StatusOK {
+		t.Fatalf("OAuthCallback: expected 200, got %d: %s", callbackW.Code, callbackW.Body.String())
+	}
+
+	callbackResp := parseResponse(t, callbackW)
+	data := callbackResp["data"].(map[string]any)
+	if data["plugin"] != "spotify" {
+		t.Errorf("plugin = %q, want spotify", data["plugin"])
+	}
+	if data["status"] != "connected" {
+		t.Errorf("status = %q, want connected", data["status"])
+	}
+	if !upsertCredsCalled {
+		t.Error("expected UpsertCredentials to be called")
+	}
+	if !upsertStateCalled {
+		t.Error("expected UpsertState to be called")
+	}
+}
+
+func TestOAuthCallbackInvalidState(t *testing.T) {
+	registry := core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     "https://accounts.spotify.com/api/token",
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "id", ClientSecret: "secret"},
+	}, nil)
+
+	h := newTestHandlerWithOAuth(registry, &mockPluginStateStore{}, oauthSvc)
+
+	// First set a state via ConnectPlugin.
+	connectReq := authenticatedRequest("POST", "/api/v1/plugins/spotify/connect", uuid.New())
+	connectReq = withChiParam(connectReq, "plugin", "spotify")
+	connectW := httptest.NewRecorder()
+	h.ConnectPlugin(connectW, connectReq)
+
+	// Use a WRONG state in the callback.
+	callbackReq := authenticatedRequest("GET", "/api/v1/plugins/spotify/callback?code=test-code&state=wrong-state", uuid.New())
+	callbackReq = withChiParam(callbackReq, "plugin", "spotify")
+	for _, cookie := range connectW.Result().Cookies() {
+		callbackReq.AddCookie(cookie)
+	}
+
+	callbackW := httptest.NewRecorder()
+	h.OAuthCallback(callbackW, callbackReq)
+
+	if callbackW.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", callbackW.Code, callbackW.Body.String())
+	}
+
+	resp := parseResponse(t, callbackW)
+	errData := resp["error"].(map[string]any)
+	if errData["code"] != "validation_error" {
+		t.Errorf("error code = %q, want validation_error", errData["code"])
+	}
+}
+
+func TestOAuthCallbackMissingCode(t *testing.T) {
+	registry := core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     "https://accounts.spotify.com/api/token",
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "id", ClientSecret: "secret"},
+	}, nil)
+
+	h := newTestHandlerWithOAuth(registry, &mockPluginStateStore{}, oauthSvc)
+
+	// Missing code param.
+	req := authenticatedRequest("GET", "/api/v1/plugins/spotify/callback?state=some-state", uuid.New())
+	req = withChiParam(req, "plugin", "spotify")
+	w := httptest.NewRecorder()
+	h.OAuthCallback(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOAuthCallbackProviderError(t *testing.T) {
+	registry := core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     "https://accounts.spotify.com/api/token",
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "id", ClientSecret: "secret"},
+	}, nil)
+
+	h := newTestHandlerWithOAuth(registry, &mockPluginStateStore{}, oauthSvc)
+
+	// Provider sent an error (user denied consent).
+	req := authenticatedRequest("GET", "/api/v1/plugins/spotify/callback?error=access_denied&error_description=User+denied+access", uuid.New())
+	req = withChiParam(req, "plugin", "spotify")
+	w := httptest.NewRecorder()
+	h.OAuthCallback(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+
+	resp := parseResponse(t, w)
+	errData := resp["error"].(map[string]any)
+	if errData["code"] != "oauth_error" {
+		t.Errorf("error code = %q, want oauth_error", errData["code"])
+	}
+}
+
+func TestOAuthCallbackPluginNotFound(t *testing.T) {
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", nil, nil)
+	h := newTestHandlerWithOAuth(core.NewPluginRegistry(), &mockPluginStateStore{}, oauthSvc)
+
+	req := authenticatedRequest("GET", "/api/v1/plugins/nonexistent/callback?code=x&state=y", uuid.New())
+	req = withChiParam(req, "plugin", "nonexistent")
+	w := httptest.NewRecorder()
+
+	h.OAuthCallback(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestOAuthCallbackUnauthenticated(t *testing.T) {
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", nil, nil)
+	h := newTestHandlerWithOAuth(core.NewPluginRegistry(), &mockPluginStateStore{}, oauthSvc)
+
+	req := httptest.NewRequest("GET", "/api/v1/plugins/spotify/callback?code=x&state=y", nil)
+	req = withChiParam(req, "plugin", "spotify")
+	w := httptest.NewRecorder()
+
+	h.OAuthCallback(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestConnectPluginOAuthUnauthenticated(t *testing.T) {
+	registry := core.NewPluginRegistry()
+	registry.Register(&mockPlugin{
+		name:     "spotify",
+		authType: core.AuthOAuth,
+		authConfig: &core.OAuthConfig{
+			ProviderName: "Spotify",
+			AuthURL:      "https://accounts.spotify.com/authorize",
+			TokenURL:     "https://accounts.spotify.com/api/token",
+			Scopes:       []string{"user-read-recently-played"},
+		},
+	})
+
+	oauthSvc := auth.NewOAuthService("http://localhost:3000", map[string]auth.OAuthClientCredentials{
+		"spotify": {ClientID: "id", ClientSecret: "secret"},
+	}, nil)
+
+	h := newTestHandlerWithOAuth(registry, &mockPluginStateStore{}, oauthSvc)
+	req := httptest.NewRequest("POST", "/api/v1/plugins/spotify/connect", nil)
+	req = withChiParam(req, "plugin", "spotify")
+	w := httptest.NewRecorder()
+
+	h.ConnectPlugin(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
