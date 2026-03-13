@@ -1,0 +1,100 @@
+###########################################################
+# File import error handling tests
+###########################################################
+
+### Setup: Register and login a fresh user
+# @name errorUser
+{{
+  const timestamp = Date.now();
+  exports.errorEmail = `import_error_${timestamp}@example.com`;
+  exports.errorPassword = "password123";
+}}
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{errorEmail}}",
+  "display_name": "Error Tester",
+  "password": "{{errorPassword}}"
+}
+
+?? status == 201
+
+### Import malformed JSON file to Spotify (expect 500 - parse error)
+# @ref errorUser
+POST {{baseUrl}}/api/v1/plugins/spotify/import
+Content-Type: multipart/form-data; boundary=errorboundary
+
+--errorboundary
+Content-Disposition: form-data; name="file"; filename="bad.json"
+Content-Type: application/json
+
+< ./fixtures/malformed.json
+--errorboundary--
+
+?? status == 500
+
+### Import malformed JSON file to YouTube (expect 500 - parse error)
+# @ref errorUser
+POST {{baseUrl}}/api/v1/plugins/youtube/import
+Content-Type: multipart/form-data; boundary=errorboundary2
+
+--errorboundary2
+Content-Disposition: form-data; name="file"; filename="bad.json"
+Content-Type: application/json
+
+< ./fixtures/malformed.json
+--errorboundary2--
+
+?? status == 500
+
+### Import without file field (expect 400)
+# @ref errorUser
+POST {{baseUrl}}/api/v1/plugins/spotify/import
+Content-Type: multipart/form-data; boundary=emptyboundary
+
+--emptyboundary
+Content-Disposition: form-data; name="notfile"; filename="test.json"
+Content-Type: application/json
+
+[]
+--emptyboundary--
+
+?? status == 400
+?? body error.code == validation_error
+
+### Import to nonexistent plugin (expect 404)
+# @ref errorUser
+POST {{baseUrl}}/api/v1/plugins/nonexistent/import
+Content-Type: multipart/form-data; boundary=nfboundary
+
+--nfboundary
+Content-Disposition: form-data; name="file"; filename="test.json"
+Content-Type: application/json
+
+[]
+--nfboundary--
+
+?? status == 404
+?? body error.code == not_found
+
+### Disconnect nonexistent plugin (expect 404)
+# @ref errorUser
+DELETE {{baseUrl}}/api/v1/plugins/nonexistent/disconnect
+
+?? status == 404
+?? body error.code == not_found
+
+### Sync nonexistent plugin (expect 404)
+# @ref errorUser
+POST {{baseUrl}}/api/v1/plugins/nonexistent/sync
+
+?? status == 404
+?? body error.code == not_found
+
+### Get sync history of nonexistent plugin (expect 404)
+# @ref errorUser
+GET {{baseUrl}}/api/v1/plugins/nonexistent/sync-history
+
+?? status == 404
+?? body error.code == not_found

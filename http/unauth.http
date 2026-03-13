@@ -1,0 +1,88 @@
+###########################################################
+# Unauthenticated access tests
+# All plugin/timeline/insights endpoints should return 401
+# First we log out to clear any session from previous tests
+###########################################################
+
+### Logout to ensure no session
+DELETE {{baseUrl}}/api/v1/session
+
+### List plugins (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/plugins
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Get plugin detail (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/plugins/spotify
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Connect plugin (unauthenticated - expect 401)
+POST {{baseUrl}}/api/v1/plugins/spotify-api/connect
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Import file (unauthenticated - expect 401)
+POST {{baseUrl}}/api/v1/plugins/spotify/import
+Content-Type: multipart/form-data; boundary=unauthboundary
+
+--unauthboundary
+Content-Disposition: form-data; name="file"; filename="test.json"
+Content-Type: application/json
+
+[]
+--unauthboundary--
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Sync plugin (unauthenticated - expect 401)
+POST {{baseUrl}}/api/v1/plugins/spotify/sync
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Disconnect plugin (unauthenticated - expect 401)
+DELETE {{baseUrl}}/api/v1/plugins/spotify/disconnect
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Sync history (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/plugins/spotify/sync-history
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Timeline (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/timeline
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights summary (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/summary
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights platform breakdown (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/platform-breakdown
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights tags (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/tags
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights timeline (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/timeline
+
+?? status == 401
+?? body error.code == unauthorized

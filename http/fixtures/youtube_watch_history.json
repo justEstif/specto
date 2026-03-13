@@ -1,0 +1,51 @@
+[
+  {
+    "header": "YouTube",
+    "title": "Watched Building REST APIs in Go",
+    "titleUrl": "https://www.youtube.com/watch?v=abc123def",
+    "subtitles": [
+      {
+        "name": "Tech With Tim",
+        "url": "https://www.youtube.com/channel/UC4JX40jDee_tINbkjycV4Sg"
+      }
+    ],
+    "time": "2026-02-20T10:00:00.000Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  },
+  {
+    "header": "YouTube",
+    "title": "Watched Understanding Concurrency",
+    "titleUrl": "https://www.youtube.com/watch?v=xyz789ghi",
+    "subtitles": [
+      {
+        "name": "Go School",
+        "url": "https://www.youtube.com/channel/UCnUYZLuoy1rq1aVMwx4aTzw"
+      }
+    ],
+    "time": "2026-02-20T11:30:00.000Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  },
+  {
+    "header": "YouTube",
+    "title": "Watched a video that has been removed",
+    "time": "2026-02-20T12:00:00.000Z",
+    "products": ["YouTube"],
+    "activityControls": ["YouTube watch history"]
+  },
+  {
+    "header": "YouTube Music",
+    "title": "Watched Comfortably Numb",
+    "titleUrl": "https://www.youtube.com/watch?v=mus456jkl",
+    "subtitles": [
+      {
+        "name": "Pink Floyd - Topic",
+        "url": "https://www.youtube.com/channel/UCY2qt3dw2TQJxvBrDiYGHdQ"
+      }
+    ],
+    "time": "2026-02-20T13:00:00.000Z",
+    "products": ["YouTube Music"],
+    "activityControls": ["YouTube watch history"]
+  }
+]

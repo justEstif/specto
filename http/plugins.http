@@ -1,0 +1,92 @@
+###########################################################
+# Plugin management integration tests
+# Requires: authenticated session (run auth.http first)
+###########################################################
+
+### Setup: Register and login a fresh user
+# @name pluginUser
+{{
+  const timestamp = Date.now();
+  exports.pluginEmail = `plugin_test_${timestamp}@example.com`;
+  exports.pluginPassword = "password123";
+}}
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{pluginEmail}}",
+  "display_name": "Plugin Tester",
+  "password": "{{pluginPassword}}"
+}
+
+?? status == 201
+
+### List all plugins
+# @ref pluginUser
+GET {{baseUrl}}/api/v1/plugins
+
+?? status == 200
+?? header content-type includes json
+
+### Get Spotify file import plugin detail
+# @ref pluginUser
+GET {{baseUrl}}/api/v1/plugins/spotify
+
+?? status == 200
+?? header content-type includes json
+?? body data.name == spotify
+?? body data.auth_type == file_import
+?? body data.status == disconnected
+?? body data.connected == false
+?? body data.capabilities.can_import == true
+?? body data.capabilities.can_connect == false
+
+### Get Spotify API plugin detail
+# @ref pluginUser
+GET {{baseUrl}}/api/v1/plugins/spotify-api
+
+?? status == 200
+?? body data.name == spotify-api
+?? body data.auth_type == oauth
+?? body data.capabilities.can_connect == true
+?? body data.capabilities.can_import == false
+?? body data.capabilities.can_sync == true
+
+### Get YouTube plugin detail
+# @ref pluginUser
+GET {{baseUrl}}/api/v1/plugins/youtube
+
+?? status == 200
+?? body data.name == youtube
+?? body data.auth_type == file_import
+?? body data.capabilities.can_import == true
+?? body data.capabilities.can_connect == false
+
+### Get nonexistent plugin (expect 404)
+# @ref pluginUser
+GET {{baseUrl}}/api/v1/plugins/nonexistent
+
+?? status == 404
+?? body error.code == not_found
+
+### Connect file-import plugin (expect 400 - wrong auth type)
+# @ref pluginUser
+POST {{baseUrl}}/api/v1/plugins/spotify/connect
+
+?? status == 400
+?? body error.code == validation_error
+
+### Import to OAuth plugin (expect 400 - wrong auth type)
+# @ref pluginUser
+POST {{baseUrl}}/api/v1/plugins/spotify-api/import
+Content-Type: multipart/form-data; boundary=testboundary
+
+--testboundary
+Content-Disposition: form-data; name="file"; filename="test.json"
+Content-Type: application/json
+
+[]
+--testboundary--
+
+?? status == 400
+?? body error.code == validation_error

@@ -13,6 +13,7 @@ import (
 	"github.com/justestif/specto/internal/handlers"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
 	"github.com/justestif/specto/internal/plugins/spotify"
+	"github.com/justestif/specto/internal/plugins/youtube"
 )
 
 func main() {
@@ -61,6 +62,9 @@ func main() {
 	}
 	if err := application.Registry.Register(spotify.NewAPI()); err != nil {
 		log.Fatalf("Failed to register spotify-api plugin: %v", err)
+	}
+	if err := application.Registry.Register(youtube.New()); err != nil {
+		log.Fatalf("Failed to register youtube plugin: %v", err)
 	}
 
 	// Wire handlers with dependencies

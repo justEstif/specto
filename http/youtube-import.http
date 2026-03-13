@@ -1,0 +1,65 @@
+###########################################################
+# YouTube Takeout file import lifecycle test
+# Flow: Register -> Import -> Verify timeline -> Check sync history
+###########################################################
+
+### Setup: Register and login a fresh user for YouTube import
+# @name youtubeUser
+{{
+  const timestamp = Date.now();
+  exports.youtubeEmail = `youtube_import_${timestamp}@example.com`;
+  exports.youtubePassword = "password123";
+}}
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{youtubeEmail}}",
+  "display_name": "YouTube Tester",
+  "password": "{{youtubePassword}}"
+}
+
+?? status == 201
+
+### Import YouTube Takeout watch history
+# @ref youtubeUser
+POST {{baseUrl}}/api/v1/plugins/youtube/import
+Content-Type: multipart/form-data; boundary=ytboundary
+
+--ytboundary
+Content-Disposition: form-data; name="file"; filename="watch-history.json"
+Content-Type: application/json
+
+< ./fixtures/youtube_watch_history.json
+--ytboundary--
+
+?? status == 200
+?? header content-type includes json
+?? body data.plugin == youtube
+?? body data.status == connected
+?? body data.imported == true
+?? body data.items_added == 3
+
+### Verify YouTube plugin is now connected
+# @ref youtubeUser
+GET {{baseUrl}}/api/v1/plugins/youtube
+
+?? status == 200
+?? body data.status == connected
+?? body data.connected == true
+
+### Verify timeline shows imported YouTube items
+# @ref youtubeUser
+GET {{baseUrl}}/api/v1/timeline?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Check YouTube sync history
+# @ref youtubeUser
+GET {{baseUrl}}/api/v1/plugins/youtube/sync-history?limit=5
+
+?? status == 200
+?? header content-type includes json
+
+

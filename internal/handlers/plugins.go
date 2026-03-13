@@ -264,15 +264,9 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store file credentials so the syncer can access the file
-	creds := core.Credentials{File: file}
-	if err := h.App.PluginStates.UpsertCredentials(r.Context(), user.ID, pluginName, core.AuthFileImport, creds, nil); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to store import credentials")
-		return
-	}
-
-	// Run sync (which calls the plugin's Sync with the file reader)
-	summary, err := h.App.Syncer.SyncPlugin(r.Context(), user.ID, pluginName)
+	// Run sync with the file reader directly — io.Reader can't be
+	// serialized to the credential store, so we pass it explicitly.
+	summary, err := h.App.Syncer.SyncPluginWithFile(r.Context(), user.ID, pluginName, file)
 	if err != nil {
 		var rateLimitErr *core.RateLimitError
 		if errors.As(err, &rateLimitErr) {

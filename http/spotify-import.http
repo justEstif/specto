@@ -1,0 +1,79 @@
+###########################################################
+# Spotify GDPR file import lifecycle test
+# Flow: Register -> Import -> Verify timeline -> Check sync history -> Disconnect
+###########################################################
+
+### Setup: Register and login a fresh user for Spotify import
+# @name spotifyUser
+{{
+  const timestamp = Date.now();
+  exports.spotifyEmail = `spotify_import_${timestamp}@example.com`;
+  exports.spotifyPassword = "password123";
+}}
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{spotifyEmail}}",
+  "display_name": "Spotify Tester",
+  "password": "{{spotifyPassword}}"
+}
+
+?? status == 201
+
+### Import Spotify GDPR streaming history
+# @ref spotifyUser
+POST {{baseUrl}}/api/v1/plugins/spotify/import
+Content-Type: multipart/form-data; boundary=spotifyboundary
+
+--spotifyboundary
+Content-Disposition: form-data; name="file"; filename="Streaming_History_Audio_0.json"
+Content-Type: application/json
+
+< ./fixtures/spotify_streaming_history.json
+--spotifyboundary--
+
+?? status == 200
+?? header content-type includes json
+?? body data.plugin == spotify
+?? body data.status == connected
+?? body data.imported == true
+?? body data.items_added == 3
+
+### Verify Spotify plugin is now connected
+# @ref spotifyUser
+GET {{baseUrl}}/api/v1/plugins/spotify
+
+?? status == 200
+?? body data.status == connected
+?? body data.connected == true
+
+### Verify timeline shows imported Spotify items
+# @ref spotifyUser
+GET {{baseUrl}}/api/v1/timeline?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Check Spotify sync history
+# @ref spotifyUser
+GET {{baseUrl}}/api/v1/plugins/spotify/sync-history?limit=5
+
+?? status == 200
+?? header content-type includes json
+
+### Disconnect Spotify plugin
+# @ref spotifyUser
+DELETE {{baseUrl}}/api/v1/plugins/spotify/disconnect
+
+?? status == 200
+?? body data.plugin == spotify
+?? body data.status == disconnected
+
+### Verify plugin is disconnected
+# @ref spotifyUser
+GET {{baseUrl}}/api/v1/plugins/spotify
+
+?? status == 200
+?? body data.status == disconnected
+?? body data.connected == false
