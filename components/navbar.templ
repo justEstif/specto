@@ -1,7 +1,19 @@
 package components
 
 templ Navbar() {
-	<nav>
-		<a href="/">Specto</a>
+	<nav class="vt-navbar navbar bg-base-200/60 backdrop-blur-md border-b border-base-300 sticky top-0 z-50">
+		<div class="flex-1">
+			<a href="/" class="text-display text-xl font-bold tracking-tight text-primary hover:text-primary/80 transition-colors">
+				Specto
+			</a>
+		</div>
+		<div class="flex-none gap-2">
+			<a href="/dashboard" class="btn btn-ghost btn-sm text-base-content/70 hover:text-base-content">
+				Dashboard
+			</a>
+			<a href="/timeline" class="btn btn-ghost btn-sm text-base-content/70 hover:text-base-content">
+				Timeline
+			</a>
+		</div>
 	</nav>
 }

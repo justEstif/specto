@@ -4,3 +4,474 @@
 @source not "./daisyui{,*}.mjs";
 
 @plugin "../daisyui.mjs";
+
+/* ──────────────────────────────────────────────────────────────
+   Specto — Custom DaisyUI Themes
+   Aesthetic: Dark & Cinematic
+   Deep blacks, muted jewel-tone accents, sharp edges.
+   Premium streaming-app feel (Letterboxd / Plex territory).
+   ────────────────────────────────────────────────────────────── */
+
+/* ── DARK THEME (default) ─────────────────────────────────────
+   Base: near-true-black with subtle warm undertone.
+   Primary: warm amber/gold — the signature "spectral" accent.
+   Secondary: muted teal — cool counterpoint for balance.
+   Accent: dusty rose/copper — editorial highlight for badges, tags.
+   Neutral: dark charcoal with warmth — cards, dropdowns, overlays.
+*/
+@plugin "../daisyui-theme.mjs" {
+  name: "specto-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  /* Base surfaces — layered blacks with a warm 70° undertone */
+  --color-base-100: oklch(14% 0.008 70);
+  --color-base-200: oklch(11% 0.006 70);
+  --color-base-300: oklch(8% 0.004 70);
+  --color-base-content: oklch(90% 0.008 80);
+
+  /* Primary — warm amber/gold. The hero color. */
+  --color-primary: oklch(72% 0.155 70);
+  --color-primary-content: oklch(12% 0.02 70);
+
+  /* Secondary — desaturated teal. Cool counterpoint. */
+  --color-secondary: oklch(62% 0.09 190);
+  --color-secondary-content: oklch(95% 0.01 190);
+
+  /* Accent — dusty copper/rose. For badges, tags, highlights. */
+  --color-accent: oklch(62% 0.12 25);
+  --color-accent-content: oklch(95% 0.01 25);
+
+  /* Neutral — warm dark charcoal. Cards, overlays, elevated surfaces. */
+  --color-neutral: oklch(22% 0.01 70);
+  --color-neutral-content: oklch(85% 0.008 70);
+
+  /* Semantic status colors — desaturated to stay cinematic */
+  --color-info: oklch(65% 0.12 235);
+  --color-info-content: oklch(14% 0.02 235);
+  --color-success: oklch(65% 0.14 155);
+  --color-success-content: oklch(14% 0.02 155);
+  --color-warning: oklch(75% 0.14 65);
+  --color-warning-content: oklch(14% 0.02 65);
+  --color-error: oklch(62% 0.18 18);
+  --color-error-content: oklch(95% 0.01 18);
+
+  /* Shape — sharp, cinematic. Minimal rounding. */
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+
+  /* Sizing */
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  /* Fine 1px borders for structure without heaviness */
+  --border: 1px;
+
+  /* Subtle depth, no noise — clean premium surfaces */
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ── LIGHT THEME ──────────────────────────────────────────────
+   For users who prefer light mode.
+   Warm cream paper base, same jewel-tone accents shifted for contrast.
+   Feels like a high-end magazine/editorial layout.
+*/
+@plugin "../daisyui-theme.mjs" {
+  name: "specto-light";
+  color-scheme: light;
+
+  /* Base surfaces — warm cream/parchment tones */
+  --color-base-100: oklch(97% 0.008 80);
+  --color-base-200: oklch(94% 0.01 80);
+  --color-base-300: oklch(90% 0.014 80);
+  --color-base-content: oklch(18% 0.015 70);
+
+  /* Primary — deeper amber for legibility on light backgrounds */
+  --color-primary: oklch(52% 0.17 55);
+  --color-primary-content: oklch(97% 0.008 55);
+
+  /* Secondary — richer teal on light */
+  --color-secondary: oklch(45% 0.1 190);
+  --color-secondary-content: oklch(97% 0.008 190);
+
+  /* Accent — warm copper, deeper for contrast */
+  --color-accent: oklch(50% 0.14 25);
+  --color-accent-content: oklch(97% 0.008 25);
+
+  /* Neutral — warm medium gray */
+  --color-neutral: oklch(35% 0.015 70);
+  --color-neutral-content: oklch(95% 0.005 70);
+
+  /* Semantic — slightly more saturated for light backgrounds */
+  --color-info: oklch(50% 0.15 235);
+  --color-info-content: oklch(97% 0.01 235);
+  --color-success: oklch(50% 0.16 155);
+  --color-success-content: oklch(97% 0.01 155);
+  --color-warning: oklch(60% 0.16 65);
+  --color-warning-content: oklch(18% 0.02 65);
+  --color-error: oklch(52% 0.2 18);
+  --color-error-content: oklch(97% 0.01 18);
+
+  /* Same sharp shape language */
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Custom utilities & design tokens
+   ────────────────────────────────────────────────────────────── */
+
+/* Tailwind v4 dark: variant mapped to specto-dark theme */
+@custom-variant dark (&:where([data-theme=specto-dark], [data-theme=specto-dark] *));
+
+/* ── Typography via Google Fonts ──────────────────────────────
+   Display: "Playfair Display" — high-contrast serif for headings.
+             Cinematic, editorial, striking at large sizes.
+   Body:    "DM Sans" — geometric sans with warmth.
+             Clean but not clinical, excellent x-height.
+   Mono:    "JetBrains Mono" — for code/data readability.
+*/
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@theme {
+  --font-display: "Playfair Display", "Georgia", serif;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ── Global base styles ──────────────────────────────────────
+   Set body font, smooth rendering, and scrollbar styling.
+*/
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  /* Subtle warm-tinted scrollbar for dark theme */
+  [data-theme="specto-dark"] {
+    scrollbar-color: oklch(28% 0.01 70) transparent;
+
+    ::selection {
+      background: oklch(72% 0.155 70 / 0.3);
+      color: oklch(95% 0.008 80);
+    }
+  }
+
+  [data-theme="specto-light"] {
+    scrollbar-color: oklch(80% 0.01 70) transparent;
+
+    ::selection {
+      background: oklch(52% 0.17 55 / 0.25);
+      color: oklch(18% 0.015 70);
+    }
+  }
+}
+
+/* ── Utility classes specific to Specto ──────────────────────
+   These extend Tailwind with app-specific patterns.
+*/
+@utility text-display {
+  font-family: var(--font-display);
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility text-pretty {
+  text-wrap: pretty;
+}
+
+/* Grain overlay — cinematic texture for hero sections */
+@utility grain {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+    mix-blend-mode: overlay;
+    border-radius: inherit;
+  }
+}
+
+/* Shimmer animation for loading states */
+@utility shimmer {
+  background: linear-gradient(
+    110deg,
+    oklch(20% 0.005 70) 0%,
+    oklch(25% 0.008 70) 40%,
+    oklch(30% 0.01 70) 50%,
+    oklch(25% 0.008 70) 60%,
+    oklch(20% 0.005 70) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Fade-in-up for staggered reveals */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out both;
+}
+
+/* Subtle glow for primary-colored interactive elements */
+@utility glow-primary {
+  box-shadow: 0 0 20px -4px oklch(72% 0.155 70 / 0.25);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   View Transition API
+   htmx supports this natively via hx-swap="transition:true"
+   or globalViewTransitions config. We define the CSS animations
+   that control what the transitions look like.
+   ────────────────────────────────────────────────────────────── */
+
+@layer base {
+  /* Opt-in to view transitions for same-origin navigations */
+  @view-transition {
+    navigation: auto;
+  }
+
+  /* Named transition regions — elements with these classes get
+     isolated view-transition animations instead of the page-wide default */
+
+  /* Main content area — slides & cross-fades between pages */
+  .vt-main {
+    view-transition-name: main-content;
+  }
+
+  /* Navbar persists across navigations — no transition needed */
+  .vt-navbar {
+    view-transition-name: navbar;
+  }
+
+  /* Page heading — can morph between page titles */
+  .vt-heading {
+    view-transition-name: page-heading;
+  }
+
+  /* ── Default page transition: cinematic cross-fade ──────── */
+  ::view-transition-old(root) {
+    animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-fade-out;
+  }
+
+  ::view-transition-new(root) {
+    animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) 100ms both vt-fade-in;
+  }
+
+  /* ── Main content: slide + fade for a cinematic page change ── */
+  ::view-transition-old(main-content) {
+    animation:
+      200ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out,
+      300ms cubic-bezier(0.4, 0, 0.2, 1) both vt-slide-out-left;
+  }
+
+  ::view-transition-new(main-content) {
+    animation:
+      300ms cubic-bezier(0, 0, 0.2, 1) 80ms both vt-fade-in,
+      300ms cubic-bezier(0.4, 0, 0.2, 1) 80ms both vt-slide-in-right;
+  }
+
+  /* ── Navbar: stays put, no animation ── */
+  ::view-transition-old(navbar),
+  ::view-transition-new(navbar) {
+    animation: none;
+  }
+
+  /* ── Page heading: smooth morph-like cross-fade ── */
+  ::view-transition-old(page-heading) {
+    animation: 200ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+  }
+
+  ::view-transition-new(page-heading) {
+    animation: 300ms cubic-bezier(0, 0, 0.2, 1) 50ms both vt-fade-in;
+  }
+
+  /* ── Respect reduced motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* View transition keyframes */
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes vt-slide-in-right {
+  from { transform: translateX(30px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes vt-slide-out-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-30px); }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   HTMX CSS State Classes
+   htmx applies these classes during its request lifecycle.
+   We style them to give visual feedback without any JS.
+   
+   Lifecycle:
+     1. htmx-request    — added to triggering element while request is in flight
+     2. htmx-swapping   — added to target element during the swap phase
+     3. htmx-settling   — added to target element during the settle phase
+     4. htmx-added      — added to newly inserted elements during settle
+   ────────────────────────────────────────────────────────────── */
+
+@layer base {
+  /* ── Request in flight ──────────────────────────────────────
+     Dim the triggering element while waiting for a response.
+     Applies to buttons, forms, any element with hx-* triggers. */
+  .htmx-request {
+    opacity: 0.65;
+    pointer-events: none;
+    transition: opacity 200ms ease-out;
+  }
+
+  /* Buttons get a loading spinner when they trigger requests */
+  .htmx-request.btn,
+  button.htmx-request,
+  a.htmx-request.btn {
+    position: relative;
+    color: transparent !important;
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 9999px;
+      animation: htmx-spin 0.6s linear infinite;
+      /* Reset color since we made parent transparent */
+      color: oklch(90% 0.008 80);
+    }
+  }
+
+  @keyframes htmx-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ── Request indicator ──────────────────────────────────────
+     The standard htmx indicator pattern. Hidden by default,
+     revealed when a parent/sibling has .htmx-request. */
+  .htmx-indicator {
+    opacity: 0;
+    transition: opacity 300ms ease-in;
+  }
+
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator {
+    opacity: 1;
+  }
+
+  /* ── Swapping phase ─────────────────────────────────────────
+     Brief fade-out of old content before new content arrives. */
+  .htmx-swapping {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+
+  /* ── Settling phase ─────────────────────────────────────────
+     New content fades/slides in during settle. */
+  .htmx-settling {
+    transition: opacity 200ms ease-out, transform 200ms ease-out;
+  }
+
+  /* ── Newly added content ────────────────────────────────────
+     Elements just inserted into the DOM get a subtle entrance. */
+  .htmx-added {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  /* Once htmx-added is removed (after settle), these kick in */
+  [hx-get], [hx-post], [hx-put], [hx-patch], [hx-delete],
+  [data-hx-get], [data-hx-post] {
+    transition: opacity 200ms ease-out, transform 200ms ease-out;
+  }
+}
+
+/* ── Global loading bar ──────────────────────────────────────
+   A thin animated bar at the top of the viewport, triggered
+   when any htmx request is in flight on the body.
+   Uses the hx-indicator pattern pointed at #page-loader. */
+@layer base {
+  #page-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 9999;
+    opacity: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(72% 0.155 70) 30%,
+      oklch(72% 0.155 70) 70%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    transition: opacity 200ms ease-in;
+
+    &.htmx-request {
+      opacity: 1;
+      pointer-events: auto;
+      animation: page-loader-slide 1s ease-in-out infinite;
+    }
+  }
+
+  @keyframes page-loader-slide {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+}

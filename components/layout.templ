@@ -2,17 +2,23 @@ package components
 
 templ Layout(title string) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" data-theme="specto-dark">
 	<head>
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<title>{ title }</title>
 		<link rel="stylesheet" href="/static/css/tailwind.css"/>
 		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+		<!-- Enable View Transitions API globally for all htmx swaps -->
+		<meta name="htmx-config" content='{"globalViewTransitions": true, "defaultSwapStyle": "innerHTML", "defaultSettleDelay": 20}'/>
 	</head>
-	<body>
+	<body class="bg-base-100 text-base-content min-h-screen font-sans antialiased"
+		hx-indicator="#page-loader"
+		hx-boost="true">
+		<!-- Global loading bar — visible during any htmx request -->
+		<div id="page-loader"></div>
 		@Navbar()
-		<main>
+		<main class="vt-main mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
 			{ children... }
 		</main>
 	</body>

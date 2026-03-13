@@ -147,8 +147,12 @@ import (
 ### Templates & Frontend
 
 - Templ for type-safe Go HTML templates (`.templ` files)
-- HTMX for dynamic interactions (CDN-loaded)
+- HTMX for dynamic interactions (CDN-loaded, `hx-boost` on `<body>`)
 - DaisyUI + Tailwind CSS via standalone binary (not npm)
+- Custom themes (`specto-dark`, `specto-light`) defined in `styles/input.css`
+- View Transition API enabled globally for all htmx swaps
+- HTMX CSS state classes styled for loading/transition feedback (no JS needed)
+- See [`docs/styling.md`](docs/styling.md) for full details
 
 ## Documentation
 
@@ -163,5 +167,6 @@ relevant subsystem:
 - [`docs/enrichment.md`](docs/enrichment.md) -- Enrichment pipeline and tagging system
 - [`docs/development-workflow.md`](docs/development-workflow.md) -- Dev setup, httpyac testing conventions
 - [`docs/sharing.md`](docs/sharing.md) -- Shareable user profiles
+- [`docs/styling.md`](docs/styling.md) -- DaisyUI themes, typography, HTMX CSS states, View Transitions
 - [`docs/MVP.md`](docs/MVP.md) -- Product scope and feature list
 - [`docs/plugins/`](docs/plugins/) -- Platform-specific API research (spotify, youtube, etc.)

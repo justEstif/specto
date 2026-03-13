@@ -1,10 +1,11 @@
 ---
 # project-media-consumption-analysis-l1gi
 title: Design website UI/UX
-status: todo
+status: in-progress
 type: task
+priority: normal
 created_at: 2026-03-13T12:51:13Z
-updated_at: 2026-03-13T12:51:13Z
+updated_at: 2026-03-13T15:08:04Z
 parent: project-media-consumption-analysis-nn0q
 ---
 
@@ -18,3 +19,7 @@ Create the visual and UX design for Specto's web app before implementation begin
 - Wireframes or mockups for each key screen
 
 This should produce a design document in docs/ that the team references during implementation.
+
+## Work Done\n\n### Custom DaisyUI Theme (styles/input.css)\n- Created `specto-dark` theme (default) — dark & cinematic aesthetic\n- Created `specto-light` theme — warm editorial counterpart\n- Both use oklch color space with warm amber primary, desaturated teal secondary, dusty copper accent\n- Sharp edges (0.25rem/0.5rem radii), fine 1px borders, depth enabled\n\n### Typography\n- Display: Playfair Display (serif) — cinematic headings\n- Body: DM Sans (geometric sans) — clean, warm\n- Mono: JetBrains Mono — data/code readability\n- Loaded via Google Fonts\n\n### Custom Utilities\n- `text-display` — applies display font\n- `grain` — SVG noise overlay for hero sections\n- `shimmer` — loading state animation\n- `animate-fade-in-up` — staggered entrance animation\n- `glow-primary` — amber glow for CTAs\n\n### Updated Templates\n- `layout.templ` — added data-theme, base styles, font, container\n- `navbar.templ` — DaisyUI navbar with blur backdrop, sticky, styled links\n- `home.templ` — hero section with display typography, staggered animation
+
+\n### Styling Doc\n- Created `docs/styling.md` covering themes, typography, custom utilities, HTMX CSS state classes, View Transition API, conventions\n- Added reference to AGENTS.md documentation list

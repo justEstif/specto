@@ -2,7 +2,23 @@ package components
 
 templ Home() {
 	@Layout("Specto") {
-		<h1>Specto</h1>
-		<p>Media consumption analysis dashboard.</p>
+		<section class="py-16 sm:py-24">
+			<h1 class="text-display text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-balance animate-fade-in-up">
+				Know what you
+				<span class="text-primary">consume.</span>
+			</h1>
+			<p class="mt-6 max-w-2xl text-lg text-base-content/60 text-pretty animate-fade-in-up" style="animation-delay: 0.1s">
+				Your media diet across every platform — unified, analyzed, and shareable.
+				Connect Spotify, YouTube, Netflix, and more.
+			</p>
+			<div class="mt-10 flex gap-4 animate-fade-in-up" style="animation-delay: 0.2s">
+				<a href="/register" class="btn btn-primary glow-primary">
+					Get started
+				</a>
+				<a href="/login" class="btn btn-ghost border-base-300">
+					Sign in
+				</a>
+			</div>
+		</section>
 	}
 }
