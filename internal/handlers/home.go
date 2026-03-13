@@ -18,36 +18,62 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 		components.Home(nil).Render(r.Context(), w)
 		return
 	}
-	h.renderDashboard(w, r, user, "30d")
+	filters := parseDashboardFilters(r)
+	h.renderDashboard(w, r, user, filters, false)
 }
 
-// renderDashboard fetches all dashboard data and renders the page.
-func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *core.UserInfo, rangeStr string) {
-	ctx := r.Context()
-	from, to := rangeToTime(rangeStr)
+// DashboardPartial handles GET /partials/dashboard — returns the dashboard
+// content area (everything below the filter bar) for HTMX filter swaps.
+func (h *Handler) DashboardPartial(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	filters := parseDashboardFilters(r)
+	h.renderDashboard(w, r, user, filters, true)
+}
 
-	summary, err := h.App.Insights.GetSummary(ctx, user.ID, from, to)
+// renderDashboard fetches all dashboard data and renders the page or partial.
+func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *core.UserInfo, filters components.DashboardFilters, partial bool) {
+	ctx := r.Context()
+	from, to := rangeToTime(filters.Range)
+
+	insightsFilter := core.InsightsFilter{
+		Platform:  nilIfEmpty(filters.Platform),
+		MediaType: nilIfEmpty(filters.Type),
+	}
+
+	summary, err := h.App.Insights.GetSummaryFiltered(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
 		log.Printf("dashboard: summary error: %v", err)
 		summary = &core.Summary{}
 	}
 
-	timeline, err := h.App.Insights.GetTimeline(ctx, user.ID, core.BucketDay, from, to)
+	timeline, err := h.App.Insights.GetTimelineFiltered(ctx, user.ID, core.BucketDay, from, to, insightsFilter)
 	if err != nil {
 		log.Printf("dashboard: timeline error: %v", err)
 	}
 
-	recentItems, err := h.App.MediaItems.List(ctx, user.ID, from, to, 5, 0)
+	// Recent items use ListFiltered when filters are active.
+	var recentItems []core.MediaItem
+	if filters.Platform != "" || filters.Type != "" {
+		platform := nilIfEmpty(filters.Platform)
+		mediaType := nilIfEmpty(filters.Type)
+		recentItems, err = h.App.MediaItems.ListFiltered(ctx, user.ID, from, to, 5, 0, platform, mediaType, nil)
+	} else {
+		recentItems, err = h.App.MediaItems.List(ctx, user.ID, from, to, 5, 0)
+	}
 	if err != nil {
 		log.Printf("dashboard: recent items error: %v", err)
 	}
 
-	tags, err := h.App.Insights.GetTagDistribution(ctx, user.ID, from, to, 5)
+	tags, err := h.App.Insights.GetTagDistributionFiltered(ctx, user.ID, from, to, 5, insightsFilter)
 	if err != nil {
 		log.Printf("dashboard: tags error: %v", err)
 	}
 
-	platforms, err := h.App.Insights.GetPlatformBreakdown(ctx, user.ID, from, to)
+	platforms, err := h.App.Insights.GetPlatformBreakdownFiltered(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
 		log.Printf("dashboard: platforms error: %v", err)
 	}
@@ -59,9 +85,15 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		RecentItems:       recentItems,
 		Tags:              tags,
 		PlatformBreakdown: platforms,
-		ActiveRange:       rangeStr,
+		ActiveRange:       filters.Range,
+		Filters:           filters,
 	}
-	components.Dashboard(data).Render(ctx, w)
+
+	if partial {
+		components.DashboardContent(data).Render(ctx, w)
+	} else {
+		components.Dashboard(data).Render(ctx, w)
+	}
 }
 
 // ActivityChartPartial handles GET /partials/activity-chart?range=7d|30d|90d.
@@ -100,10 +132,22 @@ func (h *Handler) RecentItemsPartial(w http.ResponseWriter, r *http.Request) {
 	limit := parseIntParam(q.Get("limit"), 5, 1, 50)
 	offset := parseIntParam(q.Get("offset"), 0, 0, 10000)
 
-	now := time.Now().UTC()
-	from := now.AddDate(0, 0, -90)
+	rangeStr := q.Get("range")
+	if rangeStr == "" {
+		rangeStr = "30d"
+	}
+	from, to := rangeToTime(rangeStr)
 
-	items, err := h.App.MediaItems.List(r.Context(), user.ID, from, now, int32(limit), int32(offset))
+	platform := nilIfEmpty(q.Get("platform"))
+	mediaType := nilIfEmpty(q.Get("type"))
+
+	var items []core.MediaItem
+	var err error
+	if platform != nil || mediaType != nil {
+		items, err = h.App.MediaItems.ListFiltered(r.Context(), user.ID, from, to, int32(limit), int32(offset), platform, mediaType, nil)
+	} else {
+		items, err = h.App.MediaItems.List(r.Context(), user.ID, from, to, int32(limit), int32(offset))
+	}
 	if err != nil {
 		log.Printf("recent items partial: %v", err)
 		return
@@ -111,6 +155,26 @@ func (h *Handler) RecentItemsPartial(w http.ResponseWriter, r *http.Request) {
 
 	for _, item := range items {
 		components.TimelineRow(item).Render(r.Context(), w)
+	}
+}
+
+// parseDashboardFilters extracts filter values from the request query.
+func parseDashboardFilters(r *http.Request) components.DashboardFilters {
+	q := r.URL.Query()
+	rangeStr := q.Get("range")
+	if rangeStr == "" {
+		rangeStr = "30d"
+	}
+	// Validate range
+	switch rangeStr {
+	case "7d", "30d", "90d":
+	default:
+		rangeStr = "30d"
+	}
+	return components.DashboardFilters{
+		Platform: q.Get("platform"),
+		Type:     q.Get("type"),
+		Range:    rangeStr,
 	}
 }
 

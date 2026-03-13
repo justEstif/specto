@@ -191,20 +191,27 @@ The main screen after login. Summary stats + recent activity + quick actions.
 │                                                             │
 │  Dashboard                         (vt-heading, text-display)│
 │                                                             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Filters:                                            │    │
+│  │ ┌──────────┐ ┌──────────┐          ┌─────────────┐ │    │
+│  │ │ Platform▼│ │  Type  ▼ │          │ 7d 30d 90d  │ │    │
+│  │ └──────────┘ └──────────┘          │ (range tabs) │ │    │
+│  │                                    └─────────────┘ │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
 │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────┐ │
 │  │ 4,218      │ │ 263 hrs    │ │ spotify    │ │ music    │ │
 │  │ items      │ │ total time │ │ top source │ │ top type │ │
 │  │ (stat)     │ │ (stat)     │ │ (stat)     │ │ (stat)   │ │
 │  └────────────┘ └────────────┘ └────────────┘ └──────────┘ │
 │                                                             │
-│  Activity                                   ┌─────────────┐│
-│  ─────────                                  │ 7d 30d 90d  ││
-│                                             │ (filter tab) ││
-│  ┌─────────────────────────────────────┐    └─────────────┘│
-│  │  ▁▃▅▇▆▄▃▅▇█▆▅▃▂▁▃▅▆▇█▆▅▃▂▁▃▅▇▆▄  │                   │
-│  │  consumption over time (bar chart)   │                   │
-│  │  M  T  W  T  F  S  S  M  T  W  T   │                   │
-│  └─────────────────────────────────────┘                   │
+│  Activity                                                   │
+│  ─────────                                                  │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  ▁▃▅▇▆▄▃▅▇█▆▅▃▂▁▃▅▆▇█▆▅▃▂▁▃▅▇▆▄                  │    │
+│  │  consumption over time (bar chart)                   │    │
+│  │  M  T  W  T  F  S  S  M  T  W  T                   │    │
+│  └─────────────────────────────────────────────────────┘    │
 │                                                             │
 │  Recent                                                     │
 │  ──────                                                     │
@@ -230,27 +237,48 @@ The main screen after login. Summary stats + recent activity + quick actions.
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**Filters:**
+
+A global filter bar sits between the heading and the stats row. All dashboard
+sections respond to the same filters — changing any filter re-renders everything
+below the filter bar as a single partial swap.
+
+| Filter     | Control                 | Values                                         |
+| ---------- | ----------------------- | ---------------------------------------------- |
+| Platform   | `<select>` dropdown     | All platforms, spotify, youtube, netflix        |
+| Type       | `<select>` dropdown     | All types, music, video, podcast, article       |
+| Date range | Tab group (DaisyUI tabs)| 7d (default), 30d, 90d                         |
+
+Platform and type dropdowns follow the same pattern as the timeline page filters.
+The date range tabs replace the previous per-section activity chart tabs — the
+range now applies globally to stats, activity chart, tags, and platform breakdown.
+
 **Sections:**
 
 | Section            | Data source                      | DaisyUI component     |
 | ------------------ | -------------------------------- | --------------------- |
+| Filter bar         | (client-side controls)           | `select` + `tabs`     |
 | Summary stats      | `GET /api/v1/insights/summary`   | `stat` (4-col grid)   |
 | Activity chart     | `GET /api/v1/insights/timeline`  | Custom bar chart      |
 | Recent items       | `GET /api/v1/timeline?limit=5`   | `list`                |
 | Top Tags           | `GET /api/v1/insights/tags`      | `list` with counts    |
 | Platform Breakdown | `GET /api/v1/insights/platform-breakdown` | Horizontal bars |
 
+All data endpoints accept optional `?platform=`, `?type=`, and `?range=` query
+params. When filters are active, stats/tags/breakdown reflect only the filtered
+subset.
+
 **HTMX interactions:**
 
-- "Show more" on recent items: `hx-get="/partials/timeline?offset=5&limit=5"` with `hx-swap="beforeend"` to append rows
-- Time range tabs on activity chart: `hx-get="/partials/activity-chart?range=30d"` targeting the chart container
-- Both use `htmx-indicator` spinner on the target area
+- Filter change (any control): `hx-get="/partials/dashboard?platform=X&type=Y&range=Z"` targeting `#dashboard-content`, `hx-swap="innerHTML"`, `hx-push-url="true"`. Each filter control uses `hx-include` to send sibling filter values.
+- "Show more" on recent items: `hx-get="/partials/timeline?offset=5&limit=5&platform=X&type=Y"` with `hx-swap="beforeend"` to append rows (carries active filters)
+- All use `htmx-indicator` spinner on the target area
 
 **Responsive:**
 
-- `>= lg`: 4-col stat grid, 2-col bottom row (tags + platforms side by side)
-- `>= sm`: 2-col stat grid, stacked bottom row
-- `< sm`: 1-col everything, stats stack vertically
+- `>= lg`: Filters in one row (selects + tabs), 4-col stat grid, 2-col bottom row (tags + platforms side by side)
+- `>= sm`: Filters in one row, 2-col stat grid, stacked bottom row
+- `< sm`: Filters stack vertically (selects full-width, tabs below), 1-col everything, stats stack vertically
 
 ---
 

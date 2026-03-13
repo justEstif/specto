@@ -8,6 +8,13 @@ import (
 	"github.com/justestif/specto/internal/core"
 )
 
+// DashboardFilters holds the active filter state for the dashboard.
+type DashboardFilters struct {
+	Platform string
+	Type     string
+	Range    string // "7d", "30d", "90d"
+}
+
 // DashboardData holds all pre-fetched data for the dashboard page.
 type DashboardData struct {
 	User              *core.UserInfo
@@ -17,24 +24,93 @@ type DashboardData struct {
 	PlatformBreakdown []core.PlatformBreakdownEntry
 	ActiveRange       string // "7d", "30d", "90d"
 	Timeline          []core.TimelineEntry
+	Filters           DashboardFilters
 }
 
 // Dashboard renders the authenticated dashboard page.
 templ Dashboard(data DashboardData) {
 	@Layout("Dashboard — Specto", data.User) {
-		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-8">Dashboard</h1>
-		<!-- Summary stats -->
-		@dashboardStats(data.Summary)
-		<!-- Activity chart with range tabs -->
-		@dashboardActivity(data.Timeline, data.ActiveRange)
-		<!-- Recent items -->
-		@dashboardRecent(data.RecentItems)
-		<!-- Bottom row: tags + platform breakdown -->
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-			@dashboardTags(data.Tags)
-			@dashboardPlatforms(data.PlatformBreakdown)
+		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-6">Dashboard</h1>
+		<!-- Filters -->
+		@dashboardFilterBar(data.Filters)
+		<!-- Filterable content area -->
+		<div id="dashboard-content">
+			@DashboardContent(data)
 		</div>
 	}
+}
+
+// DashboardContent renders the dashboard content below the filter bar.
+// This is the HTMX swap target for filter changes.
+templ DashboardContent(data DashboardData) {
+	<!-- Summary stats -->
+	@dashboardStats(data.Summary)
+	<!-- Activity chart -->
+	@dashboardActivity(data.Timeline)
+	<!-- Recent items -->
+	@dashboardRecent(data.RecentItems, data.Filters)
+	<!-- Bottom row: tags + platform breakdown -->
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+		@dashboardTags(data.Tags)
+		@dashboardPlatforms(data.PlatformBreakdown)
+	</div>
+}
+
+// dashboardFilterBar renders the filter controls.
+templ dashboardFilterBar(f DashboardFilters) {
+	<div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
+		<select
+			name="platform"
+			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-40"
+			hx-get="/partials/dashboard"
+			hx-target="#dashboard-content"
+			hx-swap="innerHTML"
+			hx-push-url="true"
+			hx-include="[name='type'], [name='range']"
+		>
+			<option value="" selected?={ f.Platform == "" }>All platforms</option>
+			<option value="spotify" selected?={ f.Platform == "spotify" }>Spotify</option>
+			<option value="youtube" selected?={ f.Platform == "youtube" }>YouTube</option>
+			<option value="netflix" selected?={ f.Platform == "netflix" }>Netflix</option>
+		</select>
+		<select
+			name="type"
+			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-36"
+			hx-get="/partials/dashboard"
+			hx-target="#dashboard-content"
+			hx-swap="innerHTML"
+			hx-push-url="true"
+			hx-include="[name='platform'], [name='range']"
+		>
+			<option value="" selected?={ f.Type == "" }>All types</option>
+			<option value="music" selected?={ f.Type == "music" }>Music</option>
+			<option value="video" selected?={ f.Type == "video" }>Video</option>
+			<option value="podcast" selected?={ f.Type == "podcast" }>Podcast</option>
+			<option value="article" selected?={ f.Type == "article" }>Article</option>
+		</select>
+		<div class="sm:ml-auto">
+			<div role="tablist" class="tabs tabs-box tabs-sm bg-base-200">
+				@dashboardRangeTab("7d", f)
+				@dashboardRangeTab("30d", f)
+				@dashboardRangeTab("90d", f)
+			</div>
+		</div>
+	</div>
+}
+
+templ dashboardRangeTab(value string, f DashboardFilters) {
+	<button
+		role="tab"
+		name="range"
+		value={ value }
+		class={ "tab", templ.KV("tab-active", value == f.Range) }
+		hx-get={ "/partials/dashboard?range=" + value + dashboardFilterQuery(f) }
+		hx-target="#dashboard-content"
+		hx-swap="innerHTML"
+		hx-push-url="true"
+	>
+		{ value }
+	</button>
 }
 
 // dashboardStats renders the 4-column stat grid.
@@ -57,33 +133,12 @@ templ statCard(label, value, desc string) {
 	</div>
 }
 
-// dashboardActivity renders the activity chart section with time range tabs.
-templ dashboardActivity(timeline []core.TimelineEntry, activeRange string) {
+// dashboardActivity renders the activity chart section.
+templ dashboardActivity(timeline []core.TimelineEntry) {
 	<div class="mb-8">
-		<div class="flex items-center justify-between mb-4">
-			<h2 class="text-display text-xl font-semibold">Activity</h2>
-			<div role="tablist" class="tabs tabs-box tabs-sm bg-base-200">
-				@rangeTab("7d", activeRange)
-				@rangeTab("30d", activeRange)
-				@rangeTab("90d", activeRange)
-			</div>
-		</div>
-		<div id="activity-chart">
-			@ActivityChart(timeline)
-		</div>
+		<h2 class="text-display text-xl font-semibold mb-4">Activity</h2>
+		@ActivityChart(timeline)
 	</div>
-}
-
-templ rangeTab(value, active string) {
-	<button
-		role="tab"
-		class={ "tab", templ.KV("tab-active", value == active) }
-		hx-get={ "/partials/activity-chart?range=" + value }
-		hx-target="#activity-chart"
-		hx-swap="innerHTML"
-	>
-		{ value }
-	</button>
 }
 
 // ActivityChart renders just the bar chart (swap target for range tabs).
@@ -112,12 +167,16 @@ templ chartBar(entry core.TimelineEntry, max int64) {
 }
 
 // dashboardRecent renders the recent items list.
-templ dashboardRecent(items []core.MediaItem) {
+templ dashboardRecent(items []core.MediaItem, f DashboardFilters) {
 	<div>
 		<h2 class="text-display text-xl font-semibold mb-4">Recent</h2>
 		if len(items) == 0 {
 			<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
-				No items yet. Connect a plugin and sync your history.
+				if f.Platform != "" || f.Type != "" {
+					No items match your filters.
+				} else {
+					No items yet. Connect a plugin and sync your history.
+				}
 			</div>
 		} else {
 			<div id="recent-items" class="bg-neutral border border-base-300 rounded-box divide-y divide-base-300">
@@ -129,7 +188,7 @@ templ dashboardRecent(items []core.MediaItem) {
 				<div class="mt-3 text-center">
 					<button
 						class="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content"
-						hx-get="/partials/timeline?offset=5&limit=5"
+						hx-get={ "/partials/timeline?offset=5&limit=5" + showMoreFilterQuery(f) }
 						hx-target="#recent-items"
 						hx-swap="beforeend"
 					>
@@ -213,6 +272,41 @@ templ dashboardPlatforms(entries []core.PlatformBreakdownEntry) {
 }
 
 // --- Helper functions ---
+
+// dashboardFilterQuery builds query params for platform and type filters
+// (used by range tab buttons to preserve filter state).
+func dashboardFilterQuery(f DashboardFilters) string {
+	var parts []string
+	if f.Platform != "" {
+		parts = append(parts, "platform="+f.Platform)
+	}
+	if f.Type != "" {
+		parts = append(parts, "type="+f.Type)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "&" + strings.Join(parts, "&")
+}
+
+// showMoreFilterQuery builds query params for the "show more" button
+// to carry active filters.
+func showMoreFilterQuery(f DashboardFilters) string {
+	var parts []string
+	if f.Platform != "" {
+		parts = append(parts, "platform="+f.Platform)
+	}
+	if f.Type != "" {
+		parts = append(parts, "type="+f.Type)
+	}
+	if f.Range != "" {
+		parts = append(parts, "range="+f.Range)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "&" + strings.Join(parts, "&")
+}
 
 type platformAgg struct {
 	name  string
