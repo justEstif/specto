@@ -76,7 +76,7 @@ templ SettingsAccount(data SettingsData) {
 						name="display_name"
 						value={ data.User.DisplayName }
 						required
-						class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+						class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
 					/>
 				</div>
 				<div>
@@ -85,7 +85,7 @@ templ SettingsAccount(data SettingsData) {
 						type="email"
 						value={ data.User.Email }
 						disabled
-						class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px] opacity-50"
+						class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px] opacity-50"
 					/>
 				</div>
 				<div>
@@ -95,7 +95,7 @@ templ SettingsAccount(data SettingsData) {
 						name="profile_slug"
 						value={ derefStr(data.User.ProfileSlug) }
 						pattern="[a-z0-9-]+"
-						class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+						class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
 						placeholder="your-slug"
 					/>
 					if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
@@ -256,7 +256,7 @@ templ SettingsSharing(data SettingsData) {
 					type="text"
 					name="excluded_platforms"
 					placeholder="e.g. netflix, tiktok"
-					class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+					class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
 				/>
 				<p class="text-xs text-base-content/40 mt-1">Comma-separated platform names</p>
 			</div>
@@ -266,7 +266,7 @@ templ SettingsSharing(data SettingsData) {
 					type="text"
 					name="excluded_tags"
 					placeholder="e.g. romance, reality-tv"
-					class="input input-bordered w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+					class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
 				/>
 				<p class="text-xs text-base-content/40 mt-1">Comma-separated tag names</p>
 			</div>
@@ -302,7 +302,7 @@ templ shareBlockRow(blockType, label string, enabled bool, timeRange, platform s
 		if timeRange != "" {
 			<select
 				name={ "block_" + blockType + "_range" }
-				class="select select-bordered select-xs bg-base-100 border-base-300"
+				class="select select-xs bg-base-100 border-base-300"
 			>
 				<option value="7d" selected?={ timeRange == "7d" }>7d</option>
 				<option value="30d" selected?={ timeRange == "30d" }>30d</option>

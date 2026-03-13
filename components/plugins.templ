@@ -146,7 +146,7 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 						type="file"
 						name="file"
 						accept=".csv,.json,.txt"
-						class="file-input file-input-bordered file-input-sm bg-base-100 border-base-300 min-h-[44px]"
+						class="file-input file-input-sm bg-base-100 border-base-300 min-h-[44px]"
 					/>
 					<button type="submit" class="btn btn-sm btn-primary min-h-[44px]">
 						Upload
@@ -178,38 +178,34 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 			class="mt-4 space-y-3"
 		>
 			<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
-			<!-- Platform selector -->
-			<label class="form-control w-full max-w-xs">
-				<div class="label">
-					<span class="label-text text-base-content/70 text-sm">Platform</span>
-				</div>
-				<select
-					name="plugin"
-					class="select select-bordered bg-base-100 border-base-300 w-full max-w-xs"
-					required
-					onchange="updateImportAction(this)"
-				>
-					<option disabled selected value="">Choose a platform…</option>
-					for _, p := range available {
-						if p.AuthType == core.AuthFileImport {
-							<option value={ p.Name }>{ p.DisplayName }</option>
-						}
+		<!-- Platform selector -->
+		<fieldset class="fieldset w-full max-w-xs">
+			<label class="label text-base-content/70 text-sm">Platform</label>
+			<select
+				name="plugin"
+				class="select bg-base-100 border-base-300 w-full max-w-xs"
+				required
+				onchange="updateImportAction(this)"
+			>
+				<option disabled selected value="">Choose a platform…</option>
+				for _, p := range available {
+					if p.AuthType == core.AuthFileImport {
+						<option value={ p.Name }>{ p.DisplayName }</option>
 					}
-				</select>
-			</label>
-			<!-- File input -->
-			<label class="form-control w-full max-w-xs">
-				<div class="label">
-					<span class="label-text text-base-content/70 text-sm">Export file</span>
-				</div>
-				<input
-					type="file"
-					name="file"
-					accept=".csv,.json,.txt"
-					required
-					class="file-input file-input-bordered file-input-sm bg-base-100 border-base-300 min-h-[44px] w-full max-w-xs"
-				/>
-			</label>
+				}
+			</select>
+		</fieldset>
+		<!-- File input -->
+		<fieldset class="fieldset w-full max-w-xs">
+			<label class="label text-base-content/70 text-sm">Export file</label>
+			<input
+				type="file"
+				name="file"
+				accept=".csv,.json,.txt"
+				required
+				class="file-input file-input-sm bg-base-100 border-base-300 min-h-[44px] w-full max-w-xs"
+			/>
+		</fieldset>
 			<button type="submit" class="btn btn-sm btn-primary min-h-[44px]" disabled id="import-submit-btn">
 				Upload
 			</button>

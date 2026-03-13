@@ -176,14 +176,14 @@ templ dashboardTags(tags []core.TagDistributionEntry) {
 				No tags yet.
 			</div>
 		} else {
-			<div class="bg-neutral border border-base-300 rounded-box divide-y divide-base-300">
+			<ul class="list bg-neutral border border-base-300 rounded-box">
 				for _, tag := range tags {
-					<div class="flex items-center justify-between px-4 py-2.5">
-						<span class="text-sm text-base-content/80">{ tag.Name }</span>
+					<li class="list-row">
+						<span class="text-sm text-base-content/80 list-col-grow">{ tag.Name }</span>
 						<span class="text-sm text-base-content/40 font-mono">{ formatCount(tag.Count) }</span>
-					</div>
+					</li>
 				}
-			</div>
+			</ul>
 		}
 	</div>
 }
@@ -204,9 +204,7 @@ templ dashboardPlatforms(entries []core.PlatformBreakdownEntry) {
 							<span class="text-base-content/80">{ entry.name }</span>
 							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", entry.pct) }</span>
 						</div>
-						<div class="w-full bg-base-300 rounded-full h-2">
-							<div class="bg-primary h-2 rounded-full" style={ fmt.Sprintf("width: %d%%", entry.pct) }></div>
-						</div>
+						<progress class="progress progress-primary w-full" value={ fmt.Sprintf("%d", entry.pct) } max="100"></progress>
 					</div>
 				}
 			</div>

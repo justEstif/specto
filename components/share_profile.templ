@@ -103,9 +103,7 @@ templ shareBarBlock(title string, bars []ShareBar) {
 							<span class="text-base-content/80">{ bar.Label }</span>
 							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
 						</div>
-						<div class="w-full bg-base-300 rounded-full h-2">
-							<div class="bg-primary h-2 rounded-full" style={ fmt.Sprintf("width: %d%%", bar.Pct) }></div>
-						</div>
+						<progress class="progress progress-primary w-full" value={ fmt.Sprintf("%d", bar.Pct) } max="100"></progress>
 					</div>
 				}
 			</div>
@@ -128,9 +126,7 @@ templ shareMoodBlock(summary string, bars []ShareBar) {
 							<span class="text-base-content/80">{ bar.Label }</span>
 							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
 						</div>
-						<div class="w-full bg-base-300 rounded-full h-2">
-							<div class="bg-secondary h-2 rounded-full" style={ fmt.Sprintf("width: %d%%", bar.Pct) }></div>
-						</div>
+						<progress class="progress progress-secondary w-full" value={ fmt.Sprintf("%d", bar.Pct) } max="100"></progress>
 					</div>
 				}
 			</div>
