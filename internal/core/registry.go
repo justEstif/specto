@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -63,6 +64,27 @@ func (r *PluginRegistry) List() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// Platforms returns the unique platform names derived from registered plugins.
+// Plugin names like "spotify-api" are normalized to "spotify" by stripping
+// any "-api" suffix, so the result contains only base platform names.
+func (r *PluginRegistry) Platforms() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	seen := make(map[string]struct{})
+	for name := range r.plugins {
+		platform := strings.TrimSuffix(name, "-api")
+		seen[platform] = struct{}{}
+	}
+
+	platforms := make([]string, 0, len(seen))
+	for p := range seen {
+		platforms = append(platforms, p)
+	}
+	sort.Strings(platforms)
+	return platforms
 }
 
 // validateOAuth checks that OAuth plugins provide a valid OAuthConfig.

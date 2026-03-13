@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/justestif/specto/internal/core"
@@ -9,10 +10,11 @@ import (
 
 // TimelinePageData holds the data for the full timeline page.
 type TimelinePageData struct {
-	User     *core.UserInfo
-	Items    []core.MediaItem
-	Filters  TimelineFilters
-	HasMore  bool
+	User      *core.UserInfo
+	Items     []core.MediaItem
+	Filters   TimelineFilters
+	HasMore   bool
+	Platforms []string
 }
 
 // TimelineFilters holds the active filter state.
@@ -29,7 +31,7 @@ templ TimelinePage(data TimelinePageData) {
 	@Layout("Timeline — Specto", data.User) {
 		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-6">Timeline</h1>
 		<!-- Filters -->
-		@timelineFilters(data.Filters)
+		@timelineFilters(data.Filters, data.Platforms)
 		<!-- Items -->
 		<div id="timeline-items">
 			@TimelineItems(data.Items, data.Filters, data.HasMore)
@@ -38,7 +40,7 @@ templ TimelinePage(data TimelinePageData) {
 }
 
 // timelineFilters renders the filter bar.
-templ timelineFilters(f TimelineFilters) {
+templ timelineFilters(f TimelineFilters, platforms []string) {
 	<div class="flex flex-col sm:flex-row gap-3 mb-6">
 		<select
 			name="platform"
@@ -50,9 +52,9 @@ templ timelineFilters(f TimelineFilters) {
 			hx-include="[name='type'], [name='search']"
 		>
 			<option value="" selected?={ f.Platform == "" }>All platforms</option>
-			<option value="spotify" selected?={ f.Platform == "spotify" }>Spotify</option>
-			<option value="youtube" selected?={ f.Platform == "youtube" }>YouTube</option>
-			<option value="netflix" selected?={ f.Platform == "netflix" }>Netflix</option>
+			for _, p := range platforms {
+				<option value={ p } selected?={ f.Platform == p }>{ platformLabel(p) }</option>
+			}
 		</select>
 		<select
 			name="type"
@@ -214,6 +216,22 @@ func formatDateHeader(t time.Time) string {
 	default:
 		return t.Format("January 2, 2006")
 	}
+}
+
+// platformLabel returns a human-readable label for a platform name.
+func platformLabel(p string) string {
+	known := map[string]string{
+		"spotify": "Spotify",
+		"youtube": "YouTube",
+	}
+	if label, ok := known[p]; ok {
+		return label
+	}
+	// Fallback: capitalize first letter.
+	if len(p) == 0 {
+		return p
+	}
+	return strings.ToUpper(p[:1]) + p[1:]
 }
 
 func timelineLoadMoreURL(f TimelineFilters) string {

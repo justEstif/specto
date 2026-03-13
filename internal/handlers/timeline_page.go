@@ -22,10 +22,11 @@ func (h *Handler) TimelinePage(w http.ResponseWriter, r *http.Request) {
 	items, hasMore := h.fetchTimelineItems(r, user, filters)
 
 	data := components.TimelinePageData{
-		User:    user,
-		Items:   items,
-		Filters: filters,
-		HasMore: hasMore,
+		User:      user,
+		Items:     items,
+		Filters:   filters,
+		HasMore:   hasMore,
+		Platforms: h.App.Registry.Platforms(),
 	}
 	components.TimelinePage(data).Render(r.Context(), w)
 }
