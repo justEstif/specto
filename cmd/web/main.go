@@ -33,15 +33,34 @@ func main() {
 		log.Fatal("SESSION_SECRET must be at least 32 bytes long")
 	}
 
+	// Load optional OAuth client credentials from environment
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:3000"
+	}
+
+	oauthClients := make(map[string]app.OAuthClientConfig)
+	if id, secret := os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"); id != "" && secret != "" {
+		oauthClients["spotify-api"] = app.OAuthClientConfig{
+			ClientID:     id,
+			ClientSecret: secret,
+		}
+	}
+
 	// Initialize core application layer
 	application := app.New(database.DB, app.Config{
 		EncryptionKey: encKey,
 		SessionSecret: sessionSecret,
+		BaseURL:       baseURL,
+		OAuthClients:  oauthClients,
 	})
 
 	// Register plugins
 	if err := application.Registry.Register(spotify.New()); err != nil {
 		log.Fatalf("Failed to register spotify plugin: %v", err)
+	}
+	if err := application.Registry.Register(spotify.NewAPI()); err != nil {
+		log.Fatalf("Failed to register spotify-api plugin: %v", err)
 	}
 
 	// Wire handlers with dependencies
@@ -92,6 +111,7 @@ func main() {
 			r.Route("/plugins/{plugin}", func(r chi.Router) {
 				r.Get("/", h.GetPlugin)
 				r.Post("/connect", h.ConnectPlugin)
+				r.Get("/callback", h.OAuthCallback)
 				r.Post("/import", h.ImportPlugin)
 				r.Delete("/disconnect", h.DisconnectPlugin)
 				r.Post("/sync", h.SyncPlugin)

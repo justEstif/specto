@@ -13,6 +13,10 @@ PORT = "3000"
 CSRF_KEY = "g1PIdKZepyCk/DsajiskTluSIj5f4oXD"
 SESSION_SECRET = "vw83Upzl22O1MVwpufGA2leD+pGIE5qj"
 ENCRYPTION_KEY = "bd16b89d47f0e82c5d7eb7965a4074bda2352d0a064211a3e65e0ad774fc9c81"
+BASE_URL = "http://localhost:3000"
+# OAuth credentials (optional — leave empty to skip OAuth plugin registration)
+# SPOTIFY_CLIENT_ID = ""
+# SPOTIFY_CLIENT_SECRET = ""
 
 [tasks.dev]
 description = "Start development server with live reload"
