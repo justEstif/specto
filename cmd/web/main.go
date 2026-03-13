@@ -141,8 +141,7 @@ func main() {
 		r.Get("/timeline", h.TimelinePage)
 		r.Get("/plugins", h.PluginsPage)
 		r.Get("/settings", h.SettingsPage)
-		r.Get("/settings/appearance", h.SettingsAppearancePage)
-		r.Get("/settings/sharing", h.SettingsSharingPage)
+		r.Get("/settings/{tab}", h.SettingsPage)
 		r.Put("/settings/account", h.SettingsAccountUpdate)
 	})
 
@@ -154,9 +153,7 @@ func main() {
 		r.Get("/partials/activity-chart", h.ActivityChartPartial)
 		r.Get("/partials/timeline", h.RecentItemsPartial)
 		r.Get("/partials/timeline-page", h.TimelinePagePartial)
-		r.Get("/partials/settings/account", h.SettingsAccountPartial)
-		r.Get("/partials/settings/appearance", h.SettingsAppearancePartial)
-		r.Get("/partials/settings/sharing", h.SettingsSharingPartial)
+		r.Get("/partials/settings/{tab}", h.SettingsPartial)
 	})
 
 	// JSON API (v1)

@@ -29,14 +29,12 @@ func (h *Handler) InsightsSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"total_items":              summary.TotalItems,
-			"total_time_spent_seconds": summary.TotalDurationSec,
-			"top_platform":             summary.TopPlatform,
-			"top_type":                 summary.TopMediaType,
-		},
-	})
+	writeJSON(w, http.StatusOK, dataResponse{Data: insightsSummaryResponse{
+		TotalItems:            summary.TotalItems,
+		TotalTimeSpentSeconds: summary.TotalDurationSec,
+		TopPlatform:           summary.TopPlatform,
+		TopType:               summary.TopMediaType,
+	}})
 }
 
 // InsightsPlatformBreakdown handles GET /api/v1/insights/platform-breakdown
@@ -60,17 +58,17 @@ func (h *Handler) InsightsPlatformBreakdown(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data := make([]map[string]any, 0, len(entries))
+	data := make([]platformBreakdownResponse, 0, len(entries))
 	for _, e := range entries {
-		data = append(data, map[string]any{
-			"platform":               e.Platform,
-			"type":                   e.MediaType,
-			"count":                  e.Count,
-			"total_duration_seconds": e.TotalDurationSec,
+		data = append(data, platformBreakdownResponse{
+			Platform:             e.Platform,
+			Type:                 e.MediaType,
+			Count:                e.Count,
+			TotalDurationSeconds: e.TotalDurationSec,
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": data})
+	writeJSON(w, http.StatusOK, dataResponse{Data: data})
 }
 
 // InsightsTags handles GET /api/v1/insights/tags
@@ -97,16 +95,16 @@ func (h *Handler) InsightsTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := make([]map[string]any, 0, len(entries))
+	data := make([]tagDistributionResponse, 0, len(entries))
 	for _, e := range entries {
-		data = append(data, map[string]any{
-			"name":     e.Name,
-			"category": e.Category,
-			"count":    e.Count,
+		data = append(data, tagDistributionResponse{
+			Name:     e.Name,
+			Category: e.Category,
+			Count:    e.Count,
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": data})
+	writeJSON(w, http.StatusOK, dataResponse{Data: data})
 }
 
 // InsightsTimeline handles GET /api/v1/insights/timeline
@@ -137,14 +135,14 @@ func (h *Handler) InsightsTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := make([]map[string]any, 0, len(timeline))
+	data := make([]timelineBucketResponse, 0, len(timeline))
 	for _, e := range timeline {
-		data = append(data, map[string]any{
-			"bucket_start":       e.Bucket,
-			"count":              e.Count,
-			"time_spent_seconds": e.TotalDurationSec,
+		data = append(data, timelineBucketResponse{
+			BucketStart:      e.Bucket,
+			Count:            e.Count,
+			TimeSpentSeconds: e.TotalDurationSec,
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": data})
+	writeJSON(w, http.StatusOK, dataResponse{Data: data})
 }

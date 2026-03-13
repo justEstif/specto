@@ -55,6 +55,9 @@ func (m *mockMediaItemStore) UpdateEnrichmentStatus(ctx context.Context, itemID 
 	}
 	return nil
 }
+func (m *mockMediaItemStore) ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]core.MediaItem, error) {
+	return m.List(ctx, userID, from, to, limit, offset)
+}
 func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit int32) ([]core.MediaItem, error) {
 	if m.listPendingEnrichmentFn != nil {
 		return m.listPendingEnrichmentFn(ctx, limit)

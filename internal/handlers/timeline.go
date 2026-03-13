@@ -38,37 +38,34 @@ func (h *Handler) Timeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build response items
-	data := make([]map[string]any, 0, len(items))
+	data := make([]timelineItemResponse, 0, len(items))
 	for _, item := range items {
-		entry := map[string]any{
-			"platform":    item.Platform,
-			"type":        string(item.Type),
-			"title":       item.Title,
-			"creator":     item.Creator,
-			"consumed_at": item.ConsumedAt,
-			"external_id": item.ExternalID,
-		}
-		if item.URL != "" {
-			entry["url"] = item.URL
+		entry := timelineItemResponse{
+			Platform:   item.Platform,
+			Type:       string(item.Type),
+			Title:      item.Title,
+			Creator:    item.Creator,
+			ConsumedAt: item.ConsumedAt,
+			ExternalID: item.ExternalID,
+			URL:        item.URL,
 		}
 		if item.Duration != nil {
-			entry["duration_seconds"] = int64(item.Duration.Seconds())
+			sec := int64(item.Duration.Seconds())
+			entry.DurationSec = &sec
 		}
 		if item.TimeSpent != nil {
-			entry["time_spent_seconds"] = int64(item.TimeSpent.Seconds())
+			sec := int64(item.TimeSpent.Seconds())
+			entry.TimeSpentSec = &sec
 		}
 		if len(item.Tags) > 0 {
-			entry["tags"] = item.Tags
+			entry.Tags = item.Tags
 		}
 		data = append(data, entry)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": data,
-		"meta": map[string]any{
-			"limit":  limit,
-			"offset": offset,
-		},
+	writeJSON(w, http.StatusOK, timelineResponse{
+		Data: data,
+		Meta: timelineMeta{Limit: limit, Offset: offset},
 	})
 }
 

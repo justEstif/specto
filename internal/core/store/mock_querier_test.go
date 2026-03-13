@@ -74,6 +74,20 @@ func (m *mockQuerier) ListMediaItems(ctx context.Context, arg database.ListMedia
 	return nil, fmt.Errorf("ListMediaItems not mocked")
 }
 
+func (m *mockQuerier) ListMediaItemsFiltered(ctx context.Context, arg database.ListMediaItemsFilteredParams) ([]database.MediaItem, error) {
+	// Delegate to ListMediaItems for test compatibility
+	if m.listMediaItemsFn != nil {
+		return m.listMediaItemsFn(ctx, database.ListMediaItemsParams{
+			UserID:       arg.UserID,
+			ConsumedAt:   arg.ConsumedAt,
+			ConsumedAt_2: arg.ConsumedAt_2,
+			Limit:        arg.Limit,
+			Offset:       arg.Offset,
+		})
+	}
+	return nil, fmt.Errorf("ListMediaItemsFiltered not mocked")
+}
+
 func (m *mockQuerier) UpdateEnrichmentStatus(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error {
 	if m.updateEnrichmentStatusFn != nil {
 		return m.updateEnrichmentStatusFn(ctx, arg)

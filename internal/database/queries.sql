@@ -92,6 +92,20 @@ WHERE user_id = $1
 ORDER BY consumed_at DESC
 LIMIT $4 OFFSET $5;
 
+-- name: ListMediaItemsFiltered :many
+SELECT * FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND (sqlc.narg('platform')::TEXT IS NULL OR platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR type = sqlc.narg('media_type'))
+    AND (sqlc.narg('search')::TEXT IS NULL OR (
+        title ILIKE '%' || sqlc.narg('search') || '%'
+        OR creator ILIKE '%' || sqlc.narg('search') || '%'
+    ))
+ORDER BY consumed_at DESC
+LIMIT $4 OFFSET $5;
+
 -- name: GetMediaItemByID :one
 SELECT * FROM media_items WHERE id = $1 AND user_id = $2;
 

@@ -3,7 +3,6 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/justestif/specto/components"
@@ -46,22 +45,24 @@ func (h *Handler) TimelinePagePartial(w http.ResponseWriter, r *http.Request) {
 	components.TimelineItems(items, filters, hasMore).Render(r.Context(), w)
 }
 
-// fetchTimelineItems loads timeline items with filtering applied.
+// fetchTimelineItems loads timeline items with DB-level filtering applied.
 func (h *Handler) fetchTimelineItems(r *http.Request, user *core.UserInfo, f components.TimelineFilters) ([]core.MediaItem, bool) {
 	now := time.Now().UTC()
 	from := now.AddDate(0, 0, -90) // 90 days of history
 
-	// Fetch extra to determine if there are more items (for load more button).
+	// Fetch one extra to determine if there are more items.
 	fetchLimit := int32(f.Limit + 1)
-	items, err := h.App.MediaItems.List(r.Context(), user.ID, from, now, fetchLimit, int32(f.Offset))
+
+	// Convert empty filter strings to nil for the store's optional params.
+	platform := nilIfEmpty(f.Platform)
+	mediaType := nilIfEmpty(f.Type)
+	search := nilIfEmpty(f.Search)
+
+	items, err := h.App.MediaItems.ListFiltered(r.Context(), user.ID, from, now, fetchLimit, int32(f.Offset), platform, mediaType, search)
 	if err != nil {
 		log.Printf("timeline page: list error: %v", err)
 		return nil, false
 	}
-
-	// Apply client-side filters (platform, type, search).
-	// TODO: Move filtering to the store/query layer for better performance.
-	items = filterItems(items, f)
 
 	hasMore := len(items) > f.Limit
 	if hasMore {
@@ -71,31 +72,12 @@ func (h *Handler) fetchTimelineItems(r *http.Request, user *core.UserInfo, f com
 	return items, hasMore
 }
 
-// filterItems applies platform, type, and search filters to the item list.
-func filterItems(items []core.MediaItem, f components.TimelineFilters) []core.MediaItem {
-	if f.Platform == "" && f.Type == "" && f.Search == "" {
-		return items
+// nilIfEmpty returns nil for empty strings, or a pointer to s otherwise.
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
 	}
-
-	search := strings.ToLower(f.Search)
-	filtered := make([]core.MediaItem, 0, len(items))
-	for _, item := range items {
-		if f.Platform != "" && item.Platform != f.Platform {
-			continue
-		}
-		if f.Type != "" && string(item.Type) != f.Type {
-			continue
-		}
-		if search != "" {
-			titleMatch := strings.Contains(strings.ToLower(item.Title), search)
-			creatorMatch := strings.Contains(strings.ToLower(item.Creator), search)
-			if !titleMatch && !creatorMatch {
-				continue
-			}
-		}
-		filtered = append(filtered, item)
-	}
-	return filtered
+	return &s
 }
 
 func parseTimelineFilters(r *http.Request) components.TimelineFilters {

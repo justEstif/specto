@@ -655,6 +655,77 @@ func (q *Queries) ListMediaItems(ctx context.Context, arg ListMediaItemsParams) 
 	return items, nil
 }
 
+const listMediaItemsFiltered = `-- name: ListMediaItemsFiltered :many
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND ($6::TEXT IS NULL OR platform = $6)
+    AND ($7::TEXT IS NULL OR type = $7)
+    AND ($8::TEXT IS NULL OR (
+        title ILIKE '%' || $8 || '%'
+        OR creator ILIKE '%' || $8 || '%'
+    ))
+ORDER BY consumed_at DESC
+LIMIT $4 OFFSET $5
+`
+
+type ListMediaItemsFilteredParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit        int32              `json:"limit"`
+	Offset       int32              `json:"offset"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+	Search       pgtype.Text        `json:"search"`
+}
+
+func (q *Queries) ListMediaItemsFiltered(ctx context.Context, arg ListMediaItemsFilteredParams) ([]MediaItem, error) {
+	rows, err := q.db.Query(ctx, listMediaItemsFiltered,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.Offset,
+		arg.Platform,
+		arg.MediaType,
+		arg.Search,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MediaItem{}
+	for rows.Next() {
+		var i MediaItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Platform,
+			&i.Type,
+			&i.Title,
+			&i.Creator,
+			&i.ConsumedAt,
+			&i.Duration,
+			&i.TimeSpent,
+			&i.Url,
+			&i.ExternalID,
+			&i.EnrichmentStatus,
+			&i.RawMetadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingEnrichment = `-- name: ListPendingEnrichment :many
 SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items
 WHERE enrichment_status = 'pending'

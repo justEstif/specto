@@ -132,6 +132,44 @@ func (s *SyncService) SyncPlugin(ctx context.Context, userID uuid.UUID, pluginNa
 		}
 	}
 
+	return s.executeSyncFlow(ctx, userID, pluginName, plugin, *creds, log)
+}
+
+// SyncPluginWithFile runs the full sync flow for a file-import plugin,
+// injecting the provided file reader into the credentials. This is needed
+// because io.Reader cannot be serialized to the credential store — the
+// handler must pass the file reader directly.
+func (s *SyncService) SyncPluginWithFile(ctx context.Context, userID uuid.UUID, pluginName string, file io.Reader) (*SyncSummary, error) {
+	log := s.Logger.With("user_id", userID, "plugin", pluginName)
+
+	// Step 1: Rate-limit check
+	if err := s.checkRateLimit(ctx, userID, pluginName); err != nil {
+		return nil, err
+	}
+
+	// Step 2: Look up plugin from registry
+	plugin := s.Registry.Get(pluginName)
+	if plugin == nil {
+		return nil, fmt.Errorf("plugin %q not found in registry", pluginName)
+	}
+
+	// Step 3: Build credentials with the file reader directly
+	creds := Credentials{File: file}
+
+	return s.executeSyncFlow(ctx, userID, pluginName, plugin, creds, log)
+}
+
+// executeSyncFlow runs the shared sync pipeline (steps 4-11) after
+// credentials have been resolved. Both SyncPlugin and SyncPluginWithFile
+// delegate here after their credential-specific setup.
+func (s *SyncService) executeSyncFlow(
+	ctx context.Context,
+	userID uuid.UUID,
+	pluginName string,
+	plugin SourcePlugin,
+	creds Credentials,
+	log *slog.Logger,
+) (*SyncSummary, error) {
 	// Step 4: Get cursor from plugin state
 	state, err := s.Plugins.GetState(ctx, userID, pluginName)
 	if err != nil {
@@ -153,7 +191,7 @@ func (s *SyncService) SyncPlugin(ctx context.Context, userID uuid.UUID, pluginNa
 
 	// Step 5: Call plugin.Sync
 	log.Info("starting sync", "cursor", cursor)
-	result := plugin.Sync(ctx, *creds, cursor)
+	result := plugin.Sync(ctx, creds, cursor)
 
 	// Handle plugin errors
 	if result.Err != nil {
@@ -169,7 +207,7 @@ func (s *SyncService) SyncPlugin(ctx context.Context, userID uuid.UUID, pluginNa
 	summary.HasMore = result.HasMore
 
 	// Step 7: Plugin-specific enrichment
-	enrichedItems, err := plugin.Enrich(ctx, *creds, result.Items)
+	enrichedItems, err := plugin.Enrich(ctx, creds, result.Items)
 	if err != nil {
 		// Plugin enrichment failure is non-fatal — log and continue
 		log.Warn("plugin enrichment failed, continuing with unenriched items", "error", err)
@@ -205,103 +243,6 @@ func (s *SyncService) SyncPlugin(ctx context.Context, userID uuid.UUID, pluginNa
 		"items_added", summary.ItemsAdded,
 		"items_skipped", summary.ItemsSkipped,
 		"has_more", summary.HasMore,
-	)
-
-	return summary, nil
-}
-
-// SyncPluginWithFile runs the full sync flow for a file-import plugin,
-// injecting the provided file reader into the credentials. This is needed
-// because io.Reader cannot be serialized to the credential store — the
-// handler must pass the file reader directly.
-func (s *SyncService) SyncPluginWithFile(ctx context.Context, userID uuid.UUID, pluginName string, file io.Reader) (*SyncSummary, error) {
-	log := s.Logger.With("user_id", userID, "plugin", pluginName)
-
-	// Step 1: Rate-limit check
-	if err := s.checkRateLimit(ctx, userID, pluginName); err != nil {
-		return nil, err
-	}
-
-	// Step 2: Look up plugin from registry
-	plugin := s.Registry.Get(pluginName)
-	if plugin == nil {
-		return nil, fmt.Errorf("plugin %q not found in registry", pluginName)
-	}
-
-	// Step 3: Build credentials with the file reader directly
-	creds := Credentials{File: file}
-
-	// Step 4: Get cursor from plugin state (always empty for file imports)
-	state, err := s.Plugins.GetState(ctx, userID, pluginName)
-	if err != nil {
-		return nil, fmt.Errorf("loading plugin state for %q: %w", pluginName, err)
-	}
-
-	cursor := ""
-	if state.Cursor != nil {
-		cursor = *state.Cursor
-	}
-
-	// Begin sync log
-	logID, err := s.SyncLogs.Begin(ctx, userID, pluginName)
-	if err != nil {
-		return nil, fmt.Errorf("creating sync log: %w", err)
-	}
-
-	startTime := time.Now()
-
-	// Step 5: Call plugin.Sync with file credentials
-	log.Info("starting file import sync", "cursor", cursor)
-	result := plugin.Sync(ctx, creds, cursor)
-
-	// Handle plugin errors
-	if result.Err != nil {
-		return s.handleSyncError(ctx, userID, pluginName, logID, startTime, &result, log)
-	}
-
-	// Step 6: Store items (upsert handles dedup)
-	summary, err := s.storeItems(ctx, userID, result.Items, log)
-	if err != nil {
-		s.failSyncLog(ctx, logID, startTime, summary, err, log)
-		return summary, fmt.Errorf("storing items: %w", err)
-	}
-	summary.HasMore = result.HasMore
-
-	// Step 7: Plugin-specific enrichment (skip file for enrichment creds)
-	enrichedItems, err := plugin.Enrich(ctx, creds, result.Items)
-	if err != nil {
-		log.Warn("plugin enrichment failed, continuing with unenriched items", "error", err)
-		enrichedItems = result.Items
-	}
-
-	// Step 8 & 9: Core enrichment + tag persistence
-	s.enrichAndTagItems(ctx, userID, enrichedItems, log)
-
-	// Step 10: Complete sync log
-	durationMs := int32(time.Since(startTime).Milliseconds())
-	err = s.SyncLogs.Complete(ctx, logID, SyncLogResult{
-		ItemsAdded:   summary.ItemsAdded,
-		ItemsSkipped: summary.ItemsSkipped,
-		ItemsUpdated: summary.ItemsUpdated,
-		DurationMs:   durationMs,
-	})
-	if err != nil {
-		log.Error("failed to complete sync log", "error", err)
-	}
-
-	// Step 11: Update plugin state cursor
-	newCursor := &result.NextCursor
-	if result.NextCursor == "" {
-		newCursor = nil
-	}
-	_, err = s.Plugins.UpdateSynced(ctx, userID, pluginName, newCursor)
-	if err != nil {
-		log.Error("failed to update plugin state cursor", "error", err)
-	}
-
-	log.Info("file import sync completed",
-		"items_added", summary.ItemsAdded,
-		"items_skipped", summary.ItemsSkipped,
 	)
 
 	return summary, nil

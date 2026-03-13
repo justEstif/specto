@@ -110,6 +110,28 @@ func (s *PgMediaItemStore) List(ctx context.Context, userID uuid.UUID, from, to 
 	return items, nil
 }
 
+func (s *PgMediaItemStore) ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]core.MediaItem, error) {
+	rows, err := s.q.ListMediaItemsFiltered(ctx, database.ListMediaItemsFilteredParams{
+		UserID:       uuidToPgx(userID),
+		ConsumedAt:   timestamptz(from),
+		ConsumedAt_2: timestamptz(to),
+		Limit:        limit,
+		Offset:       offset,
+		Platform:     textPtr(platform),
+		MediaType:    textPtr(mediaType),
+		Search:       textPtr(search),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing filtered media items: %w", err)
+	}
+
+	items := make([]core.MediaItem, len(rows))
+	for i, row := range rows {
+		items[i] = mediaItemFromDB(row)
+	}
+	return items, nil
+}
+
 func (s *PgMediaItemStore) UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error {
 	err := s.q.UpdateEnrichmentStatus(ctx, database.UpdateEnrichmentStatusParams{
 		ID:               uuidToPgx(itemID),

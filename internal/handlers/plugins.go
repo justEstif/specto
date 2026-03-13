@@ -382,18 +382,18 @@ func (h *Handler) SyncPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := map[string]any{
-		"plugin":        pluginName,
-		"status":        status,
-		"items_added":   summary.ItemsAdded,
-		"items_skipped": summary.ItemsSkipped,
-		"items_updated": summary.ItemsUpdated,
+	resp := syncResultResponse{
+		Plugin:       pluginName,
+		Status:       status,
+		ItemsAdded:   summary.ItemsAdded,
+		ItemsSkipped: summary.ItemsSkipped,
+		ItemsUpdated: summary.ItemsUpdated,
 	}
-	if state != nil && state.LastSyncedAt != nil {
-		resp["last_synced_at"] = state.LastSyncedAt
+	if state != nil {
+		resp.LastSyncedAt = state.LastSyncedAt
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": resp})
+	writeJSON(w, http.StatusOK, dataResponse{Data: resp})
 }
 
 // SyncHistory handles GET /api/v1/plugins/{plugin}/sync-history
@@ -426,24 +426,21 @@ func (h *Handler) SyncHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entries := make([]map[string]any, 0, len(logs))
+	entries := make([]syncHistoryEntryResponse, 0, len(logs))
 	for _, l := range logs {
-		entry := map[string]any{
-			"started_at":    l.StartedAt,
-			"status":        l.Status,
-			"items_added":   l.ItemsAdded,
-			"items_skipped": l.ItemsSkipped,
-			"items_updated": l.ItemsUpdated,
-			"error_code":    l.ErrorCode,
-			"error_message": l.ErrorMessage,
-		}
-		if l.CompletedAt != nil {
-			entry["completed_at"] = l.CompletedAt
-		}
-		entries = append(entries, entry)
+		entries = append(entries, syncHistoryEntryResponse{
+			StartedAt:    l.StartedAt,
+			CompletedAt:  l.CompletedAt,
+			Status:       l.Status,
+			ItemsAdded:   l.ItemsAdded,
+			ItemsSkipped: l.ItemsSkipped,
+			ItemsUpdated: l.ItemsUpdated,
+			ErrorCode:    l.ErrorCode,
+			ErrorMessage: l.ErrorMessage,
+		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": entries})
+	writeJSON(w, http.StatusOK, dataResponse{Data: entries})
 }
 
 // --- helpers ---

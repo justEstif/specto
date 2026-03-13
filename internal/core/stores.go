@@ -28,6 +28,11 @@ type MediaItemStore interface {
 	// List returns media items for a user within the given time range.
 	List(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
 
+	// ListFiltered returns media items for a user within the given time range,
+	// with optional filtering by platform, media type, and title/creator search.
+	// Pass nil for any filter to skip it.
+	ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]MediaItem, error)
+
 	// UpdateEnrichmentStatus sets the enrichment status on a media item.
 	UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error
 
