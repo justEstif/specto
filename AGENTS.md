@@ -168,5 +168,6 @@ relevant subsystem:
 - [`docs/development-workflow.md`](docs/development-workflow.md) -- Dev setup, httpyac testing conventions
 - [`docs/sharing.md`](docs/sharing.md) -- Shareable user profiles
 - [`docs/styling.md`](docs/styling.md) -- DaisyUI themes, typography, HTMX CSS states, View Transitions
+- [`docs/ui-design.md`](docs/ui-design.md) -- Page wireframes, layout, responsive breakpoints, HTMX patterns
 - [`docs/MVP.md`](docs/MVP.md) -- Product scope and feature list
 - [`docs/plugins/`](docs/plugins/) -- Platform-specific API research (spotify, youtube, etc.)
