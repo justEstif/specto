@@ -68,50 +68,61 @@ templ SettingsAccount(data SettingsData) {
 		<input type="hidden" name="gorilla.csrf.Token" value={ data.CSRFToken }/>
 		<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
 			<legend class="fieldset-legend text-base font-semibold">Profile</legend>
-			<div class="space-y-4">
-				<div>
-					<label class="label text-base-content/70 text-sm">Display name</label>
+			<div class="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-x-6 gap-y-5 items-start">
+				<!-- Display name -->
+				<label class="label text-base-content/70 text-sm sm:pt-2.5" for="display_name">Display name</label>
+				<div class="max-w-md">
 					<input
+						id="display_name"
 						type="text"
 						name="display_name"
 						value={ data.User.DisplayName }
 						required
-						class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+						class="input w-full bg-base-100 border-base-300 min-h-[44px]"
 					/>
 				</div>
-				<div>
-					<label class="label text-base-content/70 text-sm">Email</label>
-					<input
-						type="email"
-						value={ data.User.Email }
-						disabled
-						class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px] opacity-50"
-					/>
+				<!-- Email (read-only) -->
+				<label class="label text-base-content/70 text-sm sm:pt-2.5">Email</label>
+				<div class="max-w-md">
+					<div class="flex items-center gap-2 input w-full bg-base-200/60 border-base-300 min-h-[44px] cursor-not-allowed">
+						<span class="text-base-content/50 truncate">{ data.User.Email }</span>
+					</div>
+					<p class="text-xs text-base-content/40 mt-1.5">Email cannot be changed</p>
 				</div>
-				<div>
-					<label class="label text-base-content/70 text-sm">Profile slug (for share URL)</label>
+				<!-- Profile slug -->
+				<label class="label text-base-content/70 text-sm sm:pt-2.5" for="profile_slug">Profile slug</label>
+				<div class="max-w-md">
 					<input
+						id="profile_slug"
 						type="text"
 						name="profile_slug"
 						value={ derefStr(data.User.ProfileSlug) }
 						pattern="[a-z0-9-]+"
-						class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+						class="input w-full bg-base-100 border-base-300 min-h-[44px]"
 						placeholder="your-slug"
 					/>
 					if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
-						<p class="text-xs text-base-content/40 mt-1">/share/{ *data.User.ProfileSlug }</p>
+						<p class="text-xs text-base-content/40 mt-1.5">
+							Your public profile: <span class="font-mono text-base-content/50">/share/{ *data.User.ProfileSlug }</span>
+						</p>
+					} else {
+						<p class="text-xs text-base-content/40 mt-1.5">Lowercase letters, numbers, and hyphens only</p>
 					}
 				</div>
-				<button type="submit" class="btn btn-primary btn-sm mt-2 min-h-[44px]">
-					Save changes
-				</button>
+				<!-- Save button -->
+				<div class="hidden sm:block"></div>
+				<div>
+					<button type="submit" class="btn btn-primary btn-sm min-h-[44px]">
+						Save changes
+					</button>
+				</div>
 			</div>
 		</fieldset>
 	</form>
 	<!-- Connected accounts -->
 	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
 		<legend class="fieldset-legend text-base font-semibold">Connected accounts</legend>
-		<div class="space-y-3">
+		<div class="divide-y divide-base-300 -mx-1">
 			@connectedAccount("Google", data.User.AuthProvider == "google")
 			@connectedAccount("GitHub", data.User.AuthProvider == "github")
 		</div>
@@ -153,15 +164,19 @@ templ SettingsAccount(data SettingsData) {
 }
 
 templ connectedAccount(provider string, connected bool) {
-	<div class="flex items-center justify-between">
-		<div class="flex items-center gap-2">
-			<span class="text-sm text-base-content/80">{ provider }</span>
+	<div class="flex items-center justify-between px-1 py-3 first:pt-0 last:pb-0">
+		<div class="flex items-center gap-3">
+			<span class="text-sm font-medium text-base-content/80">{ provider }</span>
 			if connected {
-				<span class="status status-success"></span>
-				<span class="text-xs text-base-content/50">Connected</span>
+				<span class="badge badge-success badge-sm gap-1">
+					<span class="status status-success status-xs"></span>
+					Connected
+				</span>
 			} else {
-				<span class="status status-neutral"></span>
-				<span class="text-xs text-base-content/40">Not connected</span>
+				<span class="badge badge-ghost badge-sm gap-1 text-base-content/40">
+					<span class="status status-neutral status-xs"></span>
+					Not connected
+				</span>
 			}
 		</div>
 		if !connected {
@@ -210,70 +225,72 @@ templ SettingsSharing(data SettingsData) {
 	<!-- Public profile toggle -->
 	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
 		<legend class="fieldset-legend text-base font-semibold">Public profile</legend>
-		<div class="flex items-center justify-between">
-			<div>
-				<label class="flex items-center gap-3 cursor-pointer">
-					<input type="checkbox" class="toggle toggle-primary" name="profile_enabled"/>
-					<span class="text-sm text-base-content/80">Enable public profile</span>
-				</label>
-			</div>
-		</div>
+		<p class="text-sm text-base-content/50 mb-4">Make your media profile visible to anyone with the link.</p>
+		<label class="flex items-center gap-3 cursor-pointer">
+			<input type="checkbox" class="toggle toggle-primary" name="profile_enabled"/>
+			<span class="text-sm font-medium text-base-content/80">Enable public profile</span>
+		</label>
 		if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
-			<div class="flex items-center gap-2 mt-3">
-				<span class="text-sm text-base-content/50">/share/{ *data.User.ProfileSlug }</span>
+			<div class="flex items-center gap-3 mt-4 px-3 py-2.5 bg-base-200/60 rounded-box">
+				<span class="font-mono text-sm text-base-content/60 truncate">/share/{ *data.User.ProfileSlug }</span>
 				<button
 					type="button"
-					class="btn btn-ghost btn-xs text-primary"
+					class="btn btn-ghost btn-xs text-primary shrink-0"
 					onclick="navigator.clipboard.writeText(window.location.origin + '/share/' + this.previousElementSibling.textContent.trim().replace('/share/', ''))"
 				>
 					Copy link
 				</button>
 			</div>
 		} else {
-			<p class="text-xs text-base-content/40 mt-2">Set a profile slug in the Account tab first.</p>
+			<div class="flex items-center gap-2 mt-4 px-3 py-2.5 bg-base-200/40 rounded-box">
+				<span class="status status-warning status-xs"></span>
+				<p class="text-xs text-base-content/50">Set a profile slug in the Account tab first.</p>
+			</div>
 		}
 	</fieldset>
 	<!-- Blocks -->
-	<div class="mb-6">
-		<h3 class="text-display text-lg font-semibold mb-2">Blocks</h3>
+	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+		<legend class="fieldset-legend text-base font-semibold">Blocks</legend>
 		<p class="text-sm text-base-content/50 mb-4">Toggle and reorder the sections on your public profile.</p>
-		<div class="bg-neutral border border-base-300 rounded-box divide-y divide-base-300">
+		<div class="border border-base-300 rounded-box divide-y divide-base-300 overflow-hidden">
 			@shareBlockRow("top_genres", "Top Genres", true, "30d", "")
 			@shareBlockRow("mood_profile", "Mood Profile", true, "30d", "")
 			@shareBlockRow("top_creators", "Top Creators", true, "30d", "")
 			@shareBlockRow("platform_mix", "Platform Mix", false, "30d", "")
 			@shareBlockRow("currently_into", "Currently Into", true, "", "")
 		</div>
-	</div>
+	</fieldset>
 	<!-- Exclusions -->
 	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
 		<legend class="fieldset-legend text-base font-semibold">Exclusions</legend>
 		<p class="text-sm text-base-content/50 mb-4">Content matching these filters is excluded from all share calculations.</p>
-		<div class="space-y-4">
-			<div>
-				<label class="label text-base-content/70 text-sm">Exclude platforms</label>
+		<div class="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-6 gap-y-5 items-start">
+			<label class="label text-base-content/70 text-sm sm:pt-2.5" for="excluded_platforms">Platforms</label>
+			<div class="max-w-md">
 				<input
+					id="excluded_platforms"
 					type="text"
 					name="excluded_platforms"
 					placeholder="e.g. netflix, tiktok"
-					class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+					class="input w-full bg-base-100 border-base-300 min-h-[44px]"
 				/>
-				<p class="text-xs text-base-content/40 mt-1">Comma-separated platform names</p>
+				<p class="text-xs text-base-content/40 mt-1.5">Comma-separated platform names</p>
 			</div>
-			<div>
-				<label class="label text-base-content/70 text-sm">Exclude tags</label>
+			<label class="label text-base-content/70 text-sm sm:pt-2.5" for="excluded_tags">Tags</label>
+			<div class="max-w-md">
 				<input
+					id="excluded_tags"
 					type="text"
 					name="excluded_tags"
 					placeholder="e.g. romance, reality-tv"
-					class="input w-full bg-base-100 border-base-300 max-w-md min-h-[44px]"
+					class="input w-full bg-base-100 border-base-300 min-h-[44px]"
 				/>
-				<p class="text-xs text-base-content/40 mt-1">Comma-separated tag names</p>
+				<p class="text-xs text-base-content/40 mt-1.5">Comma-separated tag names</p>
 			</div>
 		</div>
 	</fieldset>
 	<!-- Actions -->
-	<div class="flex gap-3">
+	<div class="flex items-center gap-3">
 		<button class="btn btn-primary btn-sm min-h-[44px]" disabled>
 			Save &amp; publish
 		</button>
@@ -286,28 +303,28 @@ templ SettingsSharing(data SettingsData) {
 
 // shareBlockRow renders a single block configuration row.
 templ shareBlockRow(blockType, label string, enabled bool, timeRange, platform string) {
-	<div class="flex items-center gap-3 px-4 py-3">
+	<div class={ "flex items-center gap-4 px-4 py-3 transition-colors", templ.KV("bg-base-200/30", enabled), templ.KV("opacity-50", !enabled) }>
 		<!-- Drag handle -->
-		<span class="text-base-content/30 cursor-grab" title="Drag to reorder">=</span>
+		<span class="text-base-content/25 cursor-grab select-none text-lg leading-none" title="Drag to reorder">⠿</span>
 		<!-- Enable toggle -->
 		<input
 			type="checkbox"
-			class="checkbox checkbox-primary checkbox-sm"
+			class="toggle toggle-primary toggle-sm"
 			checked?={ enabled }
 			name={ "block_" + blockType + "_enabled" }
 		/>
 		<!-- Block name -->
-		<span class="flex-1 text-sm text-base-content/80">{ label }</span>
+		<span class="flex-1 text-sm font-medium text-base-content/80">{ label }</span>
 		<!-- Time range (if applicable) -->
 		if timeRange != "" {
 			<select
 				name={ "block_" + blockType + "_range" }
-				class="select select-xs bg-base-100 border-base-300"
+				class="select select-xs bg-base-100 border-base-300 min-w-[70px]"
 			>
-				<option value="7d" selected?={ timeRange == "7d" }>7d</option>
-				<option value="30d" selected?={ timeRange == "30d" }>30d</option>
-				<option value="90d" selected?={ timeRange == "90d" }>90d</option>
-				<option value="all" selected?={ timeRange == "all" }>All</option>
+				<option value="7d" selected?={ timeRange == "7d" }>7 days</option>
+				<option value="30d" selected?={ timeRange == "30d" }>30 days</option>
+				<option value="90d" selected?={ timeRange == "90d" }>90 days</option>
+				<option value="all" selected?={ timeRange == "all" }>All time</option>
 			</select>
 		}
 	</div>
