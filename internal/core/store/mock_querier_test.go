@@ -276,3 +276,19 @@ func (m *mockQuerier) TagDistribution(ctx context.Context, arg database.TagDistr
 	}
 	return nil, fmt.Errorf("TagDistribution not mocked")
 }
+
+func (m *mockQuerier) DeleteMediaItemsByPlatform(_ context.Context, _ database.DeleteMediaItemsByPlatformParams) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockQuerier) DeleteSyncLogsByPlugin(_ context.Context, _ database.DeleteSyncLogsByPluginParams) error {
+	return nil
+}
+
+func (m *mockQuerier) PlatformBreakdownFiltered(_ context.Context, _ database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) TagDistributionFiltered(_ context.Context, _ database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error) {
+	return nil, nil
+}

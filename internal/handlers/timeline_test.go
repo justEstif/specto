@@ -64,6 +64,9 @@ func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit in
 	}
 	return nil, nil
 }
+func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
+	return 0, nil
+}
 
 func TestTimeline(t *testing.T) {
 	duration := 3 * time.Minute

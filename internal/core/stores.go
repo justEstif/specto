@@ -38,6 +38,10 @@ type MediaItemStore interface {
 
 	// ListPendingEnrichment returns items that still need enrichment.
 	ListPendingEnrichment(ctx context.Context, limit int32) ([]MediaItem, error)
+
+	// DeleteByPlatform removes all media items for a user on a given platform.
+	// Returns the number of items deleted.
+	DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error)
 }
 
 // PluginStateStore manages plugin connection state and credentials.
@@ -80,6 +84,9 @@ type SyncLogStore interface {
 
 	// List returns recent sync logs for a plugin.
 	List(ctx context.Context, userID uuid.UUID, plugin string, limit int32) ([]SyncLogEntry, error)
+
+	// DeleteByPlugin removes all sync log entries for a user's plugin.
+	DeleteByPlugin(ctx context.Context, userID uuid.UUID, plugin string) error
 }
 
 // TagStore manages tag persistence, alias resolution, and media item tagging.
@@ -126,20 +133,38 @@ type UserStore interface {
 	UpdateProfile(ctx context.Context, id uuid.UUID, displayName string, avatarURL, profileSlug *string) (*UserInfo, error)
 }
 
+// InsightsFilter holds optional filters for insights queries.
+type InsightsFilter struct {
+	Platform  *string
+	MediaType *string
+}
+
 // InsightsStore provides pre-aggregated analytics data.
 type InsightsStore interface {
 	// PlatformBreakdown returns item counts and total duration grouped by
 	// platform and media type for the given date range.
 	PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]PlatformBreakdownEntry, error)
 
+	// PlatformBreakdownFiltered returns platform breakdown with optional
+	// platform and media type filters applied.
+	PlatformBreakdownFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]PlatformBreakdownEntry, error)
+
 	// TagDistribution returns tag usage counts for the given date range,
 	// limited to tags with confidence >= minConfidence (or authoritative tags
 	// where confidence is NULL). Results are ordered by count descending.
 	TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32) ([]TagDistributionEntry, error)
 
+	// TagDistributionFiltered returns tag distribution with optional
+	// platform and media type filters applied.
+	TagDistributionFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, filter InsightsFilter) ([]TagDistributionEntry, error)
+
 	// ListMediaItems returns media items for a user within a date range
 	// (used internally by InsightsService for timeline aggregation).
 	ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
+
+	// ListMediaItemsFiltered returns media items with optional filters
+	// (used internally by InsightsService for filtered timeline aggregation).
+	ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, filter InsightsFilter) ([]MediaItem, error)
 }
 
 // --- Domain types used by store interfaces ---

@@ -39,11 +39,12 @@ templ PluginsPage(data PluginsPageData) {
 					No plugins connected yet. Connect one below to start tracking.
 				</div>
 			} else {
-				<div class="space-y-4">
-					for _, p := range data.Connected {
-						@PluginCard(p, data.CSRFToken)
-					}
-				</div>
+			<div class="space-y-4">
+				for _, p := range data.Connected {
+					@PluginCard(p, data.CSRFToken)
+					@disconnectModal(p, data.CSRFToken)
+				}
+			</div>
 			}
 		</div>
 		<!-- Available plugins -->
@@ -101,8 +102,9 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 		}
 		<!-- Actions -->
 		<div class="flex flex-wrap gap-2 mt-4">
-			if p.Connected {
-				<!-- Sync now -->
+		if p.Connected {
+			if p.AuthType != core.AuthFileImport {
+				<!-- Sync now (only for non-file-import plugins) -->
 				<button
 					class="btn btn-sm btn-outline border-base-300 min-h-[44px]"
 					hx-post={ fmt.Sprintf("/api/v1/plugins/%s/sync", p.Name) }
@@ -112,17 +114,35 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 				>
 					Sync now
 				</button>
-				<!-- Disconnect -->
-				<button
-					class="btn btn-sm btn-ghost text-error/70 hover:text-error min-h-[44px]"
-					hx-delete={ fmt.Sprintf("/api/v1/plugins/%s/disconnect", p.Name) }
+			}
+			if p.AuthType == core.AuthFileImport {
+				<!-- Re-upload for file-import plugins -->
+				<form
+					hx-post={ fmt.Sprintf("/api/v1/plugins/%s/import", p.Name) }
 					hx-target={ "#plugin-" + p.Name }
 					hx-swap="outerHTML"
-					hx-confirm={ fmt.Sprintf("Disconnect %s? Your synced data will be kept.", p.DisplayName) }
-					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
+					hx-encoding="multipart/form-data"
+					class="flex items-center gap-2"
 				>
-					Disconnect
-				</button>
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<input
+						type="file"
+						name="file"
+						accept=".csv,.json,.txt"
+						class="file-input file-input-sm bg-base-100 border-base-300 min-h-[44px]"
+					/>
+					<button type="submit" class="btn btn-sm btn-outline border-base-300 min-h-[44px]">
+						Re-upload
+					</button>
+				</form>
+			}
+			<!-- Disconnect -->
+			<button
+				class="btn btn-sm btn-ghost text-error/70 hover:text-error min-h-[44px]"
+				onclick={ showDisconnectModal(p.Name) }
+			>
+				Disconnect
+			</button>
 			} else if p.AuthType == core.AuthOAuth {
 				<button
 					hx-post={ fmt.Sprintf("/api/v1/plugins/%s/connect", p.Name) }
@@ -216,7 +236,7 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 			<div class="collapse-title text-sm font-medium text-base-content/60">
 				Accepted file formats
 			</div>
-			<div class="collapse-content text-xs text-base-content/50 space-y-1">
+			<div class="collapse-content text-xs text-base-content/50 space-y-2">
 				for _, p := range available {
 					if p.AuthType == core.AuthFileImport {
 						<div class="flex items-start gap-2">
@@ -226,12 +246,24 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 							<div>
 								<span class="font-medium text-base-content/70">{ p.DisplayName }:</span>
 								{ " " + fileFormatHint(p.Name) }
+								<button
+									class="link link-primary ml-1"
+									onclick={ showGuideModal(p.Name) }
+								>
+									How to get this file
+								</button>
 							</div>
 						</div>
 					}
 				}
 			</div>
 		</div>
+		<!-- Import guide modals -->
+		for _, p := range available {
+			if p.AuthType == core.AuthFileImport {
+				@importGuideModal(p.Name, p.DisplayName)
+			}
+		}
 		<!-- Script to update form action based on selected plugin -->
 		<script>
 			function updateImportAction(select) {
@@ -296,6 +328,132 @@ func fileFormatHint(name string) string {
 	default:
 		return "CSV, JSON, or TXT export file"
 	}
+}
+
+// showGuideModal returns a script expression to open a platform's import guide modal.
+script showGuideModal(pluginName string) {
+	document.getElementById('guide-modal-' + pluginName).showModal()
+}
+
+// importGuideModal renders a modal with step-by-step instructions for obtaining export data.
+templ importGuideModal(name string, displayName string) {
+	<dialog id={ "guide-modal-" + name } class="modal">
+		<div class="modal-box max-w-lg">
+			<form method="dialog">
+				<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+			</form>
+			<h3 class="text-lg font-bold mb-4">How to export your { displayName } data</h3>
+			<div class="text-sm text-base-content/80 space-y-3">
+				@importGuideSteps(name)
+			</div>
+			<div class="modal-action">
+				<form method="dialog">
+					<button class="btn btn-sm">Close</button>
+				</form>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+}
+
+templ importGuideSteps(name string) {
+	switch {
+		case strings.Contains(strings.ToLower(name), "spotify"):
+			<ol class="list-decimal list-inside space-y-2">
+				<li>Go to your <a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noopener" class="link link-primary">Spotify Privacy Settings</a>.</li>
+				<li>Scroll down to <strong>"Download your data"</strong>.</li>
+				<li>Select <strong>"Extended streaming history"</strong> — this includes your full listening history. The basic "Account data" option only covers the last year.</li>
+				<li>Click <strong>"Request data"</strong>. Spotify will email you when it's ready (this can take up to 30 days, but often arrives within a few days).</li>
+				<li>Download the ZIP file from the email link and extract it.</li>
+				<li>Look for files named <code class="bg-base-300 px-1 rounded">Streaming_History_Audio_*.json</code> — upload any of these files here.</li>
+			</ol>
+			<div class="alert alert-info text-xs mt-2">
+				<span>You can upload multiple files if your history is split across several JSON files. Each upload will skip any duplicates automatically.</span>
+			</div>
+		case strings.Contains(strings.ToLower(name), "youtube"):
+			<ol class="list-decimal list-inside space-y-2">
+				<li>Go to <a href="https://takeout.google.com/" target="_blank" rel="noopener" class="link link-primary">Google Takeout</a>.</li>
+				<li>Click <strong>"Deselect all"</strong>, then scroll down and check only <strong>"YouTube and YouTube Music"</strong>.</li>
+				<li>Click <strong>"Multiple formats"</strong> next to the YouTube row. Find <strong>"History"</strong> in the list and change the format from <strong>HTML to JSON</strong>. Click <strong>"OK"</strong>.</li>
+				<li>Click <strong>"All YouTube data included"</strong> and select only <strong>"history"</strong> to keep the download small.</li>
+				<li>Click <strong>"Next step"</strong>, choose your delivery method (the defaults are fine), then click <strong>"Create export"</strong>.</li>
+				<li>Wait for the email from Google (usually a few minutes), then download and extract the ZIP.</li>
+				<li>Navigate to <code class="bg-base-300 px-1 rounded">Takeout/YouTube and YouTube Music/history/</code> and upload the <code class="bg-base-300 px-1 rounded">watch-history.json</code> file here.</li>
+			</ol>
+			<div class="alert alert-warning text-xs mt-2">
+				<span>The default export format is HTML, which won't work here. Make sure you change it to JSON in step 3 or the file won't be accepted.</span>
+			</div>
+		default:
+			<p>Export your data from this platform and upload the file above. Check the platform's settings or privacy page for a data export option.</p>
+	}
+}
+
+// showDisconnectModal opens the disconnect confirmation modal for a plugin.
+script showDisconnectModal(pluginName string) {
+	document.getElementById('disconnect-modal-' + pluginName).showModal()
+}
+
+// disconnectModal renders a modal with options to disconnect only or disconnect and delete data.
+templ disconnectModal(p PluginViewData, csrfToken string) {
+	<dialog id={ "disconnect-modal-" + p.Name } class="modal">
+		<div class="modal-box max-w-md">
+			<form method="dialog">
+				<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+			</form>
+			<h3 class="text-lg font-bold mb-2">Disconnect { p.DisplayName }?</h3>
+			<p class="text-sm text-base-content/70 mb-6">Choose what to do with your synced data.</p>
+			<div class="space-y-3">
+				<!-- Disconnect only (keep data) -->
+				<button
+					class="btn btn-outline btn-block justify-start gap-3 min-h-[44px]"
+					hx-delete={ fmt.Sprintf("/api/v1/plugins/%s/disconnect", p.Name) }
+					hx-target={ "#plugin-" + p.Name }
+					hx-swap="outerHTML"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
+					onclick={ closeDisconnectModal(p.Name) }
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"></path>
+					</svg>
+					<div class="text-left">
+						<div class="font-medium">Disconnect only</div>
+						<div class="text-xs text-base-content/50">Keep your synced data, just unlink the account</div>
+					</div>
+				</button>
+				<!-- Disconnect and delete data -->
+				<button
+					class="btn btn-error btn-outline btn-block justify-start gap-3 min-h-[44px]"
+					hx-delete={ fmt.Sprintf("/api/v1/plugins/%s/data", p.Name) }
+					hx-target={ "#plugin-" + p.Name }
+					hx-swap="outerHTML"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
+					onclick={ closeDisconnectModal(p.Name) }
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"></path>
+					</svg>
+					<div class="text-left">
+						<div class="font-medium">Disconnect and delete data</div>
+						<div class="text-xs text-base-content/50">Remove all synced items and history</div>
+					</div>
+				</button>
+			</div>
+			<div class="modal-action">
+				<form method="dialog">
+					<button class="btn btn-sm btn-ghost">Cancel</button>
+				</form>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+}
+
+script closeDisconnectModal(pluginName string) {
+	document.getElementById('disconnect-modal-' + pluginName).close()
 }
 
 func authTypeLabel(at core.AuthType) string {

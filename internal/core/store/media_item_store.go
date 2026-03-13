@@ -155,3 +155,14 @@ func (s *PgMediaItemStore) ListPendingEnrichment(ctx context.Context, limit int3
 	}
 	return items, nil
 }
+
+func (s *PgMediaItemStore) DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error) {
+	count, err := s.q.DeleteMediaItemsByPlatform(ctx, database.DeleteMediaItemsByPlatformParams{
+		UserID:   uuidToPgx(userID),
+		Platform: platform,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("deleting media items for platform %s: %w", platform, err)
+	}
+	return count, nil
+}

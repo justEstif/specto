@@ -183,6 +183,9 @@ func (m *mockSyncLogStore) List(ctx context.Context, userID uuid.UUID, plugin st
 	}
 	return nil, nil
 }
+func (m *mockSyncLogStore) DeleteByPlugin(_ context.Context, _ uuid.UUID, _ string) error {
+	return nil
+}
 
 // --- tests ---
 

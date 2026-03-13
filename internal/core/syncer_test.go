@@ -91,6 +91,9 @@ func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit in
 	}
 	return nil, nil
 }
+func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
+	return 0, nil
+}
 
 // mockPluginStateStore implements PluginStateStore for testing.
 type mockPluginStateStore struct {
@@ -184,6 +187,9 @@ func (m *mockSyncLogStore) List(ctx context.Context, userID uuid.UUID, plugin st
 		return m.listFn(ctx, userID, plugin, limit)
 	}
 	return nil, nil // no previous syncs
+}
+func (m *mockSyncLogStore) DeleteByPlugin(_ context.Context, _ uuid.UUID, _ string) error {
+	return nil
 }
 
 // mockTagStore implements TagStore for testing.

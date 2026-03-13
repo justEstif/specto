@@ -275,6 +275,23 @@ func (q *Queries) CreateUserWithPassword(ctx context.Context, arg CreateUserWith
 	return i, err
 }
 
+const deleteMediaItemsByPlatform = `-- name: DeleteMediaItemsByPlatform :execrows
+DELETE FROM media_items WHERE user_id = $1 AND platform = $2
+`
+
+type DeleteMediaItemsByPlatformParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	Platform string      `json:"platform"`
+}
+
+func (q *Queries) DeleteMediaItemsByPlatform(ctx context.Context, arg DeleteMediaItemsByPlatformParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteMediaItemsByPlatform, arg.UserID, arg.Platform)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePluginCredentials = `-- name: DeletePluginCredentials :exec
 DELETE FROM plugin_credentials WHERE user_id = $1 AND plugin = $2
 `
@@ -286,6 +303,20 @@ type DeletePluginCredentialsParams struct {
 
 func (q *Queries) DeletePluginCredentials(ctx context.Context, arg DeletePluginCredentialsParams) error {
 	_, err := q.db.Exec(ctx, deletePluginCredentials, arg.UserID, arg.Plugin)
+	return err
+}
+
+const deleteSyncLogsByPlugin = `-- name: DeleteSyncLogsByPlugin :exec
+DELETE FROM sync_log WHERE user_id = $1 AND plugin = $2
+`
+
+type DeleteSyncLogsByPluginParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Plugin string      `json:"plugin"`
+}
+
+func (q *Queries) DeleteSyncLogsByPlugin(ctx context.Context, arg DeleteSyncLogsByPluginParams) error {
+	_, err := q.db.Exec(ctx, deleteSyncLogsByPlugin, arg.UserID, arg.Plugin)
 	return err
 }
 
@@ -852,7 +883,7 @@ func (q *Queries) ListSyncLogs(ctx context.Context, arg ListSyncLogsParams) ([]S
 
 const platformBreakdown = `-- name: PlatformBreakdown :many
 SELECT platform, type, COUNT(*) AS count,
-       SUM(EXTRACT(EPOCH FROM duration))::BIGINT AS total_duration_sec
+       COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
 FROM media_items
 WHERE user_id = $1
     AND consumed_at >= $2
@@ -883,6 +914,65 @@ func (q *Queries) PlatformBreakdown(ctx context.Context, arg PlatformBreakdownPa
 	items := []PlatformBreakdownRow{}
 	for rows.Next() {
 		var i PlatformBreakdownRow
+		if err := rows.Scan(
+			&i.Platform,
+			&i.Type,
+			&i.Count,
+			&i.TotalDurationSec,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const platformBreakdownFiltered = `-- name: PlatformBreakdownFiltered :many
+SELECT platform, type, COUNT(*) AS count,
+       COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
+FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND ($4::TEXT IS NULL OR platform = $4)
+    AND ($5::TEXT IS NULL OR type = $5)
+GROUP BY platform, type
+ORDER BY count DESC
+`
+
+type PlatformBreakdownFilteredParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+}
+
+type PlatformBreakdownFilteredRow struct {
+	Platform         string `json:"platform"`
+	Type             string `json:"type"`
+	Count            int64  `json:"count"`
+	TotalDurationSec int64  `json:"total_duration_sec"`
+}
+
+func (q *Queries) PlatformBreakdownFiltered(ctx context.Context, arg PlatformBreakdownFilteredParams) ([]PlatformBreakdownFilteredRow, error) {
+	rows, err := q.db.Query(ctx, platformBreakdownFiltered,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Platform,
+		arg.MediaType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PlatformBreakdownFilteredRow{}
+	for rows.Next() {
+		var i PlatformBreakdownFilteredRow
 		if err := rows.Scan(
 			&i.Platform,
 			&i.Type,
@@ -940,6 +1030,64 @@ func (q *Queries) TagDistribution(ctx context.Context, arg TagDistributionParams
 	items := []TagDistributionRow{}
 	for rows.Next() {
 		var i TagDistributionRow
+		if err := rows.Scan(&i.Name, &i.Category, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const tagDistributionFiltered = `-- name: TagDistributionFiltered :many
+SELECT t.name, t.category, COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND ($5::TEXT IS NULL OR mi.platform = $5)
+    AND ($6::TEXT IS NULL OR mi.type = $6)
+GROUP BY t.name, t.category
+ORDER BY count DESC
+LIMIT $4
+`
+
+type TagDistributionFilteredParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit        int32              `json:"limit"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+}
+
+type TagDistributionFilteredRow struct {
+	Name     string      `json:"name"`
+	Category pgtype.Text `json:"category"`
+	Count    int64       `json:"count"`
+}
+
+func (q *Queries) TagDistributionFiltered(ctx context.Context, arg TagDistributionFilteredParams) ([]TagDistributionFilteredRow, error) {
+	rows, err := q.db.Query(ctx, tagDistributionFiltered,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.Platform,
+		arg.MediaType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TagDistributionFilteredRow{}
+	for rows.Next() {
+		var i TagDistributionFilteredRow
 		if err := rows.Scan(&i.Name, &i.Category, &i.Count); err != nil {
 			return nil, err
 		}

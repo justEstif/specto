@@ -150,6 +150,7 @@ func main() {
 		r.Use(csrfMw)
 		r.Use(customMiddleware.RequireAuth(application.Auth))
 
+		r.Get("/partials/dashboard", h.DashboardPartial)
 		r.Get("/partials/activity-chart", h.ActivityChartPartial)
 		r.Get("/partials/timeline", h.RecentItemsPartial)
 		r.Get("/partials/timeline-page", h.TimelinePagePartial)
@@ -180,6 +181,7 @@ func main() {
 				r.Get("/callback", h.OAuthCallback)
 				r.Post("/import", h.ImportPlugin)
 				r.Delete("/disconnect", h.DisconnectPlugin)
+				r.Delete("/data", h.DeletePluginData)
 				r.Post("/sync", h.SyncPlugin)
 				r.Get("/sync-history", h.SyncHistory)
 			})

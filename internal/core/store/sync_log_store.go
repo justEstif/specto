@@ -83,3 +83,10 @@ func (s *PgSyncLogStore) List(ctx context.Context, userID uuid.UUID, plugin stri
 	}
 	return entries, nil
 }
+
+func (s *PgSyncLogStore) DeleteByPlugin(ctx context.Context, userID uuid.UUID, plugin string) error {
+	return s.q.DeleteSyncLogsByPlugin(ctx, database.DeleteSyncLogsByPluginParams{
+		UserID: uuidToPgx(userID),
+		Plugin: plugin,
+	})
+}

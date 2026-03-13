@@ -18,6 +18,7 @@ type Querier interface {
 	ListMediaItemsFiltered(ctx context.Context, arg database.ListMediaItemsFilteredParams) ([]database.MediaItem, error)
 	UpdateEnrichmentStatus(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
 	ListPendingEnrichment(ctx context.Context, limit int32) ([]database.MediaItem, error)
+	DeleteMediaItemsByPlatform(ctx context.Context, arg database.DeleteMediaItemsByPlatformParams) (int64, error)
 
 	// Plugin state
 	GetPluginState(ctx context.Context, arg database.GetPluginStateParams) (database.PluginState, error)
@@ -35,6 +36,7 @@ type Querier interface {
 	CreateSyncLog(ctx context.Context, arg database.CreateSyncLogParams) (database.SyncLog, error)
 	CompleteSyncLog(ctx context.Context, arg database.CompleteSyncLogParams) (database.SyncLog, error)
 	ListSyncLogs(ctx context.Context, arg database.ListSyncLogsParams) ([]database.SyncLog, error)
+	DeleteSyncLogsByPlugin(ctx context.Context, arg database.DeleteSyncLogsByPluginParams) error
 
 	// Users
 	GetUserByID(ctx context.Context, id pgtype.UUID) (database.User, error)
@@ -54,7 +56,9 @@ type Querier interface {
 
 	// Insights / analytics
 	PlatformBreakdown(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
+	PlatformBreakdownFiltered(ctx context.Context, arg database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error)
 	TagDistribution(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
+	TagDistributionFiltered(ctx context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error)
 }
 
 // Compile-time assertion that database.Queries satisfies Querier.

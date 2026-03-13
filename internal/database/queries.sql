@@ -180,11 +180,23 @@ LIMIT $3;
 
 -- name: PlatformBreakdown :many
 SELECT platform, type, COUNT(*) AS count,
-       SUM(EXTRACT(EPOCH FROM duration))::BIGINT AS total_duration_sec
+       COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
 FROM media_items
 WHERE user_id = $1
     AND consumed_at >= $2
     AND consumed_at <= $3
+GROUP BY platform, type
+ORDER BY count DESC;
+
+-- name: PlatformBreakdownFiltered :many
+SELECT platform, type, COUNT(*) AS count,
+       COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
+FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND (sqlc.narg('platform')::TEXT IS NULL OR platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR type = sqlc.narg('media_type'))
 GROUP BY platform, type
 ORDER BY count DESC;
 
@@ -200,3 +212,24 @@ WHERE mi.user_id = $1
 GROUP BY t.name, t.category
 ORDER BY count DESC
 LIMIT $4;
+
+-- name: TagDistributionFiltered :many
+SELECT t.name, t.category, COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND (sqlc.narg('platform')::TEXT IS NULL OR mi.platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR mi.type = sqlc.narg('media_type'))
+GROUP BY t.name, t.category
+ORDER BY count DESC
+LIMIT $4;
+
+-- name: DeleteMediaItemsByPlatform :execrows
+DELETE FROM media_items WHERE user_id = $1 AND platform = $2;
+
+-- name: DeleteSyncLogsByPlugin :exec
+DELETE FROM sync_log WHERE user_id = $1 AND plugin = $2;

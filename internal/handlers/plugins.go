@@ -333,6 +333,55 @@ func (h *Handler) DisconnectPlugin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeletePluginData handles DELETE /api/v1/plugins/{plugin}/data
+// Deletes all media items, sync logs, and credentials for a plugin,
+// then resets the plugin state to disconnected.
+func (h *Handler) DeletePluginData(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return
+	}
+
+	pluginName := chi.URLParam(r, "plugin")
+	p := h.App.Registry.Get(pluginName)
+	if p == nil {
+		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
+		return
+	}
+
+	// Delete media items
+	deleted, err := h.App.MediaItems.DeleteByPlatform(r.Context(), user.ID, pluginName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to delete media items")
+		return
+	}
+
+	// Delete sync logs
+	if err := h.App.SyncLogs.DeleteByPlugin(r.Context(), user.ID, pluginName); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to delete sync history")
+		return
+	}
+
+	// Delete credentials
+	_ = h.App.PluginStates.DeleteCredentials(r.Context(), user.ID, pluginName)
+
+	// Reset state to disconnected
+	_, _ = h.App.PluginStates.UpdateStatus(r.Context(), user.ID, pluginName, "disconnected", nil)
+
+	if h.renderPluginCard(w, r, user.ID, pluginName) {
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"plugin":        pluginName,
+			"status":        "disconnected",
+			"items_deleted": deleted,
+		},
+	})
+}
+
 // SyncPlugin handles POST /api/v1/plugins/{plugin}/sync
 // Triggers a sync for a connected plugin.
 func (h *Handler) SyncPlugin(w http.ResponseWriter, r *http.Request) {

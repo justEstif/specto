@@ -40,6 +40,18 @@ func (m *mockInsightsStore) ListMediaItems(ctx context.Context, userID uuid.UUID
 	return nil, nil
 }
 
+func (m *mockInsightsStore) PlatformBreakdownFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, _ InsightsFilter) ([]PlatformBreakdownEntry, error) {
+	return m.PlatformBreakdown(ctx, userID, from, to)
+}
+
+func (m *mockInsightsStore) TagDistributionFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, _ InsightsFilter) ([]TagDistributionEntry, error) {
+	return m.TagDistribution(ctx, userID, from, to, limit)
+}
+
+func (m *mockInsightsStore) ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, _ InsightsFilter) ([]MediaItem, error) {
+	return m.ListMediaItems(ctx, userID, from, to, limit, offset)
+}
+
 // --- test helpers ---
 
 var (

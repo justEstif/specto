@@ -42,9 +42,9 @@ func (h *Handler) PluginsPage(w http.ResponseWriter, r *http.Request) {
 		view := buildPluginView(p, stateMap[name])
 		if view.Connected {
 			connected = append(connected, view)
-		} else {
-			available = append(available, view)
 		}
+		// Always show in available list (connected plugins can re-upload or reconnect)
+		available = append(available, view)
 	}
 
 	data := components.PluginsPageData{
