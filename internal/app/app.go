@@ -3,22 +3,24 @@
 package app
 
 import (
-	"fmt"
-	"os"
-
+	"github.com/justestif/specto/internal/auth"
 	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/core/store"
 	"github.com/justestif/specto/internal/database"
 )
 
+// Config holds all configuration values needed by the application.
+// Loaded once in main() and passed in — no env reads inside app.
+type Config struct {
+	EncryptionKey string // 64 hex chars for AES-256 credential encryption
+	SessionSecret []byte // at least 32 bytes for session cookie signing
+}
+
 // App holds all core dependencies. It is created once at startup and
 // shared across handlers and middleware via closures.
 type App struct {
-	// DB is the sqlc Queries instance for direct database access
-	// (used by auth until it's refactored to use core stores).
-	DB *database.Queries
-
 	// Core services
+	Auth     *auth.Service
 	Registry *core.PluginRegistry
 	Syncer   *core.SyncService
 	Insights *core.InsightsService
@@ -32,20 +34,13 @@ type App struct {
 }
 
 // New initializes all core components and returns a fully wired App.
-// It reads ENCRYPTION_KEY from the environment for credential encryption.
-// The database must already be initialized (database.DB and database.Pool set).
-func New(db *database.Queries) (*App, error) {
-	// Encryption key for plugin credentials
-	encKey := os.Getenv("ENCRYPTION_KEY")
-	if encKey == "" {
-		return nil, fmt.Errorf("ENCRYPTION_KEY environment variable not set (must be 64 hex chars for AES-256)")
-	}
-
+// The database Queries instance and config are injected — no globals read.
+func New(db *database.Queries, cfg Config) *App {
 	// Build store layer
 	querier := db // *database.Queries satisfies store.Querier
 	userStore := store.NewUserStore(querier)
 	mediaItemStore := store.NewMediaItemStore(querier)
-	pluginStateStore := store.NewPluginStateStore(querier, encKey)
+	pluginStateStore := store.NewPluginStateStore(querier, cfg.EncryptionKey)
 	syncLogStore := store.NewSyncLogStore(querier)
 	tagStore := store.NewTagStore(querier)
 	insightsStore := store.NewInsightsStore(querier)
@@ -67,8 +62,12 @@ func New(db *database.Queries) (*App, error) {
 
 	insights := core.NewInsightsService(insightsStore)
 
+	// Build auth service
+	sessions := auth.NewSessionManager(cfg.SessionSecret)
+	authSvc := auth.NewService(userStore, sessions)
+
 	return &App{
-		DB:           db,
+		Auth:         authSvc,
 		Registry:     registry,
 		Syncer:       syncer,
 		Insights:     insights,
@@ -77,5 +76,5 @@ func New(db *database.Queries) (*App, error) {
 		PluginStates: pluginStateStore,
 		SyncLogs:     syncLogStore,
 		Tags:         tagStore,
-	}, nil
+	}
 }

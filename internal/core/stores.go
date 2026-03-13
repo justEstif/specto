@@ -22,6 +22,9 @@ type MediaItemStore interface {
 	// Get retrieves a single media item by ID for a user.
 	Get(ctx context.Context, userID, itemID uuid.UUID) (*MediaItem, error)
 
+	// GetByExternalID retrieves a media item by its platform-specific external ID.
+	GetByExternalID(ctx context.Context, userID uuid.UUID, platform, externalID string) (*MediaItem, uuid.UUID, error)
+
 	// List returns media items for a user within the given time range.
 	List(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
 

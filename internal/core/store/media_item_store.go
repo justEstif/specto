@@ -64,6 +64,20 @@ func (s *PgMediaItemStore) Create(ctx context.Context, userID uuid.UUID, item co
 	return pgxToUUID(row.ID), nil
 }
 
+func (s *PgMediaItemStore) GetByExternalID(ctx context.Context, userID uuid.UUID, platform, externalID string) (*core.MediaItem, uuid.UUID, error) {
+	row, err := s.q.GetMediaItemByExternalID(ctx, database.GetMediaItemByExternalIDParams{
+		UserID:     uuidToPgx(userID),
+		Platform:   platform,
+		ExternalID: externalID,
+	})
+	if err != nil {
+		return nil, uuid.Nil, fmt.Errorf("getting media item by external ID: %w", err)
+	}
+
+	item := mediaItemFromDB(row)
+	return &item, pgxToUUID(row.ID), nil
+}
+
 func (s *PgMediaItemStore) Get(ctx context.Context, userID, itemID uuid.UUID) (*core.MediaItem, error) {
 	row, err := s.q.GetMediaItemByID(ctx, database.GetMediaItemByIDParams{
 		ID:     uuidToPgx(itemID),

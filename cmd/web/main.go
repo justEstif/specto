@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/justestif/specto/internal/app"
-	"github.com/justestif/specto/internal/auth"
 	"github.com/justestif/specto/internal/database"
 	"github.com/justestif/specto/internal/handlers"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
@@ -22,21 +21,25 @@ func main() {
 	}
 	defer database.Close()
 
-	// Initialize sessions
+	// Load configuration from environment (single place for all env reads)
+	encKey := os.Getenv("ENCRYPTION_KEY")
+	if encKey == "" {
+		log.Fatal("ENCRYPTION_KEY environment variable not set (must be 64 hex chars for AES-256)")
+	}
+
 	sessionSecret := []byte(os.Getenv("SESSION_SECRET"))
 	if len(sessionSecret) < 32 {
 		log.Fatal("SESSION_SECRET must be at least 32 bytes long")
 	}
-	auth.InitSessions(sessionSecret)
 
 	// Initialize core application layer
-	application, err := app.New(database.DB)
-	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
-	}
+	application := app.New(database.DB, app.Config{
+		EncryptionKey: encKey,
+		SessionSecret: sessionSecret,
+	})
 
 	// Wire handlers with dependencies
-	h := handlers.New(application.DB)
+	h := handlers.New(application)
 
 	r := chi.NewRouter()
 
@@ -72,9 +75,31 @@ func main() {
 
 		// Authenticated routes
 		r.Group(func(r chi.Router) {
-			r.Use(customMiddleware.RequireAuth(application.DB))
+			r.Use(customMiddleware.RequireAuth(application.Auth))
+
+			// Session
 			r.Get("/session", h.Session)
 			r.Delete("/session", h.Logout)
+
+			// Plugins
+			r.Get("/plugins", h.ListPlugins)
+			r.Route("/plugins/{plugin}", func(r chi.Router) {
+				r.Get("/", h.GetPlugin)
+				r.Post("/connect", h.ConnectPlugin)
+				r.Post("/import", h.ImportPlugin)
+				r.Delete("/disconnect", h.DisconnectPlugin)
+				r.Post("/sync", h.SyncPlugin)
+				r.Get("/sync-history", h.SyncHistory)
+			})
+
+			// Timeline
+			r.Get("/timeline", h.Timeline)
+
+			// Insights
+			r.Get("/insights/summary", h.InsightsSummary)
+			r.Get("/insights/platform-breakdown", h.InsightsPlatformBreakdown)
+			r.Get("/insights/tags", h.InsightsTags)
+			r.Get("/insights/timeline", h.InsightsTimeline)
 		})
 	})
 

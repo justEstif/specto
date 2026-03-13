@@ -289,6 +289,39 @@ func (q *Queries) DeletePluginCredentials(ctx context.Context, arg DeletePluginC
 	return err
 }
 
+const getMediaItemByExternalID = `-- name: GetMediaItemByExternalID :one
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items WHERE user_id = $1 AND platform = $2 AND external_id = $3
+`
+
+type GetMediaItemByExternalIDParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	Platform   string      `json:"platform"`
+	ExternalID string      `json:"external_id"`
+}
+
+func (q *Queries) GetMediaItemByExternalID(ctx context.Context, arg GetMediaItemByExternalIDParams) (MediaItem, error) {
+	row := q.db.QueryRow(ctx, getMediaItemByExternalID, arg.UserID, arg.Platform, arg.ExternalID)
+	var i MediaItem
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Platform,
+		&i.Type,
+		&i.Title,
+		&i.Creator,
+		&i.ConsumedAt,
+		&i.Duration,
+		&i.TimeSpent,
+		&i.Url,
+		&i.ExternalID,
+		&i.EnrichmentStatus,
+		&i.RawMetadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getMediaItemByID = `-- name: GetMediaItemByID :one
 SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items WHERE id = $1 AND user_id = $2
 `

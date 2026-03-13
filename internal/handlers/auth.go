@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/justestif/specto/internal/auth"
-	"github.com/justestif/specto/internal/database"
+	"github.com/justestif/specto/internal/core"
 )
 
 type registerRequest struct {
@@ -39,7 +39,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := auth.Register(r.Context(), h.DB, req.Email, req.DisplayName, req.Password)
+	user, err := h.App.Auth.Register(r.Context(), req.Email, req.DisplayName, req.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrEmailTaken) {
 			writeError(w, http.StatusConflict, "validation_error", "Email already registered")
@@ -49,7 +49,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := auth.SetUserSession(w, r, user.ID); err != nil {
+	if err := h.App.Auth.Sessions.SetUserSession(w, r, user.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to create session")
 		return
 	}
@@ -74,7 +74,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := auth.Login(r.Context(), h.DB, req.Email, req.Password)
+	user, err := h.App.Auth.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "Invalid email or password")
@@ -84,7 +84,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := auth.SetUserSession(w, r, user.ID); err != nil {
+	if err := h.App.Auth.Sessions.SetUserSession(w, r, user.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to create session")
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles DELETE /api/v1/session
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	auth.ClearSession(w, r)
+	h.App.Auth.Sessions.ClearSession(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -117,17 +117,17 @@ func (h *Handler) Session(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func userResponse(u *database.User) map[string]any {
+func userResponse(u *core.UserInfo) map[string]any {
 	resp := map[string]any{
-		"id":           fmt.Sprintf("%x", u.ID.Bytes),
+		"id":           fmt.Sprintf("%x", u.ID),
 		"email":        u.Email,
 		"display_name": u.DisplayName,
 	}
-	if u.AvatarUrl.Valid {
-		resp["avatar_url"] = u.AvatarUrl.String
+	if u.AvatarURL != nil {
+		resp["avatar_url"] = *u.AvatarURL
 	}
-	if u.ProfileSlug.Valid {
-		resp["profile_slug"] = u.ProfileSlug.String
+	if u.ProfileSlug != nil {
+		resp["profile_slug"] = *u.ProfileSlug
 	}
 	return resp
 }

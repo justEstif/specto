@@ -13,6 +13,7 @@ type Querier interface {
 	// Media items
 	CreateMediaItem(ctx context.Context, arg database.CreateMediaItemParams) (database.MediaItem, error)
 	GetMediaItemByID(ctx context.Context, arg database.GetMediaItemByIDParams) (database.MediaItem, error)
+	GetMediaItemByExternalID(ctx context.Context, arg database.GetMediaItemByExternalIDParams) (database.MediaItem, error)
 	ListMediaItems(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error)
 	UpdateEnrichmentStatus(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
 	ListPendingEnrichment(ctx context.Context, limit int32) ([]database.MediaItem, error)

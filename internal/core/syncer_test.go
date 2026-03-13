@@ -46,6 +46,7 @@ func (m *mockPlugin) Enrich(ctx context.Context, creds Credentials, items []Medi
 type mockMediaItemStore struct {
 	createFn                 func(ctx context.Context, userID uuid.UUID, item MediaItem) (uuid.UUID, error)
 	getFn                    func(ctx context.Context, userID, itemID uuid.UUID) (*MediaItem, error)
+	getByExternalIDFn        func(ctx context.Context, userID uuid.UUID, platform, externalID string) (*MediaItem, uuid.UUID, error)
 	listFn                   func(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
 	updateEnrichmentStatusFn func(ctx context.Context, itemID uuid.UUID, status string) error
 	listPendingEnrichmentFn  func(ctx context.Context, limit int32) ([]MediaItem, error)
@@ -56,6 +57,12 @@ func (m *mockMediaItemStore) Create(ctx context.Context, userID uuid.UUID, item 
 		return m.createFn(ctx, userID, item)
 	}
 	return uuid.New(), nil
+}
+func (m *mockMediaItemStore) GetByExternalID(ctx context.Context, userID uuid.UUID, platform, externalID string) (*MediaItem, uuid.UUID, error) {
+	if m.getByExternalIDFn != nil {
+		return m.getByExternalIDFn(ctx, userID, platform, externalID)
+	}
+	return &MediaItem{}, uuid.New(), nil
 }
 func (m *mockMediaItemStore) Get(ctx context.Context, userID, itemID uuid.UUID) (*MediaItem, error) {
 	if m.getFn != nil {

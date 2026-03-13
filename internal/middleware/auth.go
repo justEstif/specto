@@ -5,21 +5,20 @@ import (
 	"net/http"
 
 	"github.com/justestif/specto/internal/auth"
-	"github.com/justestif/specto/internal/database"
 )
 
 // RequireAuth returns middleware that ensures the user is authenticated.
-// The database.Queries instance is injected rather than using a global.
-func RequireAuth(db *database.Queries) func(http.Handler) http.Handler {
+// It uses the auth.Service for session and user lookup.
+func RequireAuth(authSvc *auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			userID, err := auth.GetUserIDFromSession(r)
+			userID, err := authSvc.Sessions.GetUserIDFromSession(r)
 			if err != nil {
 				writeUnauthorized(w, r)
 				return
 			}
 
-			user, err := auth.GetUserByID(r.Context(), db, userID)
+			user, err := authSvc.GetUserByID(r.Context(), userID)
 			if err != nil {
 				writeUnauthorized(w, r)
 				return

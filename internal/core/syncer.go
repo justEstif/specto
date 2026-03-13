@@ -355,10 +355,8 @@ func (s *SyncService) enrichAndTagItems(
 			continue
 		}
 
-		// Persist each tag.
-		// We re-upsert the item to get its UUID (Create is an upsert and
-		// returns the ID whether inserted or already existing).
-		itemID, lookupErr := s.Media.Create(ctx, userID, item)
+		// Look up the item's UUID by its external ID.
+		_, itemID, lookupErr := s.Media.GetByExternalID(ctx, userID, item.Platform, item.ExternalID)
 		if lookupErr != nil {
 			log.Warn("failed to look up item for tagging",
 				"title", item.Title,

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/justestif/specto/internal/database"
+	"github.com/google/uuid"
+	"github.com/justestif/specto/internal/core"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,20 +20,31 @@ type contextKey string
 const userContextKey contextKey = "user"
 
 // UserFromContext retrieves the authenticated user from the request context.
-func UserFromContext(ctx context.Context) (*database.User, bool) {
-	u, ok := ctx.Value(userContextKey).(*database.User)
+func UserFromContext(ctx context.Context) (*core.UserInfo, bool) {
+	u, ok := ctx.Value(userContextKey).(*core.UserInfo)
 	return u, ok
 }
 
 // ContextWithUser stores the user in the context.
-func ContextWithUser(ctx context.Context, user *database.User) context.Context {
+func ContextWithUser(ctx context.Context, user *core.UserInfo) context.Context {
 	return context.WithValue(ctx, userContextKey, user)
 }
 
+// Service handles authentication operations using core store interfaces.
+type Service struct {
+	Users    core.UserStore
+	Sessions *SessionManager
+}
+
+// NewService creates an auth Service.
+func NewService(users core.UserStore, sessions *SessionManager) *Service {
+	return &Service{Users: users, Sessions: sessions}
+}
+
 // Register creates a new user with email/password.
-func Register(ctx context.Context, q *database.Queries, email, displayName, password string) (*database.User, error) {
+func (s *Service) Register(ctx context.Context, email, displayName, password string) (*core.UserInfo, error) {
 	// Check if email is already taken
-	_, err := q.GetUserByEmail(ctx, email)
+	_, err := s.Users.GetByEmail(ctx, email)
 	if err == nil {
 		return nil, ErrEmailTaken
 	}
@@ -43,39 +54,31 @@ func Register(ctx context.Context, q *database.Queries, email, displayName, pass
 		return nil, fmt.Errorf("hashing password: %w", err)
 	}
 
-	user, err := q.CreateUserWithPassword(ctx, database.CreateUserWithPasswordParams{
-		Email:        email,
-		DisplayName:  displayName,
-		PasswordHash: pgtype.Text{String: string(hash), Valid: true},
-	})
+	user, err := s.Users.CreateWithPassword(ctx, email, displayName, string(hash))
 	if err != nil {
 		return nil, fmt.Errorf("creating user: %w", err)
 	}
-	return &user, nil
+	return user, nil
 }
 
 // Login authenticates a user by email/password.
-func Login(ctx context.Context, q *database.Queries, email, password string) (*database.User, error) {
-	user, err := q.GetUserByEmail(ctx, email)
+func (s *Service) Login(ctx context.Context, email, password string) (*core.UserInfo, error) {
+	user, err := s.Users.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
-	if !user.PasswordHash.Valid {
+	if user.PasswordHash == nil || *user.PasswordHash == "" {
 		return nil, ErrInvalidCredentials
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
-	return &user, nil
+	return user, nil
 }
 
 // GetUserByID looks up a user by their ID (for session restoration).
-func GetUserByID(ctx context.Context, q *database.Queries, id pgtype.UUID) (*database.User, error) {
-	user, err := q.GetUserByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
+func (s *Service) GetUserByID(ctx context.Context, id uuid.UUID) (*core.UserInfo, error) {
+	return s.Users.GetByID(ctx, id)
 }

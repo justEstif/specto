@@ -11,8 +11,9 @@ import (
 // mockQuerier is a configurable mock of the Querier interface for unit tests.
 // Each method field, when set, overrides the default behavior.
 type mockQuerier struct {
-	createMediaItemFn         func(ctx context.Context, arg database.CreateMediaItemParams) (database.MediaItem, error)
-	getMediaItemByIDFn        func(ctx context.Context, arg database.GetMediaItemByIDParams) (database.MediaItem, error)
+	createMediaItemFn              func(ctx context.Context, arg database.CreateMediaItemParams) (database.MediaItem, error)
+	getMediaItemByIDFn             func(ctx context.Context, arg database.GetMediaItemByIDParams) (database.MediaItem, error)
+	getMediaItemByExternalIDFn     func(ctx context.Context, arg database.GetMediaItemByExternalIDParams) (database.MediaItem, error)
 	listMediaItemsFn          func(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error)
 	updateEnrichmentStatusFn  func(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
 	listPendingEnrichmentFn   func(ctx context.Context, limit int32) ([]database.MediaItem, error)
@@ -56,6 +57,13 @@ func (m *mockQuerier) GetMediaItemByID(ctx context.Context, arg database.GetMedi
 		return m.getMediaItemByIDFn(ctx, arg)
 	}
 	return database.MediaItem{}, fmt.Errorf("GetMediaItemByID not mocked")
+}
+
+func (m *mockQuerier) GetMediaItemByExternalID(ctx context.Context, arg database.GetMediaItemByExternalIDParams) (database.MediaItem, error) {
+	if m.getMediaItemByExternalIDFn != nil {
+		return m.getMediaItemByExternalIDFn(ctx, arg)
+	}
+	return database.MediaItem{}, fmt.Errorf("GetMediaItemByExternalID not mocked")
 }
 
 func (m *mockQuerier) ListMediaItems(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error) {

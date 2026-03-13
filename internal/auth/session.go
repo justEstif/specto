@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
 )
 
@@ -17,12 +17,14 @@ const (
 	sessionUserID = "user_id"
 )
 
-// SessionStore is the application's session store.
-var SessionStore sessions.Store
+// SessionManager wraps a session store, eliminating the package-level global.
+type SessionManager struct {
+	store sessions.Store
+}
 
-// InitSessions creates a cookie-based session store.
-// In production, use a server-side store (PostgreSQL, Redis).
-func InitSessions(secret []byte) {
+// NewSessionManager creates a SessionManager with a cookie-based store.
+// In production, consider a server-side store (PostgreSQL, Redis).
+func NewSessionManager(secret []byte) *SessionManager {
 	store := sessions.NewCookieStore(secret)
 	store.Options = &sessions.Options{
 		Path:     "/",
@@ -31,36 +33,35 @@ func InitSessions(secret []byte) {
 		SameSite: http.SameSiteLaxMode,
 		Secure:   false, // set true in production (HTTPS)
 	}
-	SessionStore = store
+	return &SessionManager{store: store}
 }
 
 // SetUserSession stores the user ID in the session.
-func SetUserSession(w http.ResponseWriter, r *http.Request, userID pgtype.UUID) error {
-	session, err := SessionStore.Get(r, SessionName)
+func (sm *SessionManager) SetUserSession(w http.ResponseWriter, r *http.Request, userID uuid.UUID) error {
+	session, err := sm.store.Get(r, SessionName)
 	if err != nil {
 		return err
 	}
-	// Store as [16]byte
-	session.Values[sessionUserID] = userID.Bytes
+	session.Values[sessionUserID] = [16]byte(userID)
 	return session.Save(r, w)
 }
 
 // GetUserIDFromSession retrieves the user ID from the session.
-func GetUserIDFromSession(r *http.Request) (pgtype.UUID, error) {
-	session, err := SessionStore.Get(r, SessionName)
+func (sm *SessionManager) GetUserIDFromSession(r *http.Request) (uuid.UUID, error) {
+	session, err := sm.store.Get(r, SessionName)
 	if err != nil {
-		return pgtype.UUID{}, err
+		return uuid.Nil, err
 	}
 	bytes, ok := session.Values[sessionUserID].([16]byte)
 	if !ok {
-		return pgtype.UUID{}, http.ErrNoCookie
+		return uuid.Nil, http.ErrNoCookie
 	}
-	return pgtype.UUID{Bytes: bytes, Valid: true}, nil
+	return uuid.UUID(bytes), nil
 }
 
 // ClearSession removes the user session.
-func ClearSession(w http.ResponseWriter, r *http.Request) error {
-	session, err := SessionStore.Get(r, SessionName)
+func (sm *SessionManager) ClearSession(w http.ResponseWriter, r *http.Request) error {
+	session, err := sm.store.Get(r, SessionName)
 	if err != nil {
 		return err
 	}

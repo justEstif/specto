@@ -92,6 +92,9 @@ LIMIT $4 OFFSET $5;
 -- name: GetMediaItemByID :one
 SELECT * FROM media_items WHERE id = $1 AND user_id = $2;
 
+-- name: GetMediaItemByExternalID :one
+SELECT * FROM media_items WHERE user_id = $1 AND platform = $2 AND external_id = $3;
+
 -- name: ListPendingEnrichment :many
 SELECT * FROM media_items
 WHERE enrichment_status = 'pending'
