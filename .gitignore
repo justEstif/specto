@@ -52,3 +52,4 @@ static/css/tailwind.css
 # Database
 *.db
 *.sqlite
+/web
