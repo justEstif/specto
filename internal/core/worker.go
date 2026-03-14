@@ -122,7 +122,7 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 	}
 
 	// Run enrichment
-	enrichedItems, err := w.coordinator.Run(ctx, items)
+	results, err := w.coordinator.Run(ctx, items)
 	if err != nil {
 		w.logger.Error("coordinator run failed", "error", err)
 		// Mark all items for retry
@@ -134,10 +134,10 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 
 	// Update status for each item
 	for i, ei := range claimed {
-		enrichedItem := enrichedItems[i]
+		result := results[i]
 
 		// Persist tags from enrichment
-		w.persistTags(ctx, ei, enrichedItem)
+		w.persistTags(ctx, ei, result)
 
 		// Mark as enriched
 		if err := w.media.UpdateEnrichmentStatus(ctx, ei.ID, "enriched"); err != nil {
@@ -151,10 +151,19 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 	w.logger.Info("enrichment batch completed", "count", len(claimed))
 }
 
-// persistTags saves tags from the enriched item to the database.
-func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, enrichedItem MediaItem) {
-	// Persist API-provider tags (authoritative, no confidence score)
-	for _, tag := range enrichedItem.Tags {
+// persistTags saves tags from the enrichment result to the database.
+// LLM-sourced tags are identified via the typed LLMTagResult field;
+// all other tags are treated as authoritative API-provider tags.
+func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, result EnrichmentResult) {
+	// Build a lookup of LLM tags for source/confidence attribution.
+	llmTags := make(map[string]float32)
+	if result.LLMTagResult != nil {
+		for _, ts := range result.LLMTagResult.AllTags() {
+			llmTags[ts.Tag] = ts.Confidence
+		}
+	}
+
+	for _, tag := range result.Item.Tags {
 		if !IsValidTag(tag) {
 			continue
 		}
@@ -168,22 +177,11 @@ func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, e
 			continue
 		}
 
-		// Determine source and confidence.
-		// Tags stored in _llm_tag_result are from LLM (Phase 2).
-		// Other tags are from API providers (Phase 1) — authoritative.
 		source := "api"
 		var confidence *float32
-		if llmResult, ok := enrichedItem.RawMetadata["_llm_tag_result"]; ok {
-			if tr, ok := llmResult.(*TagResult); ok {
-				for _, ts := range tr.AllTags() {
-					if ts.Tag == tag {
-						source = "llm"
-						conf := ts.Confidence
-						confidence = &conf
-						break
-					}
-				}
-			}
+		if conf, ok := llmTags[tag]; ok {
+			source = "llm"
+			confidence = &conf
 		}
 
 		if err := w.tags.AddMediaItemTag(ctx, ei.ID, tagID, source, confidence); err != nil {

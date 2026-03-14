@@ -192,8 +192,8 @@ func TestCoordinator_SingleProvider_AddsTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result[0].Tags) != 2 {
-		t.Errorf("expected 2 tags, got %d: %v", len(result[0].Tags), result[0].Tags)
+	if len(result[0].Item.Tags) != 2 {
+		t.Errorf("expected 2 tags, got %d: %v", len(result[0].Item.Tags), result[0].Item.Tags)
 	}
 }
 
@@ -262,7 +262,7 @@ func TestCoordinator_MultipleProviders_MergeTags(t *testing.T) {
 	}
 
 	// Should have "rock" and "alternative" (deduplicated)
-	tags := result[0].Tags
+	tags := result[0].Item.Tags
 	if len(tags) != 2 {
 		t.Errorf("expected 2 tags (deduplicated), got %d: %v", len(tags), tags)
 	}
@@ -296,8 +296,8 @@ func TestCoordinator_ProviderError_NonFatal(t *testing.T) {
 	}
 
 	// Should still have tags from the working provider
-	if len(result[0].Tags) != 1 || result[0].Tags[0] != "rock" {
-		t.Errorf("expected ['rock'], got %v", result[0].Tags)
+	if len(result[0].Item.Tags) != 1 || result[0].Item.Tags[0] != "rock" {
+		t.Errorf("expected ['rock'], got %v", result[0].Item.Tags)
 	}
 }
 
@@ -339,7 +339,7 @@ func TestCoordinator_LLMPhase2_RunsAfterAPI(t *testing.T) {
 	}
 
 	// Result should have both API and LLM tags
-	tags := result[0].Tags
+	tags := result[0].Item.Tags
 	if len(tags) != 2 {
 		t.Errorf("expected 2 tags (rock + melancholic), got %d: %v", len(tags), tags)
 	}
@@ -368,7 +368,7 @@ func TestCoordinator_LLMPhase2_InvalidTagsFiltered(t *testing.T) {
 	}
 
 	// Only valid tags should pass
-	tags := result[0].Tags
+	tags := result[0].Item.Tags
 	if len(tags) != 1 || tags[0] != "rock" {
 		t.Errorf("expected ['rock'], got %v", tags)
 	}
@@ -386,8 +386,8 @@ func TestCoordinator_NilLLM_SkipsPhase2(t *testing.T) {
 	}
 
 	// Tags unchanged
-	if len(result[0].Tags) != 1 || result[0].Tags[0] != "rock" {
-		t.Errorf("expected ['rock'], got %v", result[0].Tags)
+	if len(result[0].Item.Tags) != 1 || result[0].Item.Tags[0] != "rock" {
+		t.Errorf("expected ['rock'], got %v", result[0].Item.Tags)
 	}
 }
 

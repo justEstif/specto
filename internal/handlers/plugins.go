@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 
@@ -56,47 +54,31 @@ func (h *Handler) ListPlugins(w http.ResponseWriter, r *http.Request) {
 // GetPlugin handles GET /api/v1/plugins/{plugin}
 // Returns a single plugin's state and capabilities.
 func (h *Handler) GetPlugin(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
 		return
 	}
 
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
-		return
-	}
+	state, _ := h.App.PluginStates.GetState(r.Context(), pc.User.ID, pc.Name)
 
-	state, _ := h.App.PluginStates.GetState(r.Context(), user.ID, pluginName)
-
-	entry := pluginDetailEntry(p, state)
+	entry := pluginDetailEntry(pc.Plugin, state)
 	writeJSON(w, http.StatusOK, map[string]any{"data": entry})
 }
 
 // ConnectPlugin handles POST /api/v1/plugins/{plugin}/connect
 // Starts an OAuth connection flow for OAuth plugins.
 func (h *Handler) ConnectPlugin(w http.ResponseWriter, r *http.Request) {
-	_, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
 		return
 	}
 
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
+	if pc.Plugin.AuthType() != core.AuthOAuth {
+		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not use OAuth", pc.Name))
 		return
 	}
 
-	if p.AuthType() != core.AuthOAuth {
-		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not use OAuth", pluginName))
-		return
-	}
-
-	cfg := p.AuthConfig()
+	cfg := pc.Plugin.AuthConfig()
 	if cfg == nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Plugin OAuth config is missing")
 		return
@@ -110,13 +92,13 @@ func (h *Handler) ConnectPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store the state in the user's session so the callback can validate it.
-	if err := h.App.Auth.Sessions.SetOAuthState(w, r, state, pluginName); err != nil {
+	if err := h.App.Auth.Sessions.SetOAuthState(w, r, state, pc.Name); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to save OAuth state")
 		return
 	}
 
 	// Build the full OAuth authorization URL with all query parameters.
-	redirectURL, err := h.App.OAuth.BuildAuthURL(pluginName, cfg, state)
+	redirectURL, err := h.App.OAuth.BuildAuthURL(pc.Name, cfg, state)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", fmt.Sprintf("Failed to build OAuth URL: %s", err.Error()))
 		return
@@ -132,25 +114,17 @@ func (h *Handler) ConnectPlugin(w http.ResponseWriter, r *http.Request) {
 // OAuthCallback handles GET /api/v1/plugins/{plugin}/callback
 // Processes the OAuth provider's redirect after user authorization.
 func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
 		return
 	}
 
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
+	if pc.Plugin.AuthType() != core.AuthOAuth {
+		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not use OAuth", pc.Name))
 		return
 	}
 
-	if p.AuthType() != core.AuthOAuth {
-		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not use OAuth", pluginName))
-		return
-	}
-
-	cfg := p.AuthConfig()
+	cfg := pc.Plugin.AuthConfig()
 	if cfg == nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Plugin OAuth config is missing")
 		return
@@ -184,13 +158,13 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "validation_error", "Invalid OAuth state parameter")
 		return
 	}
-	if pluginName != expectedPlugin {
+	if pc.Name != expectedPlugin {
 		writeError(w, http.StatusBadRequest, "validation_error", "OAuth callback plugin mismatch")
 		return
 	}
 
 	// Exchange the authorization code for tokens.
-	tokenResp, err := h.App.OAuth.ExchangeCode(pluginName, cfg, code)
+	tokenResp, err := h.App.OAuth.ExchangeCode(pc.Name, cfg, code)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "oauth_error", fmt.Sprintf("Token exchange failed: %s", err.Error()))
 		return
@@ -208,13 +182,13 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  tokenResp.AccessToken,
 		RefreshToken: tokenResp.RefreshToken,
 	}
-	if err := h.App.PluginStates.UpsertCredentials(r.Context(), user.ID, pluginName, core.AuthOAuth, creds, expiresAt); err != nil {
+	if err := h.App.PluginStates.UpsertCredentials(r.Context(), pc.User.ID, pc.Name, core.AuthOAuth, creds, expiresAt); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to store credentials")
 		return
 	}
 
 	// Mark plugin as connected.
-	if _, err := h.App.PluginStates.UpsertState(r.Context(), user.ID, pluginName, "connected", true); err != nil {
+	if _, err := h.App.PluginStates.UpsertState(r.Context(), pc.User.ID, pc.Name, "connected", true); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update plugin state")
 		return
 	}
@@ -226,21 +200,13 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 // ImportPlugin handles POST /api/v1/plugins/{plugin}/import
 // Uploads a file for file-import plugins.
 func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
 		return
 	}
 
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
-		return
-	}
-
-	if p.AuthType() != core.AuthFileImport {
-		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not support file import", pluginName))
+	if pc.Plugin.AuthType() != core.AuthFileImport {
+		writeError(w, http.StatusBadRequest, "validation_error", fmt.Sprintf("Plugin %q does not support file import", pc.Name))
 		return
 	}
 
@@ -258,7 +224,7 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	// Ensure plugin state exists as connected
-	_, err = h.App.PluginStates.UpsertState(r.Context(), user.ID, pluginName, "connected", true)
+	_, err = h.App.PluginStates.UpsertState(r.Context(), pc.User.ID, pc.Name, "connected", true)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update plugin state")
 		return
@@ -266,7 +232,7 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 
 	// Run sync with the file reader directly — io.Reader can't be
 	// serialized to the credential store, so we pass it explicitly.
-	summary, err := h.App.Syncer.SyncPluginWithFile(r.Context(), user.ID, pluginName, file)
+	summary, err := h.App.Syncer.SyncPluginWithFile(r.Context(), pc.User.ID, pc.Name, file)
 	if err != nil {
 		var rateLimitErr *core.RateLimitError
 		if errors.As(err, &rateLimitErr) {
@@ -277,13 +243,13 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.renderPluginCard(w, r, user.ID, pluginName) {
+	if h.renderPluginCard(w, r, pc.User.ID, pc.Name) {
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"plugin":        pluginName,
+			"plugin":        pc.Name,
 			"status":        "connected",
 			"imported":      true,
 			"items_added":   summary.ItemsAdded,
@@ -295,39 +261,31 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 // DisconnectPlugin handles DELETE /api/v1/plugins/{plugin}/disconnect
 // Disconnects a plugin and deletes stored credentials.
 func (h *Handler) DisconnectPlugin(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
-		return
-	}
-
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
 		return
 	}
 
 	// Delete credentials
-	if err := h.App.PluginStates.DeleteCredentials(r.Context(), user.ID, pluginName); err != nil {
+	if err := h.App.PluginStates.DeleteCredentials(r.Context(), pc.User.ID, pc.Name); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to delete credentials")
 		return
 	}
 
 	// Update state to disconnected
-	_, err := h.App.PluginStates.UpdateStatus(r.Context(), user.ID, pluginName, "disconnected", nil)
+	_, err := h.App.PluginStates.UpdateStatus(r.Context(), pc.User.ID, pc.Name, "disconnected", nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update plugin state")
 		return
 	}
 
-	if h.renderPluginCard(w, r, user.ID, pluginName) {
+	if h.renderPluginCard(w, r, pc.User.ID, pc.Name) {
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"plugin": pluginName,
+			"plugin": pc.Name,
 			"status": "disconnected",
 		},
 	})
@@ -337,45 +295,35 @@ func (h *Handler) DisconnectPlugin(w http.ResponseWriter, r *http.Request) {
 // Deletes all media items, sync logs, and credentials for a plugin,
 // then resets the plugin state to disconnected.
 func (h *Handler) DeletePluginData(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
-		return
-	}
-
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
 		return
 	}
 
 	// Delete media items
-	deleted, err := h.App.MediaItems.DeleteByPlatform(r.Context(), user.ID, pluginName)
+	deleted, err := h.App.MediaItems.DeleteByPlatform(r.Context(), pc.User.ID, pc.Name)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to delete media items")
 		return
 	}
 
 	// Delete sync logs
-	if err := h.App.SyncLogs.DeleteByPlugin(r.Context(), user.ID, pluginName); err != nil {
+	if err := h.App.SyncLogs.DeleteByPlugin(r.Context(), pc.User.ID, pc.Name); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to delete sync history")
 		return
 	}
 
-	// Delete credentials
-	_ = h.App.PluginStates.DeleteCredentials(r.Context(), user.ID, pluginName)
+	// Best-effort cleanup: credentials and state reset are non-critical.
+	_ = h.App.PluginStates.DeleteCredentials(r.Context(), pc.User.ID, pc.Name)
+	_, _ = h.App.PluginStates.UpdateStatus(r.Context(), pc.User.ID, pc.Name, "disconnected", nil)
 
-	// Reset state to disconnected
-	_, _ = h.App.PluginStates.UpdateStatus(r.Context(), user.ID, pluginName, "disconnected", nil)
-
-	if h.renderPluginCard(w, r, user.ID, pluginName) {
+	if h.renderPluginCard(w, r, pc.User.ID, pc.Name) {
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"plugin":        pluginName,
+			"plugin":        pc.Name,
 			"status":        "disconnected",
 			"items_deleted": deleted,
 		},
@@ -385,20 +333,12 @@ func (h *Handler) DeletePluginData(w http.ResponseWriter, r *http.Request) {
 // SyncPlugin handles POST /api/v1/plugins/{plugin}/sync
 // Triggers a sync for a connected plugin.
 func (h *Handler) SyncPlugin(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
 		return
 	}
 
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
-		return
-	}
-
-	summary, err := h.App.Syncer.SyncPlugin(r.Context(), user.ID, pluginName)
+	summary, err := h.App.Syncer.SyncPlugin(r.Context(), pc.User.ID, pc.Name)
 	if err != nil {
 		var rateLimitErr *core.RateLimitError
 		if errors.As(err, &rateLimitErr) {
@@ -425,14 +365,14 @@ func (h *Handler) SyncPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get updated state for last_synced_at
-	state, _ := h.App.PluginStates.GetState(r.Context(), user.ID, pluginName)
+	state, _ := h.App.PluginStates.GetState(r.Context(), pc.User.ID, pc.Name)
 
-	if h.renderPluginCard(w, r, user.ID, pluginName) {
+	if h.renderPluginCard(w, r, pc.User.ID, pc.Name) {
 		return
 	}
 
 	resp := syncResultResponse{
-		Plugin:       pluginName,
+		Plugin:       pc.Name,
 		Status:       status,
 		ItemsAdded:   summary.ItemsAdded,
 		ItemsSkipped: summary.ItemsSkipped,
@@ -448,16 +388,8 @@ func (h *Handler) SyncPlugin(w http.ResponseWriter, r *http.Request) {
 // SyncHistory handles GET /api/v1/plugins/{plugin}/sync-history
 // Returns recent sync runs for this plugin.
 func (h *Handler) SyncHistory(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	pc, ok := h.requirePlugin(w, r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
-		return
-	}
-
-	pluginName := chi.URLParam(r, "plugin")
-	p := h.App.Registry.Get(pluginName)
-	if p == nil {
-		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", pluginName))
 		return
 	}
 
@@ -469,7 +401,7 @@ func (h *Handler) SyncHistory(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logs, err := h.App.SyncLogs.List(r.Context(), user.ID, pluginName, limit)
+	logs, err := h.App.SyncLogs.List(r.Context(), pc.User.ID, pc.Name, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load sync history")
 		return

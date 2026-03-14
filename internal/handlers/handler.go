@@ -2,10 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/justestif/specto/internal/app"
+	"github.com/justestif/specto/internal/auth"
+	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/logger"
 )
 
@@ -31,6 +36,33 @@ func addContext(r *http.Request, key string, value any) {
 	if we := logger.FromContext(r.Context()); we != nil {
 		we.Set(key, value)
 	}
+}
+
+// pluginContext holds the common context extracted by requirePlugin.
+type pluginContext struct {
+	User   *core.UserInfo
+	Name   string
+	Plugin core.SourcePlugin
+}
+
+// requirePlugin extracts the authenticated user and looks up the plugin
+// from the URL. It writes an error response and returns false if either
+// step fails, so callers can early-return on !ok.
+func (h *Handler) requirePlugin(w http.ResponseWriter, r *http.Request) (pluginContext, bool) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return pluginContext{}, false
+	}
+
+	name := chi.URLParam(r, "plugin")
+	p := h.App.Registry.Get(name)
+	if p == nil {
+		writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Plugin %q not found", name))
+		return pluginContext{}, false
+	}
+
+	return pluginContext{User: user, Name: name, Plugin: p}, true
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

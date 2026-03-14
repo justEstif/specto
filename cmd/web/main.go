@@ -31,12 +31,14 @@ func main() {
 		Version:     version(),
 	})
 
-	// Initialize database
-	if err := database.InitDB(); err != nil {
+	// Initialize database — main.go owns the pool lifecycle.
+	databaseURL := os.Getenv("DATABASE_URL")
+	db, pool, err := database.InitDB(databaseURL)
+	if err != nil {
 		log.Error("failed to initialize database", "error", err)
 		os.Exit(1)
 	}
-	defer database.Close()
+	defer pool.Close()
 
 	// Load configuration from environment (single place for all env reads)
 	encKey := os.Getenv("ENCRYPTION_KEY")
@@ -105,7 +107,7 @@ func main() {
 	}
 
 	// Initialize core application layer
-	application := app.New(database.DB, app.Config{
+	application := app.New(db, app.Config{
 		EncryptionKey: encKey,
 		SessionSecret: sessionSecret,
 		BaseURL:       baseURL,

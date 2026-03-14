@@ -96,6 +96,12 @@ func NewEnrichmentCoordinator(
 	}
 }
 
+// EnrichmentResult holds the output for a single item after both phases.
+type EnrichmentResult struct {
+	Item         MediaItem
+	LLMTagResult *TagResult // non-nil if LLM enrichment produced tags
+}
+
 // Run executes two-phase enrichment on a batch of items.
 //
 // Phase 1: All API providers run concurrently. Each provider receives only
@@ -104,20 +110,20 @@ func NewEnrichmentCoordinator(
 // Phase 2: The LLM enricher runs on all items, using accumulated tags
 // from Phase 1 as context.
 //
-// Returns the enriched items with merged tags. Per-provider and per-item
-// errors are logged but do not fail the batch.
-func (c *EnrichmentCoordinator) Run(ctx context.Context, items []MediaItem) ([]MediaItem, error) {
+// Returns enrichment results with items and their LLM tag results (if any).
+// Per-provider and per-item errors are logged but do not fail the batch.
+func (c *EnrichmentCoordinator) Run(ctx context.Context, items []MediaItem) ([]EnrichmentResult, error) {
 	if len(items) == 0 {
-		return items, nil
+		return nil, nil
 	}
 
 	// Phase 1: API providers (concurrent)
 	items = c.runAPIProviders(ctx, items)
 
 	// Phase 2: LLM enricher (sequential, uses Phase 1 tags as context)
-	items = c.runLLMEnricher(ctx, items)
+	results := c.runLLMEnricher(ctx, items)
 
-	return items, nil
+	return results, nil
 }
 
 // runAPIProviders runs all API providers concurrently and merges their
@@ -197,10 +203,16 @@ func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []Med
 	return items
 }
 
-// runLLMEnricher runs the LLM enricher (Phase 2) on all items.
-func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []MediaItem) []MediaItem {
+// runLLMEnricher runs the LLM enricher (Phase 2) on all items and
+// returns structured results with LLM tag data separated from items.
+func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []MediaItem) []EnrichmentResult {
+	results := make([]EnrichmentResult, len(items))
+	for i := range items {
+		results[i] = EnrichmentResult{Item: items[i]}
+	}
+
 	if c.enricher == nil {
-		return items
+		return results
 	}
 
 	for i, item := range items {
@@ -228,16 +240,11 @@ func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []Medi
 		for _, ts := range validated.AllTags() {
 			llmTags = append(llmTags, ts.Tag)
 		}
-		items[i].Tags = mergeUniqueTags(items[i].Tags, llmTags)
-
-		// Store the validated tag result in raw metadata for later persistence
-		if items[i].RawMetadata == nil {
-			items[i].RawMetadata = make(map[string]any)
-		}
-		items[i].RawMetadata["_llm_tag_result"] = validated
+		results[i].Item.Tags = mergeUniqueTags(results[i].Item.Tags, llmTags)
+		results[i].LLMTagResult = validated
 	}
 
-	return items
+	return results
 }
 
 // mergeUniqueTags merges two tag slices, deduplicating entries.
