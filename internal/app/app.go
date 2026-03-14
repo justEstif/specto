@@ -7,6 +7,9 @@ import (
 	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/core/store"
 	"github.com/justestif/specto/internal/database"
+	"github.com/justestif/specto/internal/plugins/anilist"
+	"github.com/justestif/specto/internal/plugins/lastfm"
+	"github.com/justestif/specto/internal/plugins/tmdb"
 )
 
 // OAuthClientConfig holds the client credentials for an OAuth provider.
@@ -22,6 +25,8 @@ type Config struct {
 	SessionSecret []byte                       // at least 32 bytes for session cookie signing
 	BaseURL       string                       // server's public base URL (e.g., "http://localhost:3000")
 	OAuthClients  map[string]OAuthClientConfig // keyed by plugin name
+	LastfmAPIKey  string                       // Last.fm API key for music enrichment (optional)
+	TMDBAPIKey    string                       // TMDB API key for movie/TV enrichment (optional)
 }
 
 // App holds all core dependencies. It is created once at startup and
@@ -71,9 +76,18 @@ func New(db *database.Queries, cfg Config) *App {
 	)
 
 	// Build enrichment infrastructure
-	// API providers are empty for now — individual provider beans will register them.
+	// Build provider list. API-key-gated providers are conditional;
+	// providers with no auth (like AniList) are always registered.
 	// LLM enricher is nil for now — the Genkit LLM enricher bean will set it.
-	coordinator := core.NewEnrichmentCoordinator(nil, nil, nil)
+	var providers []core.EnrichmentProvider
+	providers = append(providers, anilist.New())
+	if cfg.LastfmAPIKey != "" {
+		providers = append(providers, lastfm.New(cfg.LastfmAPIKey))
+	}
+	if cfg.TMDBAPIKey != "" {
+		providers = append(providers, tmdb.New(cfg.TMDBAPIKey))
+	}
+	coordinator := core.NewEnrichmentCoordinator(providers, nil, nil)
 	worker := core.NewEnrichmentWorker(
 		coordinator,
 		mediaItemStore,

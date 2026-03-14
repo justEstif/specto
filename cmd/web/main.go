@@ -71,12 +71,18 @@ func main() {
 		}
 	}
 
+	// Load optional enrichment API keys
+	lastfmAPIKey := os.Getenv("LASTFM_API_KEY")
+	tmdbAPIKey := os.Getenv("TMDB_API_KEY")
+
 	// Initialize core application layer
 	application := app.New(database.DB, app.Config{
 		EncryptionKey: encKey,
 		SessionSecret: sessionSecret,
 		BaseURL:       baseURL,
 		OAuthClients:  oauthClients,
+		LastfmAPIKey:  lastfmAPIKey,
+		TMDBAPIKey:    tmdbAPIKey,
 	})
 
 	// Register plugins
