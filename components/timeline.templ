@@ -49,7 +49,6 @@ templ timelineFilters(f TimelineFilters, platforms []string) {
 			hx-get="/partials/timeline-page"
 			hx-target="#timeline-items"
 			hx-swap="innerHTML"
-			hx-push-url="true"
 			hx-include="[name='type'], [name='search']"
 		>
 			<option value="" selected?={ f.Platform == "" }>All platforms</option>
@@ -64,7 +63,6 @@ templ timelineFilters(f TimelineFilters, platforms []string) {
 			hx-get="/partials/timeline-page"
 			hx-target="#timeline-items"
 			hx-swap="innerHTML"
-			hx-push-url="true"
 			hx-include="[name='platform'], [name='search']"
 		>
 			<option value="" selected?={ f.Type == "" }>All types</option>
@@ -82,7 +80,6 @@ templ timelineFilters(f TimelineFilters, platforms []string) {
 			hx-get="/partials/timeline-page"
 			hx-target="#timeline-items"
 			hx-swap="innerHTML"
-			hx-push-url="true"
 			hx-trigger="keyup changed delay:400ms"
 			hx-include="[name='platform'], [name='type']"
 		/>

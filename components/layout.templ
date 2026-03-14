@@ -27,12 +27,12 @@ templ Layout(title string, user *core.UserInfo) {
 		/>
 		<link rel="stylesheet" href="/static/css/tailwind.css"/>
 		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
-		<!-- Enable View Transitions API globally for all htmx swaps -->
-		<meta name="htmx-config" content='{"globalViewTransitions": true, "defaultSwapStyle": "innerHTML", "defaultSettleDelay": 20}'/>
+		<meta name="htmx-config" content='{"defaultSwapStyle": "innerHTML", "defaultSettleDelay": 20}'/>
 	</head>
 	<body class="bg-base-100 text-base-content min-h-screen font-sans antialiased"
 		hx-indicator="#page-loader"
-		hx-boost="true">
+		hx-boost="true"
+		hx-swap="innerHTML show:window:top transition:true">
 		<!-- Global loading bar — visible during any htmx request -->
 		<div id="page-loader"></div>
 		if user != nil {
