@@ -28,8 +28,7 @@ BASE_URL = "http://127.0.0.1:3000"
 # LASTFM_API_KEY = ""
 # TMDB_API_KEY = ""
 # OMDB_API_KEY = ""
-# PODCAST_INDEX_API_KEY = ""
-# PODCAST_INDEX_API_SECRET = ""
+
 # IGDB_CLIENT_ID = ""
 # IGDB_CLIENT_SECRET = ""
 # LLM enricher (optional — leave empty to skip LLM enrichment)

@@ -13,7 +13,7 @@ required API key is not configured, it is simply not registered.
 ### Provider types
 
 - **API providers** — Call external platform APIs (Last.fm, TMDB, YouTube Data API,
-  Open Library, Podcast Index, AniList, IGDB). Add authoritative tags with
+  Open Library, AniList, IGDB). Add authoritative tags with
   confidence `NULL` (meaning "certain").
 - **LLM provider** — Universal Genkit-based classification. Fills gaps (mood, topic).
   Tags stored with confidence 0.0–1.0. Runs **after** API providers so it can use
@@ -103,7 +103,7 @@ type EnrichmentProvider interface {
 | **YouTube Data API** | video (youtube) | genre, topic, format, duration, view counts |
 | **TMDB** | video (netflix, prime-video, etc.) | genre, format, runtime, ratings |
 | **Open Library** | book (any platform) | genre, topic, format |
-| **Podcast Index** | podcast (any platform) | genre, topic |
+
 | **AniList** | anime, manga (any platform) | genre, topic |
 | **IGDB** | game (any platform) | genre, topic |
 | **LLM (Genkit)** | all types, all platforms | mood, topic (fills gaps after API providers) |
@@ -170,17 +170,6 @@ type EnrichmentProvider interface {
 - **Key endpoint**: `videos?id=ID1,ID2,...&part=snippet,contentDetails,topicDetails`
 - **Quota**: 1 unit per call, 50 IDs per call, 10K units/day
 - **Output**: `categoryId`, `topicDetails.topicCategories` (Wikipedia URLs), `tags`
-
-### Podcast Index (podcasts)
-
-- **API**: `https://api.podcastindex.org/api/1.0/`
-- **Auth**: API key + secret (free at [podcastindex.org](https://api.podcastindex.org/))
-- **Key endpoints**:
-  - `search/byterm?q=X` — search podcasts by title
-  - `podcasts/byitunesid?id=X` — lookup by Apple Podcasts ID
-  - `episodes/byfeedid?id=X` — episodes for a podcast
-- **Rate limit**: Undocumented (~few req/s)
-- **Output**: Categories (Apple/iTunes taxonomy, ~100 structured values), episode count, description
 
 ### AniList (anime, manga)
 
@@ -395,8 +384,7 @@ Providers are only registered if their required env vars are set.
 LASTFM_API_KEY=xxx
 TMDB_API_KEY=xxx
 OMDB_API_KEY=xxx                    # optional, supplements TMDB
-PODCAST_INDEX_API_KEY=xxx
-PODCAST_INDEX_API_SECRET=xxx
+
 IGDB_CLIENT_ID=xxx
 IGDB_CLIENT_SECRET=xxx
 

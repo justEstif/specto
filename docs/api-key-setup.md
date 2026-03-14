@@ -18,7 +18,7 @@ Once you have the credentials, uncomment and fill in the values in `mise.toml`.
   - [Last.fm](#lastfm)
   - [TMDB](#tmdb)
   - [OMDB](#omdb)
-  - [Podcast Index](#podcast-index)
+
   - [IGDB (Twitch)](#igdb-twitch)
   - [AniList](#anilist)
   - [MusicBrainz](#musicbrainz)
@@ -268,32 +268,6 @@ OMDB_API_KEY = "your-omdb-api-key"
 
 ---
 
-### Podcast Index
-
-Enriches **podcast** items with genre categories and episode metadata from
-the open Podcast Index database.
-
-**Rate limit**: No strict published limit, but be reasonable (~10 req/s).
-
-#### 1. Get API Credentials
-
-1. Go to [Podcast Index API](https://api.podcastindex.org/)
-2. Click **Get a Free API Key**
-3. Fill in your name and email
-4. You'll receive an **API Key** and **API Secret** by email
-
-#### 2. Set Environment Variables
-
-```toml
-# In mise.toml
-PODCAST_INDEX_API_KEY = "your-podcast-index-api-key"
-PODCAST_INDEX_API_SECRET = "your-podcast-index-api-secret"
-```
-
-> **Note**: Podcast Index API authentication uses both the key and secret to
-> generate a request signature. Both values are required.
-
----
 
 ### IGDB (Twitch)
 
@@ -460,8 +434,6 @@ YOUTUBE_CLIENT_SECRET = ""                # same as GOOGLE_CLIENT_SECRET
 LASTFM_API_KEY = ""
 TMDB_API_KEY = ""
 OMDB_API_KEY = ""                         # optional, supplements TMDB
-PODCAST_INDEX_API_KEY = ""
-PODCAST_INDEX_API_SECRET = ""
 IGDB_CLIENT_ID = ""                       # Twitch client ID
 IGDB_CLIENT_SECRET = ""                   # Twitch client secret
 # AniList — no key needed (public API)
