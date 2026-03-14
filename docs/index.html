@@ -125,10 +125,6 @@
     }
     .steps li {
       counter-increment: step;
-      display: grid;
-      grid-template-columns: 2.5rem 1fr;
-      gap: 0.25rem;
-      align-items: baseline;
       padding-block: 0.6rem;
       border-block-end: 1px solid var(--graphical-fg);
     }
@@ -136,9 +132,8 @@
       border-block-end: none;
     }
     .steps li::before {
-      content: counter(step);
+      content: counter(step) ". ";
       font-family: var(--display-font);
-      font-size: 1.3rem;
       color: var(--accent);
     }
     .steps strong {
