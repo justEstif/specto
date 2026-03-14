@@ -71,6 +71,9 @@ type Querier interface {
 	TagDistributionByCategory(ctx context.Context, arg database.TagDistributionByCategoryParams) ([]database.TagDistributionByCategoryRow, error)
 	AttentionByType(ctx context.Context, arg database.AttentionByTypeParams) ([]database.AttentionByTypeRow, error)
 	ConsumptionHeatmap(ctx context.Context, arg database.ConsumptionHeatmapParams) ([]database.ConsumptionHeatmapRow, error)
+	CrossPlatformCrossover(ctx context.Context, arg database.CrossPlatformCrossoverParams) ([]database.CrossPlatformCrossoverRow, error)
+	TopicTimeSeries(ctx context.Context, arg database.TopicTimeSeriesParams) ([]database.TopicTimeSeriesRow, error)
+	TopicSpikes(ctx context.Context, arg database.TopicSpikesParams) ([]database.TopicSpikesRow, error)
 
 	// Share profiles
 	GetShareProfile(ctx context.Context, userID pgtype.UUID) (database.ShareProfile, error)

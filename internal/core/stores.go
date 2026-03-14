@@ -205,6 +205,18 @@ type InsightsStore interface {
 	// ConsumptionHeatmap returns consumption counts grouped by day-of-week
 	// (0=Sun..6=Sat) and hour-of-day (0..23) for a rhythm heatmap.
 	ConsumptionHeatmap(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]HeatmapCell, error)
+
+	// Crossover returns tags that appear across 2+ platforms,
+	// revealing unified taste patterns. Optionally filtered by category.
+	Crossover(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, category *string, filter InsightsFilter) ([]CrossoverEntry, error)
+
+	// TopicTimeSeries returns weekly tag usage counts for visualizing
+	// obsession arcs over time. Can filter to a specific tag or category.
+	TopicTimeSeries(ctx context.Context, userID uuid.UUID, from, to time.Time, tagName, category *string, filter InsightsFilter) ([]TopicTimeSeriesEntry, error)
+
+	// TopicSpikes returns tags with recent activity spikes compared to
+	// their historical average, detecting obsession onset.
+	TopicSpikes(ctx context.Context, userID uuid.UUID, from, to time.Time, recentStart time.Time, limit int32, filter InsightsFilter) ([]TopicSpikeEntry, error)
 }
 
 // --- Domain types used by store interfaces ---
@@ -420,4 +432,30 @@ type HeatmapCell struct {
 	DayOfWeek int // 0=Sun, 1=Mon, ..., 6=Sat
 	HourOfDay int // 0..23
 	Count     int64
+}
+
+// CrossoverEntry represents a tag that appears across multiple platforms,
+// revealing cross-platform taste patterns.
+type CrossoverEntry struct {
+	Name          string
+	Category      string
+	PlatformCount int64
+	ItemCount     int64
+	Platforms     []string
+}
+
+// TopicTimeSeriesEntry represents tag usage in a single time bucket.
+type TopicTimeSeriesEntry struct {
+	WeekStart time.Time
+	TagName   string
+	Count     int64
+}
+
+// TopicSpikeEntry represents a tag with a recent activity spike.
+type TopicSpikeEntry struct {
+	Name          string
+	Category      string
+	RecentCount   int64
+	TotalCount    int64
+	PlatformCount int64
 }

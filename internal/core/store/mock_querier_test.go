@@ -48,6 +48,9 @@ type mockQuerier struct {
 	onThisDayFn                 func(ctx context.Context, arg database.OnThisDayParams) ([]database.MediaItem, error)
 	tagDistributionByCategoryFn func(ctx context.Context, arg database.TagDistributionByCategoryParams) ([]database.TagDistributionByCategoryRow, error)
 	attentionByTypeFn           func(ctx context.Context, arg database.AttentionByTypeParams) ([]database.AttentionByTypeRow, error)
+	crossPlatformCrossoverFn    func(ctx context.Context, arg database.CrossPlatformCrossoverParams) ([]database.CrossPlatformCrossoverRow, error)
+	topicTimeSeriesFn           func(ctx context.Context, arg database.TopicTimeSeriesParams) ([]database.TopicTimeSeriesRow, error)
+	topicSpikesFn               func(ctx context.Context, arg database.TopicSpikesParams) ([]database.TopicSpikesRow, error)
 }
 
 var _ Querier = (*mockQuerier)(nil)
@@ -386,5 +389,26 @@ func (m *mockQuerier) AttentionByType(ctx context.Context, arg database.Attentio
 }
 
 func (m *mockQuerier) ConsumptionHeatmap(_ context.Context, _ database.ConsumptionHeatmapParams) ([]database.ConsumptionHeatmapRow, error) {
+	return nil, nil
+}
+
+func (m *mockQuerier) CrossPlatformCrossover(ctx context.Context, arg database.CrossPlatformCrossoverParams) ([]database.CrossPlatformCrossoverRow, error) {
+	if m.crossPlatformCrossoverFn != nil {
+		return m.crossPlatformCrossoverFn(ctx, arg)
+	}
+	return nil, nil
+}
+
+func (m *mockQuerier) TopicTimeSeries(ctx context.Context, arg database.TopicTimeSeriesParams) ([]database.TopicTimeSeriesRow, error) {
+	if m.topicTimeSeriesFn != nil {
+		return m.topicTimeSeriesFn(ctx, arg)
+	}
+	return nil, nil
+}
+
+func (m *mockQuerier) TopicSpikes(ctx context.Context, arg database.TopicSpikesParams) ([]database.TopicSpikesRow, error) {
+	if m.topicSpikesFn != nil {
+		return m.topicSpikesFn(ctx, arg)
+	}
 	return nil, nil
 }

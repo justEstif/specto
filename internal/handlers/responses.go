@@ -82,6 +82,28 @@ type syncResultResponse struct {
 	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
 }
 
+type crossoverResponse struct {
+	Name          string   `json:"name"`
+	Category      string   `json:"category"`
+	PlatformCount int64    `json:"platform_count"`
+	ItemCount     int64    `json:"item_count"`
+	Platforms     []string `json:"platforms"`
+}
+
+type topicTimeSeriesResponse struct {
+	WeekStart time.Time `json:"week_start"`
+	TagName   string    `json:"tag_name"`
+	Count     int64     `json:"count"`
+}
+
+type topicSpikeResponse struct {
+	Name          string `json:"name"`
+	Category      string `json:"category"`
+	RecentCount   int64  `json:"recent_count"`
+	TotalCount    int64  `json:"total_count"`
+	PlatformCount int64  `json:"platform_count"`
+}
+
 type syncHistoryEntryResponse struct {
 	StartedAt    time.Time  `json:"started_at"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`

@@ -398,6 +398,71 @@ WHERE user_id = $1
 ORDER BY consumed_at DESC
 LIMIT $3;
 
+-- name: CrossPlatformCrossover :many
+-- Returns tags that appear across 2+ platforms for a user, revealing
+-- cross-platform taste patterns. Groups by tag with platform count and list.
+SELECT t.name, t.category, COUNT(DISTINCT mi.platform) AS platform_count,
+       COUNT(*) AS item_count,
+       array_agg(DISTINCT mi.platform ORDER BY mi.platform) AS platforms
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND (sqlc.narg('platform')::TEXT IS NULL OR mi.platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR mi.type = sqlc.narg('media_type'))
+    AND (sqlc.narg('category')::TEXT IS NULL OR t.category = sqlc.narg('category'))
+GROUP BY t.name, t.category
+HAVING COUNT(DISTINCT mi.platform) >= 2
+ORDER BY platform_count DESC, item_count DESC
+LIMIT $4;
+
+-- name: TopicTimeSeries :many
+-- Returns tag usage over time bucketed by week, for visualizing
+-- obsession arcs (onset, peak, fadeout). Filters to a specific
+-- tag category or specific tag name.
+SELECT
+    date_trunc('week', mi.consumed_at)::TIMESTAMPTZ AS week_start,
+    t.name AS tag_name,
+    COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND (sqlc.narg('platform')::TEXT IS NULL OR mi.platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR mi.type = sqlc.narg('media_type'))
+    AND (sqlc.narg('category')::TEXT IS NULL OR t.category = sqlc.narg('category'))
+    AND (sqlc.narg('tag_name')::TEXT IS NULL OR t.name = sqlc.narg('tag_name'))
+GROUP BY week_start, t.name
+ORDER BY week_start, count DESC;
+
+-- name: TopicSpikes :many
+-- Returns tags that had significant activity spikes in recent weeks
+-- compared to their historical average. Used for detecting obsession
+-- onset. Only considers the last N weeks (controlled by date range).
+SELECT t.name, t.category,
+    COUNT(*) FILTER (WHERE mi.consumed_at >= @recent_start::TIMESTAMPTZ) AS recent_count,
+    COUNT(*) AS total_count,
+    COUNT(DISTINCT mi.platform) AS platform_count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND (sqlc.narg('platform')::TEXT IS NULL OR mi.platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR mi.type = sqlc.narg('media_type'))
+GROUP BY t.name, t.category
+HAVING COUNT(*) >= 3
+ORDER BY (COUNT(*) FILTER (WHERE mi.consumed_at >= @recent_start::TIMESTAMPTZ))::FLOAT / GREATEST(COUNT(*)::FLOAT / GREATEST(EXTRACT(EPOCH FROM ($3::TIMESTAMPTZ - $2::TIMESTAMPTZ)) / EXTRACT(EPOCH FROM ($3::TIMESTAMPTZ - @recent_start::TIMESTAMPTZ)), 1), 1) DESC
+LIMIT $4;
+
 -- name: GetPublicPlatformMix :many
 SELECT mi.platform, COUNT(*) AS count
 FROM media_items mi

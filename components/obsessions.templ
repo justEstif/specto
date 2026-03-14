@@ -1,0 +1,193 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// ObsessionsData holds all pre-fetched data for the obsessions tracker page.
+type ObsessionsData struct {
+	User       *core.UserInfo
+	Filters    AttentionFilters
+	Spikes     []core.TopicSpikeEntry
+	TimeSeries []core.TopicTimeSeriesEntry
+	SelectedTag string // currently selected tag for detail view
+}
+
+// ObsessionsContent renders the obsessions content (used by insights hub).
+templ ObsessionsContent(data ObsessionsData) {
+	<!-- Current obsessions / spikes -->
+	<div class="mb-8">
+		<h2 class="text-display text-xl font-semibold mb-4">Currently Obsessed With</h2>
+		if len(data.Spikes) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+				No obsession spikes detected yet. Keep consuming and we'll spot the patterns.
+			</div>
+		} else {
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+				for _, spike := range data.Spikes {
+					@obsessionSpikeCard(spike)
+				}
+			</div>
+		}
+	</div>
+	<!-- Time series chart (text-based) -->
+	if len(data.TimeSeries) > 0 {
+		<div>
+			<h2 class="text-display text-xl font-semibold mb-4">
+				if data.SelectedTag != "" {
+					{ fmt.Sprintf("Activity: %s", data.SelectedTag) }
+				} else {
+					Top Topic Arcs
+				}
+			</h2>
+			@obsessionTimeline(data.TimeSeries)
+		</div>
+	}
+}
+
+templ obsessionSpikeCard(spike core.TopicSpikeEntry) {
+	<div class="stat bg-neutral border border-base-300 rounded-box p-4">
+		<div class="stat-title text-base-content/50 text-xs uppercase tracking-wider">
+			{ spike.Category }
+		</div>
+		<div class="stat-value text-xl font-bold text-base-content">
+			{ spike.Name }
+		</div>
+		<div class="stat-desc text-base-content/40 tabular-nums space-y-0.5">
+			<div>{ fmt.Sprintf("%d recent / %d total", spike.RecentCount, spike.TotalCount) }</div>
+			if spike.PlatformCount > 1 {
+				<div>{ fmt.Sprintf("across %d platforms", spike.PlatformCount) }</div>
+			}
+		</div>
+	</div>
+}
+
+templ obsessionTimeline(entries []core.TopicTimeSeriesEntry) {
+	<div class="bg-neutral border border-base-300 rounded-box p-4 overflow-x-auto">
+		<!-- Group entries by tag name, show sparkline-style bars per week -->
+		for _, group := range groupTimeSeriesByTag(entries) {
+			<div class="mb-4 last:mb-0">
+				<div class="flex items-center gap-2 mb-2">
+					<span class="text-sm font-medium text-base-content/80 w-24 truncate" title={ group.name }>{ group.name }</span>
+					<div class="flex items-end gap-px flex-1 h-8">
+						for _, bar := range group.bars {
+							<div
+								class="bg-primary/70 rounded-t-sm flex-1 min-w-1"
+								style={ fmt.Sprintf("height: %d%%", bar.heightPct) }
+								title={ fmt.Sprintf("%s: %d items", bar.label, bar.count) }
+							></div>
+						}
+					</div>
+					<span class="text-xs text-base-content/40 tabular-nums w-8 text-right">{ fmt.Sprintf("%d", group.total) }</span>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// --- helpers ---
+
+type timeSeriesBar struct {
+	label     string
+	count     int64
+	heightPct int
+}
+
+type timeSeriesGroup struct {
+	name  string
+	bars  []timeSeriesBar
+	total int64
+}
+
+func groupTimeSeriesByTag(entries []core.TopicTimeSeriesEntry) []timeSeriesGroup {
+	// Group by tag name, preserving week order
+	type tagData struct {
+		name  string
+		weeks map[time.Time]int64
+		total int64
+	}
+
+	tagMap := make(map[string]*tagData)
+	var tagOrder []string
+	var maxCount int64
+
+	for _, e := range entries {
+		td, ok := tagMap[e.TagName]
+		if !ok {
+			td = &tagData{name: e.TagName, weeks: make(map[time.Time]int64)}
+			tagMap[e.TagName] = td
+			tagOrder = append(tagOrder, e.TagName)
+		}
+		td.weeks[e.WeekStart] = e.Count
+		td.total += e.Count
+		if e.Count > maxCount {
+			maxCount = e.Count
+		}
+	}
+
+	// Collect all unique weeks
+	weekSet := make(map[time.Time]bool)
+	for _, e := range entries {
+		weekSet[e.WeekStart] = true
+	}
+	var weeks []time.Time
+	for w := range weekSet {
+		weeks = append(weeks, w)
+	}
+	// Sort weeks
+	for i := range weeks {
+		for j := i + 1; j < len(weeks); j++ {
+			if weeks[j].Before(weeks[i]) {
+				weeks[i], weeks[j] = weeks[j], weeks[i]
+			}
+		}
+	}
+
+	// Limit to top 5 tags by total
+	if len(tagOrder) > 5 {
+		// Sort by total descending
+		for i := range tagOrder {
+			for j := i + 1; j < len(tagOrder); j++ {
+				if tagMap[tagOrder[j]].total > tagMap[tagOrder[i]].total {
+					tagOrder[i], tagOrder[j] = tagOrder[j], tagOrder[i]
+				}
+			}
+		}
+		tagOrder = tagOrder[:5]
+	}
+
+	groups := make([]timeSeriesGroup, 0, len(tagOrder))
+	for _, name := range tagOrder {
+		td := tagMap[name]
+		bars := make([]timeSeriesBar, len(weeks))
+		for i, w := range weeks {
+			count := td.weeks[w]
+			pct := 0
+			if maxCount > 0 {
+				pct = int(count * 100 / maxCount)
+			}
+			if pct == 0 && count > 0 {
+				pct = 2 // minimum visible height
+			}
+			bars[i] = timeSeriesBar{
+				label:     w.Format("Jan 2"),
+				count:     count,
+				heightPct: pct,
+			}
+		}
+		groups = append(groups, timeSeriesGroup{
+			name:  name,
+			bars:  bars,
+			total: td.total,
+		})
+	}
+	return groups
+}
+
+// ensure imports are used
+var _ = strings.ToLower
+var _ = time.Now

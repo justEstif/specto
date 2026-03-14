@@ -52,6 +52,18 @@ func (m *mockInsightsStore) ConsumptionHeatmap(_ context.Context, _ uuid.UUID, _
 	return nil, nil
 }
 
+func (m *mockInsightsStore) Crossover(_ context.Context, _ uuid.UUID, _, _ time.Time, _ int32, _ *string, _ InsightsFilter) ([]CrossoverEntry, error) {
+	return nil, nil
+}
+
+func (m *mockInsightsStore) TopicTimeSeries(_ context.Context, _ uuid.UUID, _, _ time.Time, _, _ *string, _ InsightsFilter) ([]TopicTimeSeriesEntry, error) {
+	return nil, nil
+}
+
+func (m *mockInsightsStore) TopicSpikes(_ context.Context, _ uuid.UUID, _, _ time.Time, _ time.Time, _ int32, _ InsightsFilter) ([]TopicSpikeEntry, error) {
+	return nil, nil
+}
+
 // --- test helpers ---
 
 var (

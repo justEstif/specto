@@ -146,3 +146,127 @@ func (h *Handler) InsightsTimeline(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, dataResponse{Data: data})
 }
+
+// InsightsCrossover handles GET /api/v1/insights/crossover
+func (h *Handler) InsightsCrossover(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return
+	}
+
+	q := r.URL.Query()
+	from, to, err := parseDateRange(q.Get("from"), q.Get("to"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+
+	limit := parseIntParam(q.Get("limit"), 30, 1, 100)
+	filter := core.InsightsFilter{
+		Platform:  nilIfEmpty(q.Get("platform")),
+		MediaType: nilIfEmpty(q.Get("type")),
+	}
+
+	entries, err := h.App.Insights.GetCrossover(r.Context(), user.ID, from, to, int32(limit), nilIfEmpty(q.Get("category")), filter)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load crossover data")
+		return
+	}
+
+	data := make([]crossoverResponse, len(entries))
+	for i, e := range entries {
+		data[i] = crossoverResponse{
+			Name:          e.Name,
+			Category:      e.Category,
+			PlatformCount: e.PlatformCount,
+			ItemCount:     e.ItemCount,
+			Platforms:     e.Platforms,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, dataResponse{Data: data})
+}
+
+// InsightsTopicTimeSeries handles GET /api/v1/insights/topic-timeline
+func (h *Handler) InsightsTopicTimeSeries(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return
+	}
+
+	q := r.URL.Query()
+	from, to, err := parseDateRange(q.Get("from"), q.Get("to"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+
+	filter := core.InsightsFilter{
+		Platform:  nilIfEmpty(q.Get("platform")),
+		MediaType: nilIfEmpty(q.Get("type")),
+	}
+
+	entries, err := h.App.Insights.GetTopicTimeSeries(r.Context(), user.ID, from, to, nilIfEmpty(q.Get("tag")), nilIfEmpty(q.Get("category")), filter)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load topic timeline")
+		return
+	}
+
+	data := make([]topicTimeSeriesResponse, len(entries))
+	for i, e := range entries {
+		data[i] = topicTimeSeriesResponse{
+			WeekStart: e.WeekStart,
+			TagName:   e.TagName,
+			Count:     e.Count,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, dataResponse{Data: data})
+}
+
+// InsightsTopicSpikes handles GET /api/v1/insights/topic-spikes
+func (h *Handler) InsightsTopicSpikes(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Not authenticated")
+		return
+	}
+
+	q := r.URL.Query()
+	from, to, err := parseDateRange(q.Get("from"), q.Get("to"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", err.Error())
+		return
+	}
+
+	limit := parseIntParam(q.Get("limit"), 10, 1, 50)
+	filter := core.InsightsFilter{
+		Platform:  nilIfEmpty(q.Get("platform")),
+		MediaType: nilIfEmpty(q.Get("type")),
+	}
+
+	// "Recent" = last 25% of the time range
+	rangeDuration := to.Sub(from)
+	recentStart := to.Add(-rangeDuration / 4)
+
+	entries, err := h.App.Insights.GetTopicSpikes(r.Context(), user.ID, from, to, recentStart, int32(limit), filter)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load topic spikes")
+		return
+	}
+
+	data := make([]topicSpikeResponse, len(entries))
+	for i, e := range entries {
+		data[i] = topicSpikeResponse{
+			Name:          e.Name,
+			Category:      e.Category,
+			RecentCount:   e.RecentCount,
+			TotalCount:    e.TotalCount,
+			PlatformCount: e.PlatformCount,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, dataResponse{Data: data})
+}

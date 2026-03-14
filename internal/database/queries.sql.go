@@ -445,6 +445,80 @@ func (q *Queries) CreateUserWithPassword(ctx context.Context, arg CreateUserWith
 	return i, err
 }
 
+const crossPlatformCrossover = `-- name: CrossPlatformCrossover :many
+SELECT t.name, t.category, COUNT(DISTINCT mi.platform) AS platform_count,
+       COUNT(*) AS item_count,
+       array_agg(DISTINCT mi.platform ORDER BY mi.platform) AS platforms
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND ($5::TEXT IS NULL OR mi.platform = $5)
+    AND ($6::TEXT IS NULL OR mi.type = $6)
+    AND ($7::TEXT IS NULL OR t.category = $7)
+GROUP BY t.name, t.category
+HAVING COUNT(DISTINCT mi.platform) >= 2
+ORDER BY platform_count DESC, item_count DESC
+LIMIT $4
+`
+
+type CrossPlatformCrossoverParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit        int32              `json:"limit"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+	Category     pgtype.Text        `json:"category"`
+}
+
+type CrossPlatformCrossoverRow struct {
+	Name          string      `json:"name"`
+	Category      pgtype.Text `json:"category"`
+	PlatformCount int64       `json:"platform_count"`
+	ItemCount     int64       `json:"item_count"`
+	Platforms     interface{} `json:"platforms"`
+}
+
+// Returns tags that appear across 2+ platforms for a user, revealing
+// cross-platform taste patterns. Groups by tag with platform count and list.
+func (q *Queries) CrossPlatformCrossover(ctx context.Context, arg CrossPlatformCrossoverParams) ([]CrossPlatformCrossoverRow, error) {
+	rows, err := q.db.Query(ctx, crossPlatformCrossover,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.Platform,
+		arg.MediaType,
+		arg.Category,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CrossPlatformCrossoverRow{}
+	for rows.Next() {
+		var i CrossPlatformCrossoverRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.Category,
+			&i.PlatformCount,
+			&i.ItemCount,
+			&i.Platforms,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteMediaItemsByPlatform = `-- name: DeleteMediaItemsByPlatform :execrows
 DELETE FROM media_items WHERE user_id = $1 AND platform = $2
 `
@@ -1791,6 +1865,148 @@ func (q *Queries) TagDistributionFiltered(ctx context.Context, arg TagDistributi
 	for rows.Next() {
 		var i TagDistributionFilteredRow
 		if err := rows.Scan(&i.Name, &i.Category, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const topicSpikes = `-- name: TopicSpikes :many
+SELECT t.name, t.category,
+    COUNT(*) FILTER (WHERE mi.consumed_at >= $5::TIMESTAMPTZ) AS recent_count,
+    COUNT(*) AS total_count,
+    COUNT(DISTINCT mi.platform) AS platform_count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND ($6::TEXT IS NULL OR mi.platform = $6)
+    AND ($7::TEXT IS NULL OR mi.type = $7)
+GROUP BY t.name, t.category
+HAVING COUNT(*) >= 3
+ORDER BY (COUNT(*) FILTER (WHERE mi.consumed_at >= $5::TIMESTAMPTZ))::FLOAT / GREATEST(COUNT(*)::FLOAT / GREATEST(EXTRACT(EPOCH FROM ($3::TIMESTAMPTZ - $2::TIMESTAMPTZ)) / EXTRACT(EPOCH FROM ($3::TIMESTAMPTZ - $5::TIMESTAMPTZ)), 1), 1) DESC
+LIMIT $4
+`
+
+type TopicSpikesParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit        int32              `json:"limit"`
+	RecentStart  pgtype.Timestamptz `json:"recent_start"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+}
+
+type TopicSpikesRow struct {
+	Name          string      `json:"name"`
+	Category      pgtype.Text `json:"category"`
+	RecentCount   int64       `json:"recent_count"`
+	TotalCount    int64       `json:"total_count"`
+	PlatformCount int64       `json:"platform_count"`
+}
+
+// Returns tags that had significant activity spikes in recent weeks
+// compared to their historical average. Used for detecting obsession
+// onset. Only considers the last N weeks (controlled by date range).
+func (q *Queries) TopicSpikes(ctx context.Context, arg TopicSpikesParams) ([]TopicSpikesRow, error) {
+	rows, err := q.db.Query(ctx, topicSpikes,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.RecentStart,
+		arg.Platform,
+		arg.MediaType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TopicSpikesRow{}
+	for rows.Next() {
+		var i TopicSpikesRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.Category,
+			&i.RecentCount,
+			&i.TotalCount,
+			&i.PlatformCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const topicTimeSeries = `-- name: TopicTimeSeries :many
+SELECT
+    date_trunc('week', mi.consumed_at)::TIMESTAMPTZ AS week_start,
+    t.name AS tag_name,
+    COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND ($4::TEXT IS NULL OR mi.platform = $4)
+    AND ($5::TEXT IS NULL OR mi.type = $5)
+    AND ($6::TEXT IS NULL OR t.category = $6)
+    AND ($7::TEXT IS NULL OR t.name = $7)
+GROUP BY week_start, t.name
+ORDER BY week_start, count DESC
+`
+
+type TopicTimeSeriesParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+	Category     pgtype.Text        `json:"category"`
+	TagName      pgtype.Text        `json:"tag_name"`
+}
+
+type TopicTimeSeriesRow struct {
+	WeekStart pgtype.Timestamptz `json:"week_start"`
+	TagName   string             `json:"tag_name"`
+	Count     int64              `json:"count"`
+}
+
+// Returns tag usage over time bucketed by week, for visualizing
+// obsession arcs (onset, peak, fadeout). Filters to a specific
+// tag category or specific tag name.
+func (q *Queries) TopicTimeSeries(ctx context.Context, arg TopicTimeSeriesParams) ([]TopicTimeSeriesRow, error) {
+	rows, err := q.db.Query(ctx, topicTimeSeries,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Platform,
+		arg.MediaType,
+		arg.Category,
+		arg.TagName,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TopicTimeSeriesRow{}
+	for rows.Next() {
+		var i TopicTimeSeriesRow
+		if err := rows.Scan(&i.WeekStart, &i.TagName, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

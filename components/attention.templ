@@ -26,19 +26,7 @@ type AttentionData struct {
 	HeatmapCells    []core.HeatmapCell
 }
 
-// AttentionPage renders the full attention audit page.
-templ AttentionPage(data AttentionData) {
-	@Layout("Attention Audit — Specto", data.User) {
-		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-2">Attention Audit</h1>
-		<p class="text-base-content/50 text-sm mb-6">Where your attention actually goes.</p>
-		@attentionFilterBar(data.Filters)
-		<div id="attention-content">
-			@AttentionContent(data)
-		</div>
-	}
-}
-
-// AttentionContent renders the attention audit content (HTMX swap target).
+// AttentionContent renders the attention audit content (used by insights hub).
 templ AttentionContent(data AttentionData) {
 	<!-- Attention by type -->
 	@attentionByTypeSection(data.AttentionByType)
@@ -59,64 +47,6 @@ templ AttentionContent(data AttentionData) {
 		@consumptionHeatmap(data.HeatmapCells)
 		@heatmapInsights(data.HeatmapCells)
 	</div>
-}
-
-templ attentionFilterBar(f AttentionFilters) {
-	<div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
-		<select
-			name="platform"
-			aria-label="Filter by platform"
-			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-40"
-			hx-get="/partials/attention"
-			hx-target="#attention-content"
-			hx-swap="innerHTML"
-			hx-push-url="false"
-			hx-include="[name='type'], [name='range']"
-		>
-			<option value="" selected?={ f.Platform == "" }>All platforms</option>
-			<option value="spotify" selected?={ f.Platform == "spotify" }>Spotify</option>
-			<option value="youtube" selected?={ f.Platform == "youtube" }>YouTube</option>
-			<option value="netflix" selected?={ f.Platform == "netflix" }>Netflix</option>
-		</select>
-		<select
-			name="type"
-			aria-label="Filter by type"
-			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-36"
-			hx-get="/partials/attention"
-			hx-target="#attention-content"
-			hx-swap="innerHTML"
-			hx-push-url="false"
-			hx-include="[name='platform'], [name='range']"
-		>
-			<option value="" selected?={ f.Type == "" }>All types</option>
-			<option value="music" selected?={ f.Type == "music" }>Music</option>
-			<option value="video" selected?={ f.Type == "video" }>Video</option>
-			<option value="podcast" selected?={ f.Type == "podcast" }>Podcast</option>
-			<option value="article" selected?={ f.Type == "article" }>Article</option>
-		</select>
-		<div class="sm:ml-auto">
-			<div role="tablist" class="tabs tabs-box tabs-sm bg-base-200">
-				@attentionRangeTab("7d", f)
-				@attentionRangeTab("30d", f)
-				@attentionRangeTab("90d", f)
-			</div>
-		</div>
-	</div>
-}
-
-templ attentionRangeTab(value string, f AttentionFilters) {
-	<button
-		role="tab"
-		name="range"
-		value={ value }
-		class={ "tab", templ.KV("tab-active", value == f.Range) }
-		hx-get={ "/partials/attention?range=" + value + attentionFilterQuery(f) }
-		hx-target="#attention-content"
-		hx-swap="innerHTML"
-		hx-push-url="false"
-	>
-		{ value }
-	</button>
 }
 
 // attentionByTypeSection shows how attention is distributed across media types.

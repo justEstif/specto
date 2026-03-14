@@ -165,6 +165,38 @@ func (s *InsightsService) GetConsumptionHeatmap(ctx context.Context, userID uuid
 	return s.store.ConsumptionHeatmap(ctx, userID, from, to, filter)
 }
 
+// GetCrossover returns tags that appear across 2+ platforms,
+// revealing unified taste patterns that no single-platform tool can show.
+func (s *InsightsService) GetCrossover(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, category *string, filter InsightsFilter) ([]CrossoverEntry, error) {
+	if err := validateDateRange(from, to); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 30
+	}
+	return s.store.Crossover(ctx, userID, from, to, limit, category, filter)
+}
+
+// GetTopicTimeSeries returns weekly tag usage for visualizing obsession arcs.
+func (s *InsightsService) GetTopicTimeSeries(ctx context.Context, userID uuid.UUID, from, to time.Time, tagName, category *string, filter InsightsFilter) ([]TopicTimeSeriesEntry, error) {
+	if err := validateDateRange(from, to); err != nil {
+		return nil, err
+	}
+	return s.store.TopicTimeSeries(ctx, userID, from, to, tagName, category, filter)
+}
+
+// GetTopicSpikes returns tags with recent activity spikes, detecting
+// obsession onset. recentStart defines the boundary for "recent" activity.
+func (s *InsightsService) GetTopicSpikes(ctx context.Context, userID uuid.UUID, from, to time.Time, recentStart time.Time, limit int32, filter InsightsFilter) ([]TopicSpikeEntry, error) {
+	if err := validateDateRange(from, to); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	return s.store.TopicSpikes(ctx, userID, from, to, recentStart, limit, filter)
+}
+
 // --- helpers ---
 
 func validateDateRange(from, to time.Time) error {

@@ -8,94 +8,6 @@ import (
 	"github.com/justestif/specto/internal/core"
 )
 
-// AttentionPage renders GET /attention — the attention audit dashboard.
-func (h *Handler) AttentionPage(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	filters := parseAttentionFilters(r)
-	h.renderAttention(w, r, user, filters, false)
-}
-
-// AttentionPartial handles GET /partials/attention — HTMX swap target for filters.
-func (h *Handler) AttentionPartial(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	filters := parseAttentionFilters(r)
-	h.renderAttention(w, r, user, filters, true)
-}
-
-func (h *Handler) renderAttention(w http.ResponseWriter, r *http.Request, user *core.UserInfo, filters components.AttentionFilters, partial bool) {
-	ctx := r.Context()
-	from, to := rangeToTime(filters.Range)
-
-	insightsFilter := core.InsightsFilter{
-		Platform:  nilIfEmpty(filters.Platform),
-		MediaType: nilIfEmpty(filters.Type),
-	}
-
-	addContext(r, "handler", "attention")
-	addContext(r, "user_id", user.ID.String())
-
-	// Attention by media type
-	attentionByType, err := h.App.Insights.GetAttentionByType(ctx, user.ID, from, to, nilIfEmpty(filters.Platform))
-	if err != nil {
-		addContext(r, "attention_by_type_error", err.Error())
-	}
-
-	// Tag breakdowns by category
-	genres, err := h.App.Insights.GetTagDistributionByCategory(ctx, user.ID, from, to, 10, "genre", insightsFilter)
-	if err != nil {
-		addContext(r, "attention_genres_error", err.Error())
-	}
-
-	topics, err := h.App.Insights.GetTagDistributionByCategory(ctx, user.ID, from, to, 10, "topic", insightsFilter)
-	if err != nil {
-		addContext(r, "attention_topics_error", err.Error())
-	}
-
-	moods, err := h.App.Insights.GetTagDistributionByCategory(ctx, user.ID, from, to, 10, "mood", insightsFilter)
-	if err != nil {
-		addContext(r, "attention_moods_error", err.Error())
-	}
-
-	// Platform breakdown
-	platforms, err := h.App.Insights.GetPlatformBreakdown(ctx, user.ID, from, to, insightsFilter)
-	if err != nil {
-		addContext(r, "attention_platforms_error", err.Error())
-	}
-
-	// Consumption heatmap
-	heatmapCells, err := h.App.Insights.GetConsumptionHeatmap(ctx, user.ID, from, to, insightsFilter)
-	if err != nil {
-		addContext(r, "heatmap_error", err.Error())
-	}
-
-	data := components.AttentionData{
-		User:            user,
-		Filters:         filters,
-		AttentionByType: attentionByType,
-		Genres:          genres,
-		Topics:          topics,
-		Moods:           moods,
-		Platforms:       platforms,
-		HeatmapCells:    heatmapCells,
-	}
-
-	if partial {
-		components.AttentionContent(data).Render(ctx, w)
-	} else {
-		components.AttentionPage(data).Render(ctx, w)
-	}
-}
-
 // InsightsAttentionByType handles GET /api/v1/insights/attention-by-type
 func (h *Handler) InsightsAttentionByType(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.UserFromContext(r.Context())
@@ -130,7 +42,7 @@ func (h *Handler) InsightsAttentionByType(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, dataResponse{Data: data})
 }
 
-// InsightsTagsByCategory handles GET /api/v1/insights/tags/{category}
+// InsightsTagsByCategory handles GET /api/v1/insights/tags-by-category
 func (h *Handler) InsightsTagsByCategory(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.UserFromContext(r.Context())
 	if !ok {

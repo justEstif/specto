@@ -1,0 +1,112 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// CrossoverData holds all pre-fetched data for the crossover tab.
+type CrossoverData struct {
+	User    *core.UserInfo
+	Filters AttentionFilters
+	AllDNA  []core.CrossoverEntry
+	Genres  []core.CrossoverEntry
+	Topics  []core.CrossoverEntry
+	Moods   []core.CrossoverEntry
+}
+
+// CrossoverContent renders the crossover content (used by insights hub).
+templ CrossoverContent(data CrossoverData) {
+	if len(data.AllDNA) == 0 {
+		<div class="bg-neutral border border-base-300 rounded-box p-12 text-center">
+			<p class="text-base-content/40 text-lg mb-2">No cross-platform patterns yet</p>
+			<p class="text-base-content/30 text-sm">Connect 2+ platforms and let enrichment tag your media to reveal shared themes.</p>
+			<a href="/plugins" class="btn btn-primary btn-sm mt-4">Connect Plugins</a>
+		</div>
+	} else {
+		<!-- Top cross-platform tags -->
+		<div class="mb-8">
+			<h2 class="text-display text-xl font-semibold mb-4">Your Unified Taste Profile</h2>
+			<div class="flex flex-wrap gap-2">
+				for _, entry := range data.AllDNA {
+					@crossoverTag(entry)
+				}
+			</div>
+		</div>
+		<!-- Category breakdowns -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			@crossoverCategoryList("Genres", data.Genres)
+			@crossoverCategoryList("Topics", data.Topics)
+			@crossoverCategoryList("Moods", data.Moods)
+		</div>
+	}
+}
+
+templ crossoverTag(entry core.CrossoverEntry) {
+	<div class={ "badge badge-lg gap-1 py-3 px-4", crossoverBadgeColor(entry.Category) }>
+		<span class="font-semibold">{ entry.Name }</span>
+		<span class="text-xs opacity-60">
+			{ fmt.Sprintf("%d platforms", entry.PlatformCount) }
+		</span>
+	</div>
+}
+
+templ crossoverCategoryList(title string, entries []core.CrossoverEntry) {
+	<div>
+		<h2 class="text-display text-lg font-semibold mb-3">{ title }</h2>
+		if len(entries) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-6 text-center text-base-content/40 text-sm">
+				No cross-platform { strings.ToLower(title) } found yet.
+			</div>
+		} else {
+			<div class="bg-neutral border border-base-300 rounded-box p-4 space-y-4">
+				for _, entry := range entries {
+					<div>
+						<div class="flex justify-between items-center text-sm mb-1">
+							<span class="text-base-content/80 font-medium">{ entry.Name }</span>
+							<span class="text-base-content/40 font-mono text-xs">{ fmt.Sprintf("%d items", entry.ItemCount) }</span>
+						</div>
+						<div class="flex items-center gap-2 text-xs text-base-content/40">
+							for i, p := range entry.Platforms {
+								if i > 0 {
+									<span class="opacity-30">/</span>
+								}
+								<span class={ platformTextColor(p) }>{ p }</span>
+							}
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// --- helpers ---
+
+func crossoverBadgeColor(category string) string {
+	switch category {
+	case "genre":
+		return "badge-primary"
+	case "topic":
+		return "badge-secondary"
+	case "mood":
+		return "badge-accent"
+	default:
+		return "badge-ghost"
+	}
+}
+
+func platformTextColor(platform string) string {
+	switch platform {
+	case "spotify":
+		return "text-success"
+	case "youtube":
+		return "text-error"
+	case "netflix":
+		return "text-warning"
+	default:
+		return "text-info"
+	}
+}

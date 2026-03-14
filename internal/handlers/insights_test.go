@@ -49,6 +49,15 @@ func (m *mockInsightsStore) AttentionByType(_ context.Context, _ uuid.UUID, _, _
 func (m *mockInsightsStore) ConsumptionHeatmap(_ context.Context, _ uuid.UUID, _, _ time.Time, _ core.InsightsFilter) ([]core.HeatmapCell, error) {
 	return nil, nil
 }
+func (m *mockInsightsStore) Crossover(_ context.Context, _ uuid.UUID, _, _ time.Time, _ int32, _ *string, _ core.InsightsFilter) ([]core.CrossoverEntry, error) {
+	return nil, nil
+}
+func (m *mockInsightsStore) TopicTimeSeries(_ context.Context, _ uuid.UUID, _, _ time.Time, _, _ *string, _ core.InsightsFilter) ([]core.TopicTimeSeriesEntry, error) {
+	return nil, nil
+}
+func (m *mockInsightsStore) TopicSpikes(_ context.Context, _ uuid.UUID, _, _ time.Time, _ time.Time, _ int32, _ core.InsightsFilter) ([]core.TopicSpikeEntry, error) {
+	return nil, nil
+}
 
 func newInsightsTestHandler(insightsStore core.InsightsStore) *handlers.Handler {
 	insights := core.NewInsightsService(insightsStore)
