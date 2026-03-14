@@ -60,6 +60,10 @@ func (m *mockInsightsStore) AttentionByType(_ context.Context, _ uuid.UUID, _, _
 	return nil, nil
 }
 
+func (m *mockInsightsStore) ConsumptionHeatmap(_ context.Context, _ uuid.UUID, _, _ time.Time, _ InsightsFilter) ([]HeatmapCell, error) {
+	return nil, nil
+}
+
 // --- test helpers ---
 
 var (

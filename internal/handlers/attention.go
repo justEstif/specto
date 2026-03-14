@@ -72,6 +72,12 @@ func (h *Handler) renderAttention(w http.ResponseWriter, r *http.Request, user *
 		addContext(r, "attention_platforms_error", err.Error())
 	}
 
+	// Consumption heatmap
+	heatmapCells, err := h.App.Insights.GetConsumptionHeatmap(ctx, user.ID, from, to, insightsFilter)
+	if err != nil {
+		addContext(r, "heatmap_error", err.Error())
+	}
+
 	data := components.AttentionData{
 		User:            user,
 		Filters:         filters,
@@ -80,6 +86,7 @@ func (h *Handler) renderAttention(w http.ResponseWriter, r *http.Request, user *
 		Topics:          topics,
 		Moods:           moods,
 		Platforms:       platforms,
+		HeatmapCells:    heatmapCells,
 	}
 
 	if partial {

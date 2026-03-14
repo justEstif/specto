@@ -368,3 +368,7 @@ func (m *mockQuerier) AttentionByType(ctx context.Context, arg database.Attentio
 	}
 	return nil, nil
 }
+
+func (m *mockQuerier) ConsumptionHeatmap(_ context.Context, _ database.ConsumptionHeatmapParams) ([]database.ConsumptionHeatmapRow, error) {
+	return nil, nil
+}

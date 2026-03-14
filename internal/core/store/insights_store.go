@@ -194,6 +194,29 @@ func (s *PgInsightsStore) AttentionByType(ctx context.Context, userID uuid.UUID,
 	return entries, nil
 }
 
+func (s *PgInsightsStore) ConsumptionHeatmap(ctx context.Context, userID uuid.UUID, from, to time.Time, filter core.InsightsFilter) ([]core.HeatmapCell, error) {
+	rows, err := s.q.ConsumptionHeatmap(ctx, database.ConsumptionHeatmapParams{
+		UserID:       uuidToPgx(userID),
+		ConsumedAt:   timestamptz(from),
+		ConsumedAt_2: timestamptz(to),
+		Platform:     textPtr(filter.Platform),
+		MediaType:    textPtr(filter.MediaType),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("querying consumption heatmap: %w", err)
+	}
+
+	cells := make([]core.HeatmapCell, len(rows))
+	for i, row := range rows {
+		cells[i] = core.HeatmapCell{
+			DayOfWeek: int(row.DayOfWeek),
+			HourOfDay: int(row.HourOfDay),
+			Count:     row.Count,
+		}
+	}
+	return cells, nil
+}
+
 func (s *PgInsightsStore) ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, filter core.InsightsFilter) ([]core.MediaItem, error) {
 	rows, err := s.q.ListMediaItemsFiltered(ctx, database.ListMediaItemsFilteredParams{
 		UserID:       uuidToPgx(userID),

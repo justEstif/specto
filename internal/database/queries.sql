@@ -295,6 +295,22 @@ WHERE user_id = $1
 GROUP BY type
 ORDER BY total_time_spent_sec DESC;
 
+-- name: ConsumptionHeatmap :many
+-- Returns consumption counts grouped by day-of-week (0=Sun..6=Sat) and
+-- hour-of-day (0..23) for building a 7×24 rhythm heatmap.
+SELECT
+    EXTRACT(DOW FROM consumed_at)::INT AS day_of_week,
+    EXTRACT(HOUR FROM consumed_at)::INT AS hour_of_day,
+    COUNT(*) AS count
+FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND (sqlc.narg('platform')::TEXT IS NULL OR platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR type = sqlc.narg('media_type'))
+GROUP BY day_of_week, hour_of_day
+ORDER BY day_of_week, hour_of_day;
+
 -- name: DeleteMediaItemsByPlatform :execrows
 DELETE FROM media_items WHERE user_id = $1 AND platform = $2;
 

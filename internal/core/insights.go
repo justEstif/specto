@@ -183,6 +183,15 @@ func (s *InsightsService) GetAttentionByType(ctx context.Context, userID uuid.UU
 	return s.store.AttentionByType(ctx, userID, from, to, platform)
 }
 
+// GetConsumptionHeatmap returns consumption counts grouped by day-of-week
+// and hour-of-day for a rhythm heatmap visualization.
+func (s *InsightsService) GetConsumptionHeatmap(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]HeatmapCell, error) {
+	if err := validateDateRange(from, to); err != nil {
+		return nil, err
+	}
+	return s.store.ConsumptionHeatmap(ctx, userID, from, to, filter)
+}
+
 // --- helpers ---
 
 func validateDateRange(from, to time.Time) error {

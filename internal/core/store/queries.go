@@ -69,6 +69,7 @@ type Querier interface {
 	TagDistributionFiltered(ctx context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error)
 	TagDistributionByCategory(ctx context.Context, arg database.TagDistributionByCategoryParams) ([]database.TagDistributionByCategoryRow, error)
 	AttentionByType(ctx context.Context, arg database.AttentionByTypeParams) ([]database.AttentionByTypeRow, error)
+	ConsumptionHeatmap(ctx context.Context, arg database.ConsumptionHeatmapParams) ([]database.ConsumptionHeatmapRow, error)
 
 	// Share profiles
 	GetShareProfile(ctx context.Context, userID pgtype.UUID) (database.ShareProfile, error)

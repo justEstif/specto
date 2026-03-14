@@ -198,6 +198,63 @@ func (q *Queries) CompleteSyncLog(ctx context.Context, arg CompleteSyncLogParams
 	return i, err
 }
 
+const consumptionHeatmap = `-- name: ConsumptionHeatmap :many
+SELECT
+    EXTRACT(DOW FROM consumed_at)::INT AS day_of_week,
+    EXTRACT(HOUR FROM consumed_at)::INT AS hour_of_day,
+    COUNT(*) AS count
+FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND ($4::TEXT IS NULL OR platform = $4)
+    AND ($5::TEXT IS NULL OR type = $5)
+GROUP BY day_of_week, hour_of_day
+ORDER BY day_of_week, hour_of_day
+`
+
+type ConsumptionHeatmapParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+}
+
+type ConsumptionHeatmapRow struct {
+	DayOfWeek int32 `json:"day_of_week"`
+	HourOfDay int32 `json:"hour_of_day"`
+	Count     int64 `json:"count"`
+}
+
+// Returns consumption counts grouped by day-of-week (0=Sun..6=Sat) and
+// hour-of-day (0..23) for building a 7×24 rhythm heatmap.
+func (q *Queries) ConsumptionHeatmap(ctx context.Context, arg ConsumptionHeatmapParams) ([]ConsumptionHeatmapRow, error) {
+	rows, err := q.db.Query(ctx, consumptionHeatmap,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Platform,
+		arg.MediaType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ConsumptionHeatmapRow{}
+	for rows.Next() {
+		var i ConsumptionHeatmapRow
+		if err := rows.Scan(&i.DayOfWeek, &i.HourOfDay, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createMediaItem = `-- name: CreateMediaItem :one
 INSERT INTO media_items (user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, raw_metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)

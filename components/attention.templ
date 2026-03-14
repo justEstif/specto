@@ -23,6 +23,7 @@ type AttentionData struct {
 	Topics          []core.TagDistributionEntry
 	Moods           []core.TagDistributionEntry
 	Platforms       []core.PlatformBreakdownEntry
+	HeatmapCells    []core.HeatmapCell
 }
 
 // AttentionPage renders the full attention audit page.
@@ -50,6 +51,13 @@ templ AttentionContent(data AttentionData) {
 	<!-- Platform attention -->
 	<div class="mt-8">
 		@attentionPlatforms(data.Platforms)
+	</div>
+	<!-- Consumption routines heatmap -->
+	<div class="mt-8">
+		<h2 class="text-display text-xl font-semibold mb-4">Weekly Rhythm</h2>
+		<p class="text-base-content/40 text-sm mb-4">When you consume, mapped across a week.</p>
+		@consumptionHeatmap(data.HeatmapCells)
+		@heatmapInsights(data.HeatmapCells)
 	</div>
 }
 
@@ -163,11 +171,11 @@ templ attentionTagList(title, category string, tags []core.TagDistributionEntry)
 					<div>
 						<div class="flex justify-between text-sm mb-1">
 							<span class="text-base-content/80">{ tag.Name }</span>
-							<span class="text-base-content/40 font-mono">{ formatCount(tag.Count) }</span>
+							<span class="text-base-content/40 font-mono text-xs">{ fmt.Sprintf("%d%%", tagSharePct(tag.Count, tags)) }</span>
 						</div>
 						<progress
 							class={ "progress w-full", tagProgressColor(category) }
-							value={ fmt.Sprintf("%d", tagPct(tag.Count, tags)) }
+							value={ fmt.Sprintf("%d", tagSharePct(tag.Count, tags)) }
 							max="100"
 						></progress>
 					</div>
@@ -242,11 +250,24 @@ func tagProgressColor(category string) string {
 	}
 }
 
+// tagPct returns percentage relative to the top tag (for progress bar width).
 func tagPct(count int64, tags []core.TagDistributionEntry) int {
 	if len(tags) == 0 || tags[0].Count == 0 {
 		return 0
 	}
 	return int(count * 100 / tags[0].Count)
+}
+
+// tagSharePct returns percentage of total across all tags (for label display).
+func tagSharePct(count int64, tags []core.TagDistributionEntry) int {
+	var total int64
+	for _, t := range tags {
+		total += t.Count
+	}
+	if total == 0 {
+		return 0
+	}
+	return int(count * 100 / total)
 }
 
 type platformDurationAgg struct {

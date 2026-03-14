@@ -1,0 +1,243 @@
+package components
+
+import (
+	"fmt"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// consumptionHeatmap renders the 7-day x 24-hour rhythm grid.
+templ consumptionHeatmap(cells []core.HeatmapCell) {
+	if len(cells) == 0 {
+		<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+			No consumption data for this period.
+		</div>
+	} else {
+		<div class="overflow-x-auto">
+			<div class="min-w-[640px]">
+				<!-- Hour labels row -->
+				<div class="grid gap-px" style="grid-template-columns: 56px repeat(24, 1fr)">
+					<div></div>
+					for h := 0; h < 24; h++ {
+						<div class="text-center text-[10px] text-base-content/30 font-mono pb-1.5">
+							{ formatHourLabel(h) }
+						</div>
+					}
+				</div>
+				<!-- Heatmap rows (one per day) -->
+				for d := 0; d < 7; d++ {
+					<div class="grid gap-px" style="grid-template-columns: 56px repeat(24, 1fr)">
+						<div class="flex items-center text-xs text-base-content/50 pr-2 font-medium">
+							{ dayLabel(d) }
+						</div>
+						for h := 0; h < 24; h++ {
+							@heatmapCell(d, h, cells)
+						}
+					</div>
+				}
+			</div>
+		</div>
+		<!-- Legend -->
+		<div class="flex items-center justify-end gap-2 mt-4 text-xs text-base-content/30">
+			<span>Less</span>
+			<div class="flex gap-px">
+				<div class="w-3 h-3 rounded-sm bg-base-300/30"></div>
+				<div class="w-3 h-3 rounded-sm" style="background: oklch(32% 0.04 70)"></div>
+				<div class="w-3 h-3 rounded-sm" style="background: oklch(42% 0.08 70)"></div>
+				<div class="w-3 h-3 rounded-sm" style="background: oklch(55% 0.12 70)"></div>
+				<div class="w-3 h-3 rounded-sm" style="background: oklch(68% 0.155 70)"></div>
+			</div>
+			<span>More</span>
+		</div>
+	}
+}
+
+// heatmapCell renders a single cell with intensity-based color.
+templ heatmapCell(day, hour int, cells []core.HeatmapCell) {
+	<div
+		class="aspect-square rounded-sm transition-colors cursor-default"
+		style={ heatmapCellStyle(day, hour, cells) }
+		title={ heatmapCellTitle(day, hour, cells) }
+	></div>
+}
+
+// heatmapInsights shows a summary of peak consumption patterns.
+templ heatmapInsights(cells []core.HeatmapCell) {
+	if len(cells) > 0 {
+		<div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+			@routineInsightCard("Peak hour", peakHour(cells))
+			@routineInsightCard("Most active day", peakDay(cells))
+			@routineInsightCard("Quiet window", quietWindow(cells))
+		</div>
+	}
+}
+
+templ routineInsightCard(label, value string) {
+	<div class="bg-neutral border border-base-300 rounded-box p-4">
+		<div class="text-base-content/40 text-xs uppercase tracking-wider mb-1">{ label }</div>
+		<div class="text-base-content/90 text-sm font-medium">{ value }</div>
+	</div>
+}
+
+// --- Helper functions ---
+
+// buildHeatmapGrid converts sparse cells to a 7x24 grid of counts.
+func buildHeatmapGrid(cells []core.HeatmapCell) [7][24]int64 {
+	var grid [7][24]int64
+	for _, c := range cells {
+		if c.DayOfWeek >= 0 && c.DayOfWeek < 7 && c.HourOfDay >= 0 && c.HourOfDay < 24 {
+			grid[c.DayOfWeek][c.HourOfDay] = c.Count
+		}
+	}
+	return grid
+}
+
+func heatmapMaxCount(cells []core.HeatmapCell) int64 {
+	var max int64
+	for _, c := range cells {
+		if c.Count > max {
+			max = c.Count
+		}
+	}
+	return max
+}
+
+func heatmapCellStyle(day, hour int, cells []core.HeatmapCell) string {
+	grid := buildHeatmapGrid(cells)
+	count := grid[day][hour]
+	maxCount := heatmapMaxCount(cells)
+
+	if count == 0 || maxCount == 0 {
+		return "background: oklch(18% 0.005 70)"
+	}
+
+	// Intensity 0..1 with square root scaling for better distribution
+	intensity := sqrtFloat(float64(count) / float64(maxCount))
+
+	// Interpolate from dim (L=28%, C=0.02) to warm amber (L=72%, C=0.155)
+	l := 0.28 + intensity*0.44
+	c := 0.02 + intensity*0.135
+	return fmt.Sprintf("background: oklch(%.0f%% %.3f 70)", l*100, c)
+}
+
+func heatmapCellTitle(day, hour int, cells []core.HeatmapCell) string {
+	grid := buildHeatmapGrid(cells)
+	count := grid[day][hour]
+	return fmt.Sprintf("%s %s: %d items", dayLabel(day), formatHourLabel(hour), count)
+}
+
+func sqrtFloat(x float64) float64 {
+	if x <= 0 {
+		return 0
+	}
+	guess := x
+	for range 6 {
+		guess = (guess + x/guess) / 2
+	}
+	return guess
+}
+
+func formatHourLabel(h int) string {
+	switch {
+	case h == 0:
+		return "12a"
+	case h < 12:
+		return fmt.Sprintf("%da", h)
+	case h == 12:
+		return "12p"
+	default:
+		return fmt.Sprintf("%dp", h-12)
+	}
+}
+
+func dayLabel(d int) string {
+	days := [7]string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+	if d >= 0 && d < 7 {
+		return days[d]
+	}
+	return ""
+}
+
+func peakHour(cells []core.HeatmapCell) string {
+	hourTotals := [24]int64{}
+	for _, c := range cells {
+		if c.HourOfDay >= 0 && c.HourOfDay < 24 {
+			hourTotals[c.HourOfDay] += c.Count
+		}
+	}
+	maxH, maxV := 0, int64(0)
+	for h, v := range hourTotals {
+		if v > maxV {
+			maxH = h
+			maxV = v
+		}
+	}
+	return fmt.Sprintf("%s (%d items)", formatHourFull(maxH), maxV)
+}
+
+func peakDay(cells []core.HeatmapCell) string {
+	dayTotals := [7]int64{}
+	for _, c := range cells {
+		if c.DayOfWeek >= 0 && c.DayOfWeek < 7 {
+			dayTotals[c.DayOfWeek] += c.Count
+		}
+	}
+	maxD, maxV := 0, int64(0)
+	for d, v := range dayTotals {
+		if v > maxV {
+			maxD = d
+			maxV = v
+		}
+	}
+	fullDays := [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	return fmt.Sprintf("%s (%d items)", fullDays[maxD], maxV)
+}
+
+func quietWindow(cells []core.HeatmapCell) string {
+	hourTotals := [24]int64{}
+	for _, c := range cells {
+		if c.HourOfDay >= 0 && c.HourOfDay < 24 {
+			hourTotals[c.HourOfDay] += c.Count
+		}
+	}
+	minH, minLen := 0, 0
+	curStart, curLen := -1, 0
+	for h := 0; h < 48; h++ {
+		idx := h % 24
+		if hourTotals[idx] == 0 {
+			if curStart == -1 {
+				curStart = h
+			}
+			curLen++
+		} else {
+			if curLen > minLen {
+				minH = curStart % 24
+				minLen = curLen
+			}
+			curStart = -1
+			curLen = 0
+		}
+	}
+	if curLen > minLen {
+		minH = curStart % 24
+		minLen = curLen
+	}
+	if minLen == 0 {
+		return "No quiet period found"
+	}
+	endH := (minH + minLen) % 24
+	return fmt.Sprintf("%s\u2013%s", formatHourFull(minH), formatHourFull(endH))
+}
+
+func formatHourFull(h int) string {
+	switch {
+	case h == 0:
+		return "12 AM"
+	case h < 12:
+		return fmt.Sprintf("%d AM", h)
+	case h == 12:
+		return "12 PM"
+	default:
+		return fmt.Sprintf("%d PM", h-12)
+	}
+}

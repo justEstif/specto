@@ -249,6 +249,7 @@ func main() {
 			r.Get("/insights/on-this-day", h.OnThisDay)
 			r.Get("/insights/attention-by-type", h.InsightsAttentionByType)
 			r.Get("/insights/tags-by-category", h.InsightsTagsByCategory)
+			r.Get("/insights/heatmap", h.InsightsHeatmap)
 
 			// Share profile
 			r.Route("/share-profile", func(r chi.Router) {

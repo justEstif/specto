@@ -56,6 +56,10 @@ func (m *mockInsightsStore) AttentionByType(_ context.Context, _ uuid.UUID, _, _
 	return nil, nil
 }
 
+func (m *mockInsightsStore) ConsumptionHeatmap(_ context.Context, _ uuid.UUID, _, _ time.Time, _ core.InsightsFilter) ([]core.HeatmapCell, error) {
+	return nil, nil
+}
+
 func newInsightsTestHandler(insightsStore core.InsightsStore) *handlers.Handler {
 	insights := core.NewInsightsService(insightsStore)
 	application := &app.App{Insights: insights}

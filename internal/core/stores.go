@@ -204,6 +204,10 @@ type InsightsStore interface {
 	// AttentionByType returns consumption counts and time breakdowns
 	// grouped by media type, optionally filtered by platform.
 	AttentionByType(ctx context.Context, userID uuid.UUID, from, to time.Time, platform *string) ([]AttentionByTypeEntry, error)
+
+	// ConsumptionHeatmap returns consumption counts grouped by day-of-week
+	// (0=Sun..6=Sat) and hour-of-day (0..23) for a rhythm heatmap.
+	ConsumptionHeatmap(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]HeatmapCell, error)
 }
 
 // --- Domain types used by store interfaces ---
@@ -410,4 +414,12 @@ type AttentionByTypeEntry struct {
 	Count            int64
 	TotalTimeSpent   int64 // seconds of actual engagement
 	TotalDurationSec int64 // seconds of content duration
+}
+
+// HeatmapCell represents a single cell in the day-of-week × hour-of-day
+// consumption heatmap.
+type HeatmapCell struct {
+	DayOfWeek int // 0=Sun, 1=Mon, ..., 6=Sat
+	HourOfDay int // 0..23
+	Count     int64
 }
