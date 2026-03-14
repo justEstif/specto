@@ -6,142 +6,306 @@
   <title>Specto — Know What You Consume</title>
   <meta name="description" content="Personal media consumption dashboard. Aggregates your Spotify, YouTube, Netflix history into one unified view with insights and shareable profiles.">
   <link rel="stylesheet" href="https://unpkg.com/missing.css@1.2.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,400;0,500;1,400&display=swap">
   <style>
     :root {
-      --accent: #7c3aed;
-      --main-font: system-ui, -apple-system, sans-serif;
+      --accent: oklch(0.55 0.18 280);
+      --muted-accent: oklch(0.72 0.10 280);
+      --bg: light-dark(oklch(0.985 0.005 280), oklch(0.15 0.02 280));
+      --fg: light-dark(oklch(0.22 0.02 280), oklch(0.90 0.01 280));
+      --muted-fg: light-dark(oklch(0.50 0.02 280), oklch(0.60 0.02 280));
+      --graphical-fg: light-dark(oklch(0.82 0.03 280), oklch(0.30 0.03 280));
+      --box-bg: light-dark(oklch(0.97 0.008 280), oklch(0.19 0.02 280));
+      --main-font: "DM Sans", system-ui, sans-serif;
+      --display-font: "DM Serif Display", Georgia, serif;
+      --line-length: 62rem;
     }
-    header.hero {
-      padding-block: 4rem 2rem;
-      text-align: center;
+
+    /* — Hero — */
+    .hero {
+      padding: clamp(3rem, 10vw, 7rem) 0 clamp(2rem, 6vw, 4rem);
+      border-block-end: 1px solid var(--graphical-fg);
     }
-    header.hero p {
-      max-width: 38rem;
-      margin-inline: auto;
+    .hero h1 {
+      font-family: var(--display-font);
+      font-size: clamp(3rem, 8vw, 5.5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin-block-end: 0;
     }
-    .feature-grid {
-      --col-width: 18rem;
+    .hero h1 span {
+      display: block;
+      font-family: var(--main-font);
+      font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+      font-weight: 400;
+      letter-spacing: 0;
+      line-height: 1.5;
+      color: var(--muted-fg);
+      margin-block-start: 1.25rem;
+      max-width: 34rem;
     }
-    .platform-list {
-      list-style: none;
-      padding: 0;
+    .hero nav {
+      margin-block-start: 2rem;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .hero nav a:first-child {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    /* — Sections — */
+    section {
+      padding-block: clamp(2.5rem, 6vw, 4rem);
+      border-block-end: 1px solid var(--graphical-fg);
+    }
+    section:last-child {
+      border-block-end: none;
+    }
+    section > h2 {
+      font-family: var(--display-font);
+      font-weight: 400;
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      letter-spacing: -0.01em;
+      margin-block-end: 1.5rem;
+    }
+
+    /* — Features as definition list — */
+    .features {
+      --col-width: 26ch;
+    }
+    .features dt {
+      font-weight: 500;
+      margin-block-end: 0.15rem;
+    }
+    .features dt::before {
+      content: "";
+      display: block;
+      width: 1.5rem;
+      height: 2px;
+      background: var(--accent);
+      margin-block-end: 0.5rem;
+    }
+    .features dd {
+      margin-inline-start: 0;
+      color: var(--muted-fg);
+    }
+
+    /* — Platforms — */
+    .platforms {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      justify-content: center;
+      gap: 0.4rem;
+      list-style: none;
+      padding: 0;
+      margin-block-start: 1rem;
     }
-    .platform-list li {
-      padding: 0.35rem 0.75rem;
-      border: 1px solid var(--muted-fg);
-      border-radius: 2rem;
-      font-size: 0.875rem;
+    .platforms li {
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
+    .platforms li:not(:last-child)::after {
+      content: "·";
+      margin-inline-start: 0.4rem;
+      color: var(--graphical-fg);
+    }
+
+    /* — Steps — */
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+    }
+    .steps li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 2.5rem 1fr;
+      gap: 0.25rem;
+      align-items: baseline;
+      padding-block: 0.6rem;
+      border-block-end: 1px solid var(--graphical-fg);
+    }
+    .steps li:last-child {
+      border-block-end: none;
+    }
+    .steps li::before {
+      content: counter(step);
+      font-family: var(--display-font);
+      font-size: 1.3rem;
+      color: var(--accent);
+    }
+    .steps strong {
+      font-weight: 500;
+    }
+
+    /* — Code — */
+    pre {
+      font-size: 0.85rem;
+      max-width: 40rem;
+    }
+
+    /* — Stack — */
+    .stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 1.5rem;
+      list-style: none;
+      padding: 0;
+      color: var(--muted-fg);
+    }
+    .stack li strong {
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    /* — Two-col layout — */
+    .split {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    @media (min-width: 48rem) {
+      .split {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* — Footer — */
     footer {
-      text-align: center;
-      padding-block: 2rem;
+      padding-block: 2.5rem;
+      color: var(--muted-fg);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    footer a {
+      color: var(--muted-fg);
+    }
+
+    /* — Entrance — */
+    @media (prefers-reduced-motion: no-preference) {
+      .hero h1, .hero h1 span, .hero nav {
+        animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      .hero h1 span { animation-delay: 0.08s; }
+      .hero nav { animation-delay: 0.15s; }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(1.2rem); }
+      }
     }
   </style>
 </head>
 <body>
 
 <header class="hero">
-  <h1>Specto</h1>
-  <p class="<big>">
-    Your digital life is fragmented across dozens of platforms. Specto pulls it
-    all together &mdash; one dashboard for everything you watch, listen to, and read.
-  </p>
-  <nav role="toolbar" style="justify-content: center; margin-top: 1.5rem;">
-    <a href="https://github.com/justestif/specto" class="<button>">GitHub</a>
-    <a href="self-hosting.md" class="<button>">Self-Host</a>
+  <h1>
+    Specto
+    <span>
+      Your digital life is fragmented across dozens of platforms.
+      One dashboard for everything you watch, listen to, and read.
+    </span>
+  </h1>
+  <nav>
+    <a href="https://github.com/justEstif/specto/blob/main/docs/self-hosting.md" class="<button>">Self-Host Guide</a>
+    <a href="https://github.com/justestif/specto" class="<button>">Source on GitHub</a>
   </nav>
 </header>
 
 <main>
 
   <section>
-    <h2 class="text-align:center">What It Does</h2>
-    <div class="grid feature-grid">
-      <div class="box">
-        <strong class="titlebar">Unified Media Feed</strong>
-        <p>Pull consumption history from Spotify, YouTube, Netflix and more into a single timeline.</p>
+    <h2>What it does</h2>
+    <dl class="features textcolumns">
+      <div>
+        <dt>Unified media feed</dt>
+        <dd>Pull listening, watching, and reading history from every platform into a single timeline.</dd>
       </div>
-      <div class="box">
-        <strong class="titlebar">Auto-Tagging</strong>
-        <p>Content is classified by topic, genre, and mood using platform APIs and LLM enrichment.</p>
+      <div>
+        <dt>Automatic tagging</dt>
+        <dd>Content is classified by topic, genre, and mood using platform APIs and LLM enrichment.</dd>
       </div>
-      <div class="box">
-        <strong class="titlebar">Consumption Insights</strong>
-        <p>See time spent, topic distribution, platform breakdown, and trends over time.</p>
+      <div>
+        <dt>Consumption insights</dt>
+        <dd>Time spent, topic distribution, platform breakdown, and trends &mdash; all at a glance.</dd>
       </div>
-      <div class="box">
-        <strong class="titlebar">Shareable Profiles</strong>
-        <p>Generate a public page of your media diet &mdash; like Spotify Wrapped, but for everything.</p>
+      <div>
+        <dt>Shareable profiles</dt>
+        <dd>Publish a curated summary of your media diet. Like Spotify Wrapped, but for everything.</dd>
       </div>
+    </dl>
+  </section>
+
+  <section class="split">
+    <div>
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><strong>Connect</strong> platforms via OAuth or file upload</li>
+        <li><strong>Sync</strong> pulls history into a normalized schema</li>
+        <li><strong>Enrich</strong> auto-tags via Last.fm, TMDB, AniList, LLMs</li>
+        <li><strong>Explore</strong> consumption through the insights dashboard</li>
+        <li><strong>Share</strong> a public profile of your media diet</li>
+      </ol>
+    </div>
+    <div>
+      <h2>Self-host in minutes</h2>
+      <pre><code>git clone https://github.com/justestif/specto
+cd specto
+docker-compose up -d
+mise install &amp;&amp; mise run setup
+mise run build
+./bin/app</code></pre>
+      <p>
+        Full configuration in the
+        <a href="https://github.com/justEstif/specto/blob/main/docs/self-hosting.md">self-hosting guide</a> &mdash;
+        env vars, OAuth, reverse proxy.
+      </p>
     </div>
   </section>
 
   <section>
-    <h2 class="text-align:center">Supported Platforms</h2>
-    <p class="text-align:center">Connect via OAuth or file import. Each platform is a plugin &mdash; disable what you don't use.</p>
-    <ul class="platform-list">
+    <h2>Platforms</h2>
+    <p>Connect via OAuth or file import. Each source is a plugin &mdash; enable only what you use.</p>
+    <ul class="platforms">
       <li>Spotify</li>
       <li>YouTube</li>
       <li>Netflix</li>
       <li>Prime Video</li>
       <li>TikTok</li>
       <li>Podcasts</li>
-      <li>RSS / Blogs</li>
+      <li>RSS &amp; Blogs</li>
     </ul>
   </section>
 
   <section>
-    <h2 class="text-align:center">Tech Stack</h2>
-    <div class="text-align:center">
-      <p>
-        Go + Chi &middot; PostgreSQL + sqlc &middot; Templ + HTMX &middot;
-        DaisyUI + Tailwind CSS
-      </p>
-      <p>
-        No JavaScript framework. No build step for the frontend.
-        Server-rendered HTML with progressive enhancement.
-      </p>
-    </div>
-  </section>
-
-  <section>
-    <h2 class="text-align:center">Self-Host in Minutes</h2>
-    <pre><code>git clone https://github.com/justestif/specto
-cd specto
-docker-compose up -d
-mise install && mise run setup
-mise run build
-./bin/app</code></pre>
-    <p class="text-align:center">
-      See the <a href="self-hosting.md">self-hosting guide</a> for full
-      configuration (env vars, OAuth setup, reverse proxy).
+    <h2>Built with</h2>
+    <ul class="stack">
+      <li><strong>Go</strong> + Chi</li>
+      <li><strong>PostgreSQL</strong> + sqlc</li>
+      <li><strong>Templ</strong> + HTMX</li>
+      <li><strong>DaisyUI</strong> + Tailwind</li>
+    </ul>
+    <p class="crowded" style="color: var(--muted-fg)">
+      Server-rendered HTML. No JS framework. No frontend build step.
     </p>
-  </section>
-
-  <section>
-    <h2 class="text-align:center">How It Works</h2>
-    <ol>
-      <li><strong>Connect</strong> your platforms via OAuth or upload an export file</li>
-      <li><strong>Sync</strong> pulls your history into a normalized schema</li>
-      <li><strong>Enrich</strong> auto-tags content using Last.fm, TMDB, AniList, and LLMs</li>
-      <li><strong>Explore</strong> your consumption through the insights dashboard</li>
-      <li><strong>Share</strong> a curated public profile of your media diet</li>
-    </ol>
   </section>
 
 </main>
 
 <footer>
-  <p>
+  <span>MIT License</span>
+  <nav>
     <a href="https://github.com/justestif/specto">Source</a> &middot;
-    <a href="self-hosting.md">Self-Hosting</a> &middot;
-    <a href="api-key-setup.md">API Keys</a>
-  </p>
-  <p><small>MIT License</small></p>
+    <a href="https://github.com/justEstif/specto/blob/main/docs/self-hosting.md">Self-Hosting</a> &middot;
+    <a href="https://github.com/justEstif/specto/blob/main/docs/api-key-setup.md">API Keys</a>
+  </nav>
 </footer>
 
 </body>
