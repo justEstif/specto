@@ -1,11 +1,11 @@
 ---
 # project-media-consumption-analysis-iq3r
 title: Onboarding & Plugins Page Redesign Plan
-status: in-progress
+status: completed
 type: epic
 priority: normal
 created_at: 2026-03-14T22:06:38Z
-updated_at: 2026-03-14T22:15:15Z
+updated_at: 2026-03-14T22:37:28Z
 ---
 
 UX research-backed plan for improving the new user onboarding experience and plugins connection page to motivate users to connect their services and import data.
@@ -422,3 +422,10 @@ Position: Top of dashboard, above filters. Uses `collapse` component (collapsibl
 | ------- | ------------ | ------- | --------------------------------- |
 | `users` | `onboarded`  | `bool`  | Skip welcome flow on repeat login |
 | `users` | `media_pref` | `text`  | Preferred media type (optional)   |
+
+## Summary of Changes
+
+Completed 3 of 5 planned features, scrapped 2 as unnecessary:
+- Plugin cards: one-line descriptions, time estimates on export guides, no more duplicate listings
+- Empty states: actionable links to /plugins across all pages
+- Onboarding: first-login redirect to /plugins with DaisyUI alert welcome banner, auto-dismissed after first connect/import
