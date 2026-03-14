@@ -8,13 +8,37 @@ import (
 	"github.com/justestif/specto/internal/core"
 )
 
+// TimelineTab identifies which timeline sub-page is active.
+type TimelineTab string
+
+const (
+	TimelineTabOverview  TimelineTab = "overview"
+	TimelineTabActivity  TimelineTab = "activity"
+)
+
 // TimelinePageData holds the data for the full timeline page.
 type TimelinePageData struct {
 	User      *core.UserInfo
+	ActiveTab TimelineTab
+	// Activity tab data
 	Items     []core.MediaItem
 	Filters   TimelineFilters
 	HasMore   bool
 	Platforms []string
+	// Overview tab data
+	Scorecard *ScorecardData
+}
+
+// ScorecardData holds the aggregated consumption summary for the overview tab.
+type ScorecardData struct {
+	TotalItems      int64
+	TotalHours      float64
+	PlatformCount   int
+	MediaTypeCount  int
+	TopGenres       []core.TagDistributionEntry
+	TopMoods        []core.TagDistributionEntry
+	TopTopics       []core.TagDistributionEntry
+	Spikes          []core.TopicSpikeEntry
 }
 
 // TimelineFilters holds the active filter state.
@@ -26,17 +50,42 @@ type TimelineFilters struct {
 	Limit    int
 }
 
-// TimelinePage renders the full timeline page with filters and items.
+func timelineTabDefs() []Tab {
+	return []Tab{
+		{Label: "Overview", Value: string(TimelineTabOverview), Href: "/timeline", PartialURL: "/partials/timeline/overview"},
+		{Label: "Activity", Value: string(TimelineTabActivity), Href: "/timeline/activity", PartialURL: "/partials/timeline/activity"},
+	}
+}
+
+// TimelinePage renders the full timeline page with tab navigation.
 templ TimelinePage(data TimelinePageData) {
 	@Layout("Timeline — Specto", data.User) {
-		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-6">Timeline</h1>
-		<!-- Filters -->
-		@timelineFilters(data.Filters, data.Platforms)
-		<!-- Items -->
-		<div id="timeline-items">
-			@TimelineItems(data.Items, data.Filters, data.HasMore)
+		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-2">Timeline</h1>
+		<div id="timeline-content">
+			@TimelineTabContent(data)
 		</div>
 	}
+}
+
+// TimelineTabContent renders tabs + the active tab's content.
+// This is the HTMX swap target so that tab switches re-render everything.
+templ TimelineTabContent(data TimelinePageData) {
+	@TabBar(timelineTabDefs(), string(data.ActiveTab), "#timeline-content")
+	<div class="mt-8">
+		switch data.ActiveTab {
+			case TimelineTabActivity:
+				@timelineFilters(data.Filters, data.Platforms)
+				<div id="timeline-items">
+					@TimelineItems(data.Items, data.Filters, data.HasMore)
+				</div>
+			default:
+				if data.Scorecard != nil {
+					@timelineScorecard(*data.Scorecard)
+				} else {
+					@timelineScorecardEmpty()
+				}
+		}
+	</div>
 }
 
 // timelineFilters renders the filter bar.
@@ -174,6 +223,175 @@ templ timelineDetailRow(item core.MediaItem) {
 			</div>
 		</div>
 	</div>
+}
+
+// timelineScorecard renders the consumption overview — an editorial digest
+// of what the user has been consuming over the last 90 days.
+templ timelineScorecard(s ScorecardData) {
+	<div class="space-y-10">
+		<!-- Lead stat — the single most impactful number, not a grid of 4 -->
+		<div class="animate-fade-in-up">
+			<div class="flex items-baseline gap-3 flex-wrap">
+				<span class="text-display text-5xl sm:text-6xl font-bold tracking-tight text-base-content">
+					{ formatCount(s.TotalItems) }
+				</span>
+				<span class="text-base-content/40 text-lg">
+					if s.TotalItems == 1 {
+						item
+					} else {
+						items
+					}
+					across { fmt.Sprintf("%d", s.PlatformCount) }
+					if s.PlatformCount == 1 {
+						platform
+					} else {
+						platforms
+					}
+				</span>
+			</div>
+			if s.TotalHours > 0 {
+				<p class="text-base-content/50 mt-1">
+					<span class="font-mono text-sm">{ formatDurationHoursMinutes(s.TotalHours) }</span>
+					of content in the last 90 days
+				</p>
+			}
+		</div>
+		<!-- Taste profile — genres with visual weight via bar widths -->
+		if len(s.TopGenres) > 0 {
+			<div class="animate-fade-in-up" style="animation-delay: 0.08s">
+				<h3 class="text-xs text-base-content/40 uppercase tracking-wider mb-3">What you're into</h3>
+				<div class="space-y-2.5">
+					for i, tag := range s.TopGenres {
+						@scorecardTagBar(tag, s.TopGenres[0].Count, i)
+					}
+				</div>
+			</div>
+		}
+		<!-- Mood + topics — compact, side by side, secondary emphasis -->
+		if len(s.TopMoods) > 0 || len(s.TopTopics) > 0 {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-8 animate-fade-in-up" style="animation-delay: 0.16s">
+				if len(s.TopMoods) > 0 {
+					<div>
+						<h3 class="text-xs text-base-content/40 uppercase tracking-wider mb-3">Mood</h3>
+						<div class="flex flex-wrap gap-2">
+							for _, tag := range s.TopMoods {
+								<span class="text-sm text-base-content/70">{ tag.Name }</span>
+								if tag.Name != s.TopMoods[len(s.TopMoods)-1].Name {
+									<span class="text-base-content/20">/</span>
+								}
+							}
+						</div>
+					</div>
+				}
+				if len(s.TopTopics) > 0 {
+					<div>
+						<h3 class="text-xs text-base-content/40 uppercase tracking-wider mb-3">Topics</h3>
+						<div class="flex flex-wrap gap-2">
+							for _, tag := range s.TopTopics {
+								<span class="text-sm text-base-content/70">{ tag.Name }</span>
+								if tag.Name != s.TopTopics[len(s.TopTopics)-1].Name {
+									<span class="text-base-content/20">/</span>
+								}
+							}
+						</div>
+					</div>
+				}
+			</div>
+		}
+		<!-- Trending — only shown when spikes exist, presented as a callout -->
+		if len(s.Spikes) > 0 {
+			<div class="animate-fade-in-up" style="animation-delay: 0.24s">
+				<h3 class="text-xs text-base-content/40 uppercase tracking-wider mb-3">Lately</h3>
+				<div class="border-l-2 border-primary/40 pl-4 space-y-1.5">
+					for _, spike := range s.Spikes {
+						<div class="flex items-baseline gap-2">
+							<span class="text-sm text-base-content/80">{ spike.Name }</span>
+							if spike.TotalCount > 0 && spike.RecentCount > 0 {
+								<span class="text-xs font-mono text-primary/70">{ formatSpikePercent(spike) }</span>
+							}
+						</div>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+// scorecardTagBar renders a genre tag with a proportional horizontal bar.
+templ scorecardTagBar(tag core.TagDistributionEntry, maxCount int64, index int) {
+	<div class="flex items-center gap-3">
+		<span class="text-sm text-base-content/70 w-24 sm:w-28 shrink-0 text-right tabular-nums">
+			{ tag.Name }
+		</span>
+		<div class="flex-1 h-2 bg-base-300/50 rounded-sm overflow-hidden">
+			<div
+				class={ "h-full rounded-sm", tagBarColor(index) }
+				style={ fmt.Sprintf("width: %d%%", tagBarPercent(tag.Count, maxCount)) }
+			></div>
+		</div>
+		<span class="text-xs text-base-content/30 font-mono w-8 tabular-nums">
+			{ formatCount(tag.Count) }
+		</span>
+	</div>
+}
+
+templ timelineScorecardEmpty() {
+	<div class="py-16 text-center">
+		<p class="text-display text-2xl font-semibold text-base-content/30 mb-2">Nothing here yet</p>
+		<p class="text-sm text-base-content/40">
+			<a href="/plugins" class="text-primary hover:text-primary/80 transition-colors">Connect a plugin</a> and sync your history to see your overview.
+		</p>
+	</div>
+}
+
+func tagBarColor(index int) string {
+	// Gradient from primary to accent to secondary for visual variety.
+	switch index {
+	case 0:
+		return "bg-primary"
+	case 1:
+		return "bg-primary/60"
+	default:
+		return "bg-primary/35"
+	}
+}
+
+func tagBarPercent(count, maxCount int64) int {
+	if maxCount == 0 {
+		return 0
+	}
+	pct := int(float64(count) / float64(maxCount) * 100)
+	if pct < 4 {
+		return 4 // minimum visible width
+	}
+	return pct
+}
+
+func formatDurationHoursMinutes(hours float64) string {
+	h := int(hours)
+	m := int((hours - float64(h)) * 60)
+	if h == 0 {
+		return fmt.Sprintf("%dm", m)
+	}
+	if m == 0 {
+		return fmt.Sprintf("%dh", h)
+	}
+	return fmt.Sprintf("%dh %dm", h, m)
+}
+
+func formatSpikePercent(spike core.TopicSpikeEntry) string {
+	if spike.TotalCount == 0 || spike.RecentCount == 0 {
+		return ""
+	}
+	avg := float64(spike.TotalCount-spike.RecentCount) / 3.0
+	if avg <= 0 {
+		return "new"
+	}
+	pct := (float64(spike.RecentCount)/avg - 1) * 100
+	if pct > 0 {
+		return fmt.Sprintf("+%.0f%%", pct)
+	}
+	return ""
 }
 
 // --- Helper types and functions ---

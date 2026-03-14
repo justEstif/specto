@@ -3,8 +3,9 @@
 title: Revenue model exploration
 status: todo
 type: task
+priority: low
 created_at: 2026-03-14T20:16:55Z
-updated_at: 2026-03-14T20:16:55Z
+updated_at: 2026-03-14T23:25:29Z
 parent: project-media-consumption-analysis-zhyz
 ---
 

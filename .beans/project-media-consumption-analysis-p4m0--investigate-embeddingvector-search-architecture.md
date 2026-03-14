@@ -3,8 +3,9 @@
 title: Investigate embedding/vector search architecture
 status: todo
 type: task
+priority: low
 created_at: 2026-03-14T20:16:52Z
-updated_at: 2026-03-14T20:16:52Z
+updated_at: 2026-03-14T23:25:29Z
 parent: project-media-consumption-analysis-zhyz
 ---
 

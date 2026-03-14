@@ -188,6 +188,7 @@ func main() {
 		r.Use(customMiddleware.RequireAuth(application.Auth))
 
 		r.Get("/timeline", h.TimelinePage)
+		r.Get("/timeline/{tab}", h.TimelinePage)
 		r.Get("/insights", h.InsightsPageHandler)
 		r.Get("/insights/{tab}", h.InsightsPageHandler)
 		// Legacy redirect: /attention → /insights
@@ -208,6 +209,7 @@ func main() {
 		r.Get("/partials/dashboard", h.DashboardPartial)
 		r.Get("/partials/activity-chart", h.ActivityChartPartial)
 		r.Get("/partials/timeline", h.RecentItemsPartial)
+		r.Get("/partials/timeline/{tab}", h.TimelineTabPartial)
 		r.Get("/partials/timeline-page", h.TimelinePagePartial)
 		r.Get("/partials/settings/{tab}", h.SettingsPartial)
 		r.Get("/partials/on-this-day", h.OnThisDayPartial)

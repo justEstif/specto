@@ -1,0 +1,33 @@
+package components
+
+// Tab defines a single tab in a TabBar.
+type Tab struct {
+	Label      string // Display text
+	Value      string // Identifier for active comparison
+	Href       string // Clean URL for progressive enhancement
+	PartialURL string // HTMX partial endpoint
+}
+
+// TabBar renders a generic tab bar using DaisyUI tabs-box styling.
+// targetID is the CSS selector for the HTMX swap target (e.g. "#insights-content").
+templ TabBar(tabs []Tab, active string, targetID string) {
+	<div role="tablist" class="tabs tabs-box bg-base-200">
+		for _, t := range tabs {
+			@tabLink(t, active, targetID)
+		}
+	</div>
+}
+
+templ tabLink(t Tab, active string, targetID string) {
+	<a
+		role="tab"
+		href={ templ.SafeURL(t.Href) }
+		class={ "tab", templ.KV("tab-active", t.Value == active) }
+		hx-get={ t.PartialURL }
+		hx-target={ targetID }
+		hx-swap="innerHTML"
+		hx-push-url={ t.Href }
+	>
+		{ t.Label }
+	</a>
+}
