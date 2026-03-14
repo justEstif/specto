@@ -109,3 +109,7 @@ func (s *PgUserStore) UpdateProfile(ctx context.Context, id uuid.UUID, displayNa
 	info := userFromDB(row)
 	return &info, nil
 }
+
+func (s *PgUserStore) MarkOnboarded(ctx context.Context, id uuid.UUID) error {
+	return s.q.MarkUserOnboarded(ctx, uuidToPgx(id))
+}

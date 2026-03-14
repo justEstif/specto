@@ -186,6 +186,7 @@ func userFromDB(u database.User) core.UserInfo {
 		AuthSubject:  u.AuthSubject,
 		ProfileSlug:  ptrFromText(u.ProfileSlug),
 		PasswordHash: ptrFromText(u.PasswordHash),
+		Onboarded:    u.Onboarded,
 		CreatedAt:    u.CreatedAt.Time,
 		UpdatedAt:    u.UpdatedAt.Time,
 	}

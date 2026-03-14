@@ -26,6 +26,7 @@ func newTestHandler(registry *core.PluginRegistry, pluginStates core.PluginState
 		Registry:     registry,
 		PluginStates: pluginStates,
 		SyncLogs:     syncLogs,
+		Users:        noopUserStore{},
 	}
 	return handlers.New(application)
 }
@@ -38,6 +39,7 @@ func newTestHandlerWithOAuth(registry *core.PluginRegistry, pluginStates core.Pl
 		OAuth:        oauthSvc,
 		Registry:     registry,
 		PluginStates: pluginStates,
+		Users:        noopUserStore{},
 	}
 	return handlers.New(application)
 }
@@ -87,6 +89,31 @@ func (m *mockPlugin) Enrich(_ context.Context, _ core.Credentials, items []core.
 }
 
 var _ core.SourcePlugin = (*mockPlugin)(nil)
+
+// --- noop user store (satisfies core.UserStore for tests that don't care about users) ---
+
+type noopUserStore struct{}
+
+func (noopUserStore) GetByID(_ context.Context, _ uuid.UUID) (*core.UserInfo, error) { return nil, nil }
+func (noopUserStore) GetByEmail(_ context.Context, _ string) (*core.UserInfo, error) { return nil, nil }
+func (noopUserStore) GetByProfileSlug(_ context.Context, _ string) (*core.UserInfo, error) {
+	return nil, nil
+}
+func (noopUserStore) GetByAuth(_ context.Context, _, _ string) (*core.UserInfo, error) {
+	return nil, nil
+}
+func (noopUserStore) Create(_ context.Context, _, _ string, _ *string, _, _ string) (*core.UserInfo, error) {
+	return nil, nil
+}
+func (noopUserStore) CreateWithPassword(_ context.Context, _, _, _ string) (*core.UserInfo, error) {
+	return nil, nil
+}
+func (noopUserStore) UpdateProfile(_ context.Context, _ uuid.UUID, _ string, _, _ *string) (*core.UserInfo, error) {
+	return nil, nil
+}
+func (noopUserStore) MarkOnboarded(_ context.Context, _ uuid.UUID) error { return nil }
+
+var _ core.UserStore = noopUserStore{}
 
 // --- mock plugin state store ---
 

@@ -17,6 +17,11 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 		components.Home(nil).Render(r.Context(), w)
 		return
 	}
+	// Redirect new users to the plugins page on first login.
+	if !user.Onboarded {
+		http.Redirect(w, r, "/plugins", http.StatusSeeOther)
+		return
+	}
 	filters := parseDashboardFilters(r)
 	h.renderDashboard(w, r, user, filters, false)
 }

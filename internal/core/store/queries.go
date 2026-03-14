@@ -51,6 +51,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg database.CreateUserParams) (database.User, error)
 	CreateUserWithPassword(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)
 	UpdateUserProfile(ctx context.Context, arg database.UpdateUserProfileParams) (database.User, error)
+	MarkUserOnboarded(ctx context.Context, id pgtype.UUID) error
 
 	// Tags
 	GetOrCreateTag(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error)

@@ -21,16 +21,28 @@ type PluginViewData struct {
 
 // PluginsPageData holds the data for the plugins management page.
 type PluginsPageData struct {
-	User      *core.UserInfo
-	Connected []PluginViewData
-	Available []PluginViewData
-	CSRFToken string
+	User        *core.UserInfo
+	Connected   []PluginViewData
+	Available   []PluginViewData
+	CSRFToken   string
+	ShowWelcome bool // true for users who haven't onboarded yet
 }
 
 // PluginsPage renders the plugin management page.
 templ PluginsPage(data PluginsPageData) {
 	@Layout("Plugins — Specto", data.User) {
 		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-8">Plugins</h1>
+		if data.ShowWelcome {
+			<div role="alert" class="alert mb-8">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info h-6 w-6 shrink-0">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+				</svg>
+				<div>
+					<h3 class="font-semibold">Welcome to Specto</h3>
+					<div class="text-sm text-base-content/70">Connect a source below to start tracking your media consumption.</div>
+				</div>
+			</div>
+		}
 		<!-- Connected plugins -->
 		<div class="mb-10">
 			<h2 class="text-display text-xl font-semibold mb-4">Connected</h2>

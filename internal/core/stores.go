@@ -162,6 +162,9 @@ type UserStore interface {
 
 	// UpdateProfile updates a user's display name, avatar, and profile slug.
 	UpdateProfile(ctx context.Context, id uuid.UUID, displayName string, avatarURL, profileSlug *string) (*UserInfo, error)
+
+	// MarkOnboarded sets the user's onboarded flag to true.
+	MarkOnboarded(ctx context.Context, id uuid.UUID) error
 }
 
 // InsightsFilter holds optional filters for insights queries.
@@ -329,6 +332,7 @@ type UserInfo struct {
 	AuthSubject  string
 	ProfileSlug  *string
 	PasswordHash *string
+	Onboarded    bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

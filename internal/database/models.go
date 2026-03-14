@@ -112,4 +112,5 @@ type User struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	PasswordHash pgtype.Text        `json:"password_hash"`
+	Onboarded    bool               `json:"onboarded"`
 }

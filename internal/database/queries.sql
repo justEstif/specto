@@ -25,6 +25,10 @@ UPDATE users SET display_name = $2, avatar_url = $3, profile_slug = $4, updated_
 WHERE id = $1
 RETURNING *;
 
+-- name: MarkUserOnboarded :exec
+UPDATE users SET onboarded = true, updated_at = now()
+WHERE id = $1;
+
 -- name: GetPluginState :one
 SELECT * FROM plugin_states WHERE user_id = $1 AND plugin = $2;
 

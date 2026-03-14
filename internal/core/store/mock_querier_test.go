@@ -239,6 +239,10 @@ func (m *mockQuerier) UpdateUserProfile(ctx context.Context, arg database.Update
 	return database.User{}, fmt.Errorf("UpdateUserProfile not mocked")
 }
 
+func (m *mockQuerier) MarkUserOnboarded(_ context.Context, _ pgtype.UUID) error {
+	return nil
+}
+
 func (m *mockQuerier) GetOrCreateTag(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error) {
 	if m.getOrCreateTagFn != nil {
 		return m.getOrCreateTagFn(ctx, arg)

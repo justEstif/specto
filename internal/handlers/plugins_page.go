@@ -48,10 +48,11 @@ func (h *Handler) PluginsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := components.PluginsPageData{
-		User:      user,
-		Connected: connected,
-		Available: available,
-		CSRFToken: csrf.Token(r),
+		User:        user,
+		Connected:   connected,
+		Available:   available,
+		CSRFToken:   csrf.Token(r),
+		ShowWelcome: !user.Onboarded,
 	}
 	components.PluginsPage(data).Render(r.Context(), w)
 }

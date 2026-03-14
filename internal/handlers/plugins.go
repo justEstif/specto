@@ -193,6 +193,11 @@ func (h *Handler) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Mark user as onboarded after first successful connection.
+	if !pc.User.Onboarded {
+		_ = h.App.Users.MarkOnboarded(r.Context(), pc.User.ID)
+	}
+
 	// Redirect back to the plugins page after successful OAuth connection.
 	http.Redirect(w, r, "/plugins", http.StatusSeeOther)
 }
@@ -241,6 +246,11 @@ func (h *Handler) ImportPlugin(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusInternalServerError, "internal_error", fmt.Sprintf("Import failed: %s", err.Error()))
 		return
+	}
+
+	// Mark user as onboarded after first successful import.
+	if !pc.User.Onboarded {
+		_ = h.App.Users.MarkOnboarded(r.Context(), pc.User.ID)
 	}
 
 	if h.renderPluginCard(w, r, pc.User.ID, pc.Name) {
