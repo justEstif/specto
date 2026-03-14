@@ -36,8 +36,17 @@ type MediaItemStore interface {
 	// UpdateEnrichmentStatus sets the enrichment status on a media item.
 	UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error
 
+	// UpdateEnrichmentStatusWithRetries sets the enrichment status and retry
+	// count on a media item. Used by the enrichment worker.
+	UpdateEnrichmentStatusWithRetries(ctx context.Context, itemID uuid.UUID, status string, retries int32) error
+
 	// ListPendingEnrichment returns items that still need enrichment.
 	ListPendingEnrichment(ctx context.Context, limit int32) ([]MediaItem, error)
+
+	// ClaimPendingItems atomically selects and locks pending items for
+	// enrichment processing, skipping items already locked by another
+	// worker instance. Uses FOR UPDATE SKIP LOCKED.
+	ClaimPendingItems(ctx context.Context, limit int32, maxRetries int32) ([]EnrichmentItem, error)
 
 	// DeleteByPlatform removes all media items for a user on a given platform.
 	// Returns the number of items deleted.
@@ -251,6 +260,15 @@ type SyncLogEntry struct {
 	DurationMs   int32
 }
 
+// EnrichmentItem wraps a MediaItem with its database ID and retry count,
+// used by the enrichment worker to track per-item state.
+type EnrichmentItem struct {
+	ID      uuid.UUID
+	UserID  uuid.UUID
+	Item    MediaItem
+	Retries int32
+}
+
 // MediaItemTagInfo is the domain representation of a tag attached to a media item.
 type MediaItemTagInfo struct {
 	Name       string
@@ -271,4 +289,78 @@ type UserInfo struct {
 	PasswordHash *string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+// --- Share Profile types ---
+
+// ShareProfile is the domain representation of a user's public profile configuration.
+type ShareProfile struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	Blocks            []ShareBlock
+	ExcludedPlatforms []string
+	ExcludedTags      []string
+	Published         bool
+	Slug              *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+// ShareBlock represents a single configurable block on the public share profile.
+type ShareBlock struct {
+	Type      string   `json:"type"` // "top_genres", "mood_profile", "top_creators", "platform_mix", "currently_into"
+	Enabled   bool     `json:"enabled"`
+	TimeRange string   `json:"time_range,omitempty"` // "7d", "30d", "90d", "all"
+	Count     int      `json:"count,omitempty"`      // for top-N blocks
+	Platforms []string `json:"platforms,omitempty"`  // platform filter for this block
+	ItemIDs   []string `json:"item_ids,omitempty"`   // for recent_favorites
+	Text      string   `json:"text,omitempty"`       // for currently_into
+}
+
+// PublicShareProfile is the public-facing resolved profile with user info.
+type PublicShareProfile struct {
+	DisplayName string
+	AvatarURL   *string
+	Slug        string
+	Profile     ShareProfile
+}
+
+// ShareProfileStore manages share profile persistence.
+type ShareProfileStore interface {
+	// Get retrieves the share profile for a user.
+	Get(ctx context.Context, userID uuid.UUID) (*ShareProfile, error)
+
+	// GetBySlug retrieves a published share profile by its public slug,
+	// including user display info. Returns nil if not found or not published.
+	GetBySlug(ctx context.Context, slug string) (*PublicShareProfile, error)
+
+	// Upsert creates or updates a share profile.
+	Upsert(ctx context.Context, userID uuid.UUID, profile ShareProfile) (*ShareProfile, error)
+
+	// SetItemPrivacy sets the private flag on a media item.
+	SetItemPrivacy(ctx context.Context, userID, itemID uuid.UUID, private bool) error
+
+	// GetPublicTagDistribution returns tag distribution for public items,
+	// respecting platform and tag exclusions.
+	GetPublicTagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, excludedPlatforms, excludedTags []string, categoryFilter *string) ([]TagDistributionEntry, error)
+
+	// GetPublicTopCreators returns top creators for public items.
+	GetPublicTopCreators(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, excludedPlatforms []string) ([]TopCreatorEntry, error)
+
+	// GetPublicPlatformMix returns platform consumption mix for public items.
+	GetPublicPlatformMix(ctx context.Context, userID uuid.UUID, from, to time.Time, excludedPlatforms []string) ([]PlatformMixEntry, error)
+}
+
+// TopCreatorEntry represents a creator with consumption count.
+type TopCreatorEntry struct {
+	Creator   string
+	Platform  string
+	MediaType string
+	Count     int64
+}
+
+// PlatformMixEntry represents a platform's share of consumption.
+type PlatformMixEntry struct {
+	Platform string
+	Count    int64
 }

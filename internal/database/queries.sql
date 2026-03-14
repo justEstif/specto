@@ -118,8 +118,23 @@ WHERE enrichment_status = 'pending'
 ORDER BY created_at ASC
 LIMIT $1;
 
+-- name: ClaimPendingItems :many
+SELECT * FROM media_items
+WHERE enrichment_status = 'pending'
+    AND enrichment_retries < $2
+ORDER BY created_at ASC
+LIMIT $1
+FOR UPDATE SKIP LOCKED;
+
 -- name: UpdateEnrichmentStatus :exec
 UPDATE media_items SET enrichment_status = $2, updated_at = now()
+WHERE id = $1;
+
+-- name: UpdateEnrichmentStatusWithRetries :exec
+UPDATE media_items SET
+    enrichment_status = $2,
+    enrichment_retries = $3,
+    updated_at = now()
 WHERE id = $1;
 
 -- name: GetOrCreateTag :one
@@ -233,3 +248,82 @@ DELETE FROM media_items WHERE user_id = $1 AND platform = $2;
 
 -- name: DeleteSyncLogsByPlugin :exec
 DELETE FROM sync_log WHERE user_id = $1 AND plugin = $2;
+
+-- === Share Profiles ===
+
+-- name: GetShareProfile :one
+SELECT * FROM share_profiles WHERE user_id = $1;
+
+-- name: GetShareProfileBySlug :one
+SELECT sp.*, u.display_name, u.avatar_url
+FROM share_profiles sp
+JOIN users u ON sp.user_id = u.id
+WHERE sp.slug = $1 AND sp.published = true;
+
+-- name: UpsertShareProfile :one
+INSERT INTO share_profiles (user_id, blocks, excluded_platforms, excluded_tags, published, slug)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (user_id) DO UPDATE SET
+    blocks = EXCLUDED.blocks,
+    excluded_platforms = EXCLUDED.excluded_platforms,
+    excluded_tags = EXCLUDED.excluded_tags,
+    published = EXCLUDED.published,
+    slug = EXCLUDED.slug,
+    updated_at = now()
+RETURNING *;
+
+-- name: SetItemPrivacy :one
+UPDATE media_items SET private = $3, updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, private;
+
+-- name: GetPublicItems :many
+SELECT * FROM media_items
+WHERE user_id = $1
+    AND private = false
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND (sqlc.narg('platform_filter')::TEXT IS NULL OR platform = sqlc.narg('platform_filter'))
+ORDER BY consumed_at DESC
+LIMIT $4;
+
+-- name: GetPublicTagDistribution :many
+SELECT t.name, t.category, COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.private = false
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND NOT (mi.platform = ANY($5::TEXT[]))
+    AND NOT (t.name = ANY($6::TEXT[]))
+    AND (sqlc.narg('category_filter')::TEXT IS NULL OR t.category = sqlc.narg('category_filter'))
+GROUP BY t.name, t.category
+ORDER BY count DESC
+LIMIT $4;
+
+-- name: GetPublicTopCreators :many
+SELECT mi.creator, mi.platform, mi.type, COUNT(*) AS count
+FROM media_items mi
+WHERE mi.user_id = $1
+    AND mi.private = false
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND mi.creator IS NOT NULL AND mi.creator != ''
+    AND NOT (mi.platform = ANY($5::TEXT[]))
+GROUP BY mi.creator, mi.platform, mi.type
+ORDER BY count DESC
+LIMIT $4;
+
+-- name: GetPublicPlatformMix :many
+SELECT mi.platform, COUNT(*) AS count
+FROM media_items mi
+WHERE mi.user_id = $1
+    AND mi.private = false
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND NOT (mi.platform = ANY($4::TEXT[]))
+GROUP BY mi.platform
+ORDER BY count DESC;

@@ -28,14 +28,15 @@ type TokenRefresher interface {
 
 // SyncService orchestrates the full sync flow for a plugin.
 // It coordinates between the plugin registry, credential store,
-// media item store, enricher, tag store, and sync log.
+// media item store, and sync log.
+//
+// Enrichment is decoupled — the background EnrichmentWorker handles it
+// asynchronously after items are stored with enrichment_status='pending'.
 type SyncService struct {
 	Registry       *PluginRegistry
 	Plugins        PluginStateStore
 	Media          MediaItemStore
 	SyncLogs       SyncLogStore
-	Tags           TagStore
-	Enricher       Enricher
 	TokenRefresher TokenRefresher // optional — if set, auto-refreshes expired tokens
 	MinInterval    time.Duration  // minimum interval between syncs; defaults to DefaultMinSyncInterval
 	Logger         *slog.Logger
@@ -49,8 +50,6 @@ func NewSyncService(
 	plugins PluginStateStore,
 	media MediaItemStore,
 	syncLogs SyncLogStore,
-	tags TagStore,
-	enricher Enricher,
 	minInterval time.Duration,
 	logger *slog.Logger,
 ) *SyncService {
@@ -65,8 +64,6 @@ func NewSyncService(
 		Plugins:     plugins,
 		Media:       media,
 		SyncLogs:    syncLogs,
-		Tags:        tags,
-		Enricher:    enricher,
 		MinInterval: minInterval,
 		Logger:      logger,
 	}
@@ -89,12 +86,12 @@ type SyncSummary struct {
 //  3. Load and decrypt credentials from store
 //  4. Get cursor from plugin state
 //  5. Call plugin.Sync(credentials, cursor)
-//  6. Store items (upsert handles deduplication)
-//  7. Run plugin-specific enrichment (plugin.Enrich)
-//  8. Run core LLM enrichment on new items
-//  9. Persist tags from enrichment
-//  10. Update sync_log (success/failure/item counts)
-//  11. Update plugin_state cursor
+//  6. Store items (upsert handles deduplication, status='pending')
+//  7. Update sync_log (success/failure/item counts)
+//  8. Update plugin_state cursor
+//
+// Enrichment is handled asynchronously by the background EnrichmentWorker,
+// which polls for items with enrichment_status='pending'.
 //
 // PluginError codes are handled:
 //   - auth_expired: marks plugin as disconnected
@@ -199,6 +196,8 @@ func (s *SyncService) executeSyncFlow(
 	}
 
 	// Step 6: Store items (upsert handles dedup)
+	// Items are stored with enrichment_status='pending' (DB default).
+	// The background EnrichmentWorker will pick them up asynchronously.
 	summary, err := s.storeItems(ctx, userID, result.Items, log)
 	if err != nil {
 		s.failSyncLog(ctx, logID, startTime, summary, err, log)
@@ -206,18 +205,7 @@ func (s *SyncService) executeSyncFlow(
 	}
 	summary.HasMore = result.HasMore
 
-	// Step 7: Plugin-specific enrichment
-	enrichedItems, err := plugin.Enrich(ctx, creds, result.Items)
-	if err != nil {
-		// Plugin enrichment failure is non-fatal — log and continue
-		log.Warn("plugin enrichment failed, continuing with unenriched items", "error", err)
-		enrichedItems = result.Items
-	}
-
-	// Step 8 & 9: Core enrichment + tag persistence
-	s.enrichAndTagItems(ctx, userID, enrichedItems, log)
-
-	// Step 10: Complete sync log
+	// Step 7: Complete sync log
 	durationMs := int32(time.Since(startTime).Milliseconds())
 	err = s.SyncLogs.Complete(ctx, logID, SyncLogResult{
 		ItemsAdded:   summary.ItemsAdded,
@@ -434,67 +422,6 @@ func (s *SyncService) storeItems(
 	}
 
 	return summary, nil
-}
-
-// enrichAndTagItems runs core enrichment on items and persists resulting tags.
-func (s *SyncService) enrichAndTagItems(
-	ctx context.Context,
-	userID uuid.UUID,
-	items []MediaItem,
-	log *slog.Logger,
-) {
-	for _, item := range items {
-		// Run core enrichment (LLM or NoOp)
-		tagResult, err := s.Enricher.Enrich(ctx, item, item.Tags)
-		if err != nil {
-			log.Warn("core enrichment failed for item, skipping",
-				"title", item.Title,
-				"error", err,
-			)
-			continue
-		}
-
-		if tagResult == nil || tagResult.IsEmpty() {
-			continue
-		}
-
-		// Validate against fixed tag set
-		validated := ValidateTagResult(tagResult)
-		if validated.IsEmpty() {
-			continue
-		}
-
-		// Look up the item's UUID by its external ID.
-		_, itemID, lookupErr := s.Media.GetByExternalID(ctx, userID, item.Platform, item.ExternalID)
-		if lookupErr != nil {
-			log.Warn("failed to look up item for tagging",
-				"title", item.Title,
-				"error", lookupErr,
-			)
-			continue
-		}
-
-		for _, ts := range validated.AllTags() {
-			tagID, err := s.Tags.GetOrCreate(ctx, ts.Tag)
-			if err != nil {
-				log.Warn("failed to get/create tag",
-					"tag", ts.Tag,
-					"error", err,
-				)
-				continue
-			}
-
-			conf := ts.Confidence
-			err = s.Tags.AddMediaItemTag(ctx, itemID, tagID, "llm", &conf)
-			if err != nil {
-				log.Warn("failed to add tag to item",
-					"tag", ts.Tag,
-					"item_title", item.Title,
-					"error", err,
-				)
-			}
-		}
-	}
 }
 
 // failSyncLog records a failed sync in the sync log.

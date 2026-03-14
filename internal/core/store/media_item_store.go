@@ -156,6 +156,39 @@ func (s *PgMediaItemStore) ListPendingEnrichment(ctx context.Context, limit int3
 	return items, nil
 }
 
+func (s *PgMediaItemStore) UpdateEnrichmentStatusWithRetries(ctx context.Context, itemID uuid.UUID, status string, retries int32) error {
+	err := s.q.UpdateEnrichmentStatusWithRetries(ctx, database.UpdateEnrichmentStatusWithRetriesParams{
+		ID:                uuidToPgx(itemID),
+		EnrichmentStatus:  status,
+		EnrichmentRetries: retries,
+	})
+	if err != nil {
+		return fmt.Errorf("updating enrichment status with retries: %w", err)
+	}
+	return nil
+}
+
+func (s *PgMediaItemStore) ClaimPendingItems(ctx context.Context, limit int32, maxRetries int32) ([]core.EnrichmentItem, error) {
+	rows, err := s.q.ClaimPendingItems(ctx, database.ClaimPendingItemsParams{
+		Limit:             limit,
+		EnrichmentRetries: maxRetries,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("claiming pending items: %w", err)
+	}
+
+	items := make([]core.EnrichmentItem, len(rows))
+	for i, row := range rows {
+		items[i] = core.EnrichmentItem{
+			ID:      pgxToUUID(row.ID),
+			UserID:  pgxToUUID(row.UserID),
+			Item:    mediaItemFromDB(row),
+			Retries: row.EnrichmentRetries,
+		}
+	}
+	return items, nil
+}
+
 func (s *PgMediaItemStore) DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error) {
 	count, err := s.q.DeleteMediaItemsByPlatform(ctx, database.DeleteMediaItemsByPlatformParams{
 		UserID:   uuidToPgx(userID),

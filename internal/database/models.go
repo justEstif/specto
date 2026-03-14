@@ -9,21 +9,23 @@ import (
 )
 
 type MediaItem struct {
-	ID               pgtype.UUID        `json:"id"`
-	UserID           pgtype.UUID        `json:"user_id"`
-	Platform         string             `json:"platform"`
-	Type             string             `json:"type"`
-	Title            string             `json:"title"`
-	Creator          pgtype.Text        `json:"creator"`
-	ConsumedAt       pgtype.Timestamptz `json:"consumed_at"`
-	Duration         pgtype.Interval    `json:"duration"`
-	TimeSpent        pgtype.Interval    `json:"time_spent"`
-	Url              pgtype.Text        `json:"url"`
-	ExternalID       string             `json:"external_id"`
-	EnrichmentStatus string             `json:"enrichment_status"`
-	RawMetadata      []byte             `json:"raw_metadata"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ID                pgtype.UUID        `json:"id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	Platform          string             `json:"platform"`
+	Type              string             `json:"type"`
+	Title             string             `json:"title"`
+	Creator           pgtype.Text        `json:"creator"`
+	ConsumedAt        pgtype.Timestamptz `json:"consumed_at"`
+	Duration          pgtype.Interval    `json:"duration"`
+	TimeSpent         pgtype.Interval    `json:"time_spent"`
+	Url               pgtype.Text        `json:"url"`
+	ExternalID        string             `json:"external_id"`
+	EnrichmentStatus  string             `json:"enrichment_status"`
+	RawMetadata       []byte             `json:"raw_metadata"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	EnrichmentRetries int32              `json:"enrichment_retries"`
+	Private           bool               `json:"private"`
 }
 
 type MediaItemTag struct {
@@ -56,6 +58,18 @@ type PluginState struct {
 	ErrorMessage pgtype.Text        `json:"error_message"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ShareProfile struct {
+	ID                pgtype.UUID        `json:"id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	Blocks            []byte             `json:"blocks"`
+	ExcludedPlatforms []string           `json:"excluded_platforms"`
+	ExcludedTags      []string           `json:"excluded_tags"`
+	Published         bool               `json:"published"`
+	Slug              pgtype.Text        `json:"slug"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SyncLog struct {

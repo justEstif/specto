@@ -35,6 +35,58 @@ func (q *Queries) AddMediaItemTag(ctx context.Context, arg AddMediaItemTagParams
 	return err
 }
 
+const claimPendingItems = `-- name: ClaimPendingItems :many
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
+WHERE enrichment_status = 'pending'
+    AND enrichment_retries < $2
+ORDER BY created_at ASC
+LIMIT $1
+FOR UPDATE SKIP LOCKED
+`
+
+type ClaimPendingItemsParams struct {
+	Limit             int32 `json:"limit"`
+	EnrichmentRetries int32 `json:"enrichment_retries"`
+}
+
+func (q *Queries) ClaimPendingItems(ctx context.Context, arg ClaimPendingItemsParams) ([]MediaItem, error) {
+	rows, err := q.db.Query(ctx, claimPendingItems, arg.Limit, arg.EnrichmentRetries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MediaItem{}
+	for rows.Next() {
+		var i MediaItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Platform,
+			&i.Type,
+			&i.Title,
+			&i.Creator,
+			&i.ConsumedAt,
+			&i.Duration,
+			&i.TimeSpent,
+			&i.Url,
+			&i.ExternalID,
+			&i.EnrichmentStatus,
+			&i.RawMetadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.EnrichmentRetries,
+			&i.Private,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const completeSyncLog = `-- name: CompleteSyncLog :one
 UPDATE sync_log SET
     completed_at = now(),
@@ -100,7 +152,7 @@ ON CONFLICT (user_id, platform, external_id) DO UPDATE SET
     url = EXCLUDED.url,
     raw_metadata = EXCLUDED.raw_metadata,
     updated_at = now()
-RETURNING id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at
+RETURNING id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private
 `
 
 type CreateMediaItemParams struct {
@@ -148,6 +200,8 @@ func (q *Queries) CreateMediaItem(ctx context.Context, arg CreateMediaItemParams
 		&i.RawMetadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnrichmentRetries,
+		&i.Private,
 	)
 	return i, err
 }
@@ -321,7 +375,7 @@ func (q *Queries) DeleteSyncLogsByPlugin(ctx context.Context, arg DeleteSyncLogs
 }
 
 const getMediaItemByExternalID = `-- name: GetMediaItemByExternalID :one
-SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items WHERE user_id = $1 AND platform = $2 AND external_id = $3
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items WHERE user_id = $1 AND platform = $2 AND external_id = $3
 `
 
 type GetMediaItemByExternalIDParams struct {
@@ -349,12 +403,14 @@ func (q *Queries) GetMediaItemByExternalID(ctx context.Context, arg GetMediaItem
 		&i.RawMetadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnrichmentRetries,
+		&i.Private,
 	)
 	return i, err
 }
 
 const getMediaItemByID = `-- name: GetMediaItemByID :one
-SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items WHERE id = $1 AND user_id = $2
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items WHERE id = $1 AND user_id = $2
 `
 
 type GetMediaItemByIDParams struct {
@@ -381,6 +437,8 @@ func (q *Queries) GetMediaItemByID(ctx context.Context, arg GetMediaItemByIDPara
 		&i.RawMetadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EnrichmentRetries,
+		&i.Private,
 	)
 	return i, err
 }
@@ -457,6 +515,303 @@ func (q *Queries) GetPluginState(ctx context.Context, arg GetPluginStateParams) 
 		&i.ErrorMessage,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPublicItems = `-- name: GetPublicItems :many
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
+WHERE user_id = $1
+    AND private = false
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND ($5::TEXT IS NULL OR platform = $5)
+ORDER BY consumed_at DESC
+LIMIT $4
+`
+
+type GetPublicItemsParams struct {
+	UserID         pgtype.UUID        `json:"user_id"`
+	ConsumedAt     pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2   pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit          int32              `json:"limit"`
+	PlatformFilter pgtype.Text        `json:"platform_filter"`
+}
+
+func (q *Queries) GetPublicItems(ctx context.Context, arg GetPublicItemsParams) ([]MediaItem, error) {
+	rows, err := q.db.Query(ctx, getPublicItems,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.PlatformFilter,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MediaItem{}
+	for rows.Next() {
+		var i MediaItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Platform,
+			&i.Type,
+			&i.Title,
+			&i.Creator,
+			&i.ConsumedAt,
+			&i.Duration,
+			&i.TimeSpent,
+			&i.Url,
+			&i.ExternalID,
+			&i.EnrichmentStatus,
+			&i.RawMetadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.EnrichmentRetries,
+			&i.Private,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPublicPlatformMix = `-- name: GetPublicPlatformMix :many
+SELECT mi.platform, COUNT(*) AS count
+FROM media_items mi
+WHERE mi.user_id = $1
+    AND mi.private = false
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND NOT (mi.platform = ANY($4::TEXT[]))
+GROUP BY mi.platform
+ORDER BY count DESC
+`
+
+type GetPublicPlatformMixParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Column4      []string           `json:"column_4"`
+}
+
+type GetPublicPlatformMixRow struct {
+	Platform string `json:"platform"`
+	Count    int64  `json:"count"`
+}
+
+func (q *Queries) GetPublicPlatformMix(ctx context.Context, arg GetPublicPlatformMixParams) ([]GetPublicPlatformMixRow, error) {
+	rows, err := q.db.Query(ctx, getPublicPlatformMix,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Column4,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPublicPlatformMixRow{}
+	for rows.Next() {
+		var i GetPublicPlatformMixRow
+		if err := rows.Scan(&i.Platform, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPublicTagDistribution = `-- name: GetPublicTagDistribution :many
+SELECT t.name, t.category, COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.private = false
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND NOT (mi.platform = ANY($5::TEXT[]))
+    AND NOT (t.name = ANY($6::TEXT[]))
+    AND ($7::TEXT IS NULL OR t.category = $7)
+GROUP BY t.name, t.category
+ORDER BY count DESC
+LIMIT $4
+`
+
+type GetPublicTagDistributionParams struct {
+	UserID         pgtype.UUID        `json:"user_id"`
+	ConsumedAt     pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2   pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit          int32              `json:"limit"`
+	Column5        []string           `json:"column_5"`
+	Column6        []string           `json:"column_6"`
+	CategoryFilter pgtype.Text        `json:"category_filter"`
+}
+
+type GetPublicTagDistributionRow struct {
+	Name     string      `json:"name"`
+	Category pgtype.Text `json:"category"`
+	Count    int64       `json:"count"`
+}
+
+func (q *Queries) GetPublicTagDistribution(ctx context.Context, arg GetPublicTagDistributionParams) ([]GetPublicTagDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getPublicTagDistribution,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.Column5,
+		arg.Column6,
+		arg.CategoryFilter,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPublicTagDistributionRow{}
+	for rows.Next() {
+		var i GetPublicTagDistributionRow
+		if err := rows.Scan(&i.Name, &i.Category, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPublicTopCreators = `-- name: GetPublicTopCreators :many
+SELECT mi.creator, mi.platform, mi.type, COUNT(*) AS count
+FROM media_items mi
+WHERE mi.user_id = $1
+    AND mi.private = false
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND mi.creator IS NOT NULL AND mi.creator != ''
+    AND NOT (mi.platform = ANY($5::TEXT[]))
+GROUP BY mi.creator, mi.platform, mi.type
+ORDER BY count DESC
+LIMIT $4
+`
+
+type GetPublicTopCreatorsParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit        int32              `json:"limit"`
+	Column5      []string           `json:"column_5"`
+}
+
+type GetPublicTopCreatorsRow struct {
+	Creator  pgtype.Text `json:"creator"`
+	Platform string      `json:"platform"`
+	Type     string      `json:"type"`
+	Count    int64       `json:"count"`
+}
+
+func (q *Queries) GetPublicTopCreators(ctx context.Context, arg GetPublicTopCreatorsParams) ([]GetPublicTopCreatorsRow, error) {
+	rows, err := q.db.Query(ctx, getPublicTopCreators,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.Column5,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPublicTopCreatorsRow{}
+	for rows.Next() {
+		var i GetPublicTopCreatorsRow
+		if err := rows.Scan(
+			&i.Creator,
+			&i.Platform,
+			&i.Type,
+			&i.Count,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getShareProfile = `-- name: GetShareProfile :one
+
+SELECT id, user_id, blocks, excluded_platforms, excluded_tags, published, slug, created_at, updated_at FROM share_profiles WHERE user_id = $1
+`
+
+// === Share Profiles ===
+func (q *Queries) GetShareProfile(ctx context.Context, userID pgtype.UUID) (ShareProfile, error) {
+	row := q.db.QueryRow(ctx, getShareProfile, userID)
+	var i ShareProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Blocks,
+		&i.ExcludedPlatforms,
+		&i.ExcludedTags,
+		&i.Published,
+		&i.Slug,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getShareProfileBySlug = `-- name: GetShareProfileBySlug :one
+SELECT sp.id, sp.user_id, sp.blocks, sp.excluded_platforms, sp.excluded_tags, sp.published, sp.slug, sp.created_at, sp.updated_at, u.display_name, u.avatar_url
+FROM share_profiles sp
+JOIN users u ON sp.user_id = u.id
+WHERE sp.slug = $1 AND sp.published = true
+`
+
+type GetShareProfileBySlugRow struct {
+	ID                pgtype.UUID        `json:"id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	Blocks            []byte             `json:"blocks"`
+	ExcludedPlatforms []string           `json:"excluded_platforms"`
+	ExcludedTags      []string           `json:"excluded_tags"`
+	Published         bool               `json:"published"`
+	Slug              pgtype.Text        `json:"slug"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DisplayName       string             `json:"display_name"`
+	AvatarUrl         pgtype.Text        `json:"avatar_url"`
+}
+
+func (q *Queries) GetShareProfileBySlug(ctx context.Context, slug pgtype.Text) (GetShareProfileBySlugRow, error) {
+	row := q.db.QueryRow(ctx, getShareProfileBySlug, slug)
+	var i GetShareProfileBySlugRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Blocks,
+		&i.ExcludedPlatforms,
+		&i.ExcludedTags,
+		&i.Published,
+		&i.Slug,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DisplayName,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
@@ -628,7 +983,7 @@ func (q *Queries) ListMediaItemTags(ctx context.Context, mediaItemID pgtype.UUID
 }
 
 const listMediaItems = `-- name: ListMediaItems :many
-SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
 WHERE user_id = $1
     AND consumed_at >= $2
     AND consumed_at <= $3
@@ -675,6 +1030,8 @@ func (q *Queries) ListMediaItems(ctx context.Context, arg ListMediaItemsParams) 
 			&i.RawMetadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EnrichmentRetries,
+			&i.Private,
 		); err != nil {
 			return nil, err
 		}
@@ -687,7 +1044,7 @@ func (q *Queries) ListMediaItems(ctx context.Context, arg ListMediaItemsParams) 
 }
 
 const listMediaItemsFiltered = `-- name: ListMediaItemsFiltered :many
-SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
 WHERE user_id = $1
     AND consumed_at >= $2
     AND consumed_at <= $3
@@ -746,6 +1103,8 @@ func (q *Queries) ListMediaItemsFiltered(ctx context.Context, arg ListMediaItems
 			&i.RawMetadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EnrichmentRetries,
+			&i.Private,
 		); err != nil {
 			return nil, err
 		}
@@ -758,7 +1117,7 @@ func (q *Queries) ListMediaItemsFiltered(ctx context.Context, arg ListMediaItems
 }
 
 const listPendingEnrichment = `-- name: ListPendingEnrichment :many
-SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at FROM media_items
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
 WHERE enrichment_status = 'pending'
 ORDER BY created_at ASC
 LIMIT $1
@@ -789,6 +1148,8 @@ func (q *Queries) ListPendingEnrichment(ctx context.Context, limit int32) ([]Med
 			&i.RawMetadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EnrichmentRetries,
+			&i.Private,
 		); err != nil {
 			return nil, err
 		}
@@ -989,6 +1350,30 @@ func (q *Queries) PlatformBreakdownFiltered(ctx context.Context, arg PlatformBre
 	return items, nil
 }
 
+const setItemPrivacy = `-- name: SetItemPrivacy :one
+UPDATE media_items SET private = $3, updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, private
+`
+
+type SetItemPrivacyParams struct {
+	ID      pgtype.UUID `json:"id"`
+	UserID  pgtype.UUID `json:"user_id"`
+	Private bool        `json:"private"`
+}
+
+type SetItemPrivacyRow struct {
+	ID      pgtype.UUID `json:"id"`
+	Private bool        `json:"private"`
+}
+
+func (q *Queries) SetItemPrivacy(ctx context.Context, arg SetItemPrivacyParams) (SetItemPrivacyRow, error) {
+	row := q.db.QueryRow(ctx, setItemPrivacy, arg.ID, arg.UserID, arg.Private)
+	var i SetItemPrivacyRow
+	err := row.Scan(&i.ID, &i.Private)
+	return i, err
+}
+
 const tagDistribution = `-- name: TagDistribution :many
 SELECT t.name, t.category, COUNT(*) AS count
 FROM media_item_tags mit
@@ -1111,6 +1496,25 @@ type UpdateEnrichmentStatusParams struct {
 
 func (q *Queries) UpdateEnrichmentStatus(ctx context.Context, arg UpdateEnrichmentStatusParams) error {
 	_, err := q.db.Exec(ctx, updateEnrichmentStatus, arg.ID, arg.EnrichmentStatus)
+	return err
+}
+
+const updateEnrichmentStatusWithRetries = `-- name: UpdateEnrichmentStatusWithRetries :exec
+UPDATE media_items SET
+    enrichment_status = $2,
+    enrichment_retries = $3,
+    updated_at = now()
+WHERE id = $1
+`
+
+type UpdateEnrichmentStatusWithRetriesParams struct {
+	ID                pgtype.UUID `json:"id"`
+	EnrichmentStatus  string      `json:"enrichment_status"`
+	EnrichmentRetries int32       `json:"enrichment_retries"`
+}
+
+func (q *Queries) UpdateEnrichmentStatusWithRetries(ctx context.Context, arg UpdateEnrichmentStatusWithRetriesParams) error {
+	_, err := q.db.Exec(ctx, updateEnrichmentStatusWithRetries, arg.ID, arg.EnrichmentStatus, arg.EnrichmentRetries)
 	return err
 }
 
@@ -1296,6 +1700,52 @@ func (q *Queries) UpsertPluginState(ctx context.Context, arg UpsertPluginStatePa
 		&i.Cursor,
 		&i.LastSyncedAt,
 		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertShareProfile = `-- name: UpsertShareProfile :one
+INSERT INTO share_profiles (user_id, blocks, excluded_platforms, excluded_tags, published, slug)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (user_id) DO UPDATE SET
+    blocks = EXCLUDED.blocks,
+    excluded_platforms = EXCLUDED.excluded_platforms,
+    excluded_tags = EXCLUDED.excluded_tags,
+    published = EXCLUDED.published,
+    slug = EXCLUDED.slug,
+    updated_at = now()
+RETURNING id, user_id, blocks, excluded_platforms, excluded_tags, published, slug, created_at, updated_at
+`
+
+type UpsertShareProfileParams struct {
+	UserID            pgtype.UUID `json:"user_id"`
+	Blocks            []byte      `json:"blocks"`
+	ExcludedPlatforms []string    `json:"excluded_platforms"`
+	ExcludedTags      []string    `json:"excluded_tags"`
+	Published         bool        `json:"published"`
+	Slug              pgtype.Text `json:"slug"`
+}
+
+func (q *Queries) UpsertShareProfile(ctx context.Context, arg UpsertShareProfileParams) (ShareProfile, error) {
+	row := q.db.QueryRow(ctx, upsertShareProfile,
+		arg.UserID,
+		arg.Blocks,
+		arg.ExcludedPlatforms,
+		arg.ExcludedTags,
+		arg.Published,
+		arg.Slug,
+	)
+	var i ShareProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Blocks,
+		&i.ExcludedPlatforms,
+		&i.ExcludedTags,
+		&i.Published,
+		&i.Slug,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

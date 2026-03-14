@@ -64,6 +64,12 @@ func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit in
 	}
 	return nil, nil
 }
+func (m *mockMediaItemStore) UpdateEnrichmentStatusWithRetries(_ context.Context, _ uuid.UUID, _ string, _ int32) error {
+	return nil
+}
+func (m *mockMediaItemStore) ClaimPendingItems(_ context.Context, _ int32, _ int32) ([]core.EnrichmentItem, error) {
+	return nil, nil
+}
 func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
 	return 0, nil
 }

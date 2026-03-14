@@ -17,7 +17,9 @@ type Querier interface {
 	ListMediaItems(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error)
 	ListMediaItemsFiltered(ctx context.Context, arg database.ListMediaItemsFilteredParams) ([]database.MediaItem, error)
 	UpdateEnrichmentStatus(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
+	UpdateEnrichmentStatusWithRetries(ctx context.Context, arg database.UpdateEnrichmentStatusWithRetriesParams) error
 	ListPendingEnrichment(ctx context.Context, limit int32) ([]database.MediaItem, error)
+	ClaimPendingItems(ctx context.Context, arg database.ClaimPendingItemsParams) ([]database.MediaItem, error)
 	DeleteMediaItemsByPlatform(ctx context.Context, arg database.DeleteMediaItemsByPlatformParams) (int64, error)
 
 	// Plugin state
@@ -59,6 +61,16 @@ type Querier interface {
 	PlatformBreakdownFiltered(ctx context.Context, arg database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error)
 	TagDistribution(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
 	TagDistributionFiltered(ctx context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error)
+
+	// Share profiles
+	GetShareProfile(ctx context.Context, userID pgtype.UUID) (database.ShareProfile, error)
+	GetShareProfileBySlug(ctx context.Context, slug pgtype.Text) (database.GetShareProfileBySlugRow, error)
+	UpsertShareProfile(ctx context.Context, arg database.UpsertShareProfileParams) (database.ShareProfile, error)
+	SetItemPrivacy(ctx context.Context, arg database.SetItemPrivacyParams) (database.SetItemPrivacyRow, error)
+	GetPublicItems(ctx context.Context, arg database.GetPublicItemsParams) ([]database.MediaItem, error)
+	GetPublicTagDistribution(ctx context.Context, arg database.GetPublicTagDistributionParams) ([]database.GetPublicTagDistributionRow, error)
+	GetPublicTopCreators(ctx context.Context, arg database.GetPublicTopCreatorsParams) ([]database.GetPublicTopCreatorsRow, error)
+	GetPublicPlatformMix(ctx context.Context, arg database.GetPublicPlatformMixParams) ([]database.GetPublicPlatformMixRow, error)
 }
 
 // Compile-time assertion that database.Queries satisfies Querier.

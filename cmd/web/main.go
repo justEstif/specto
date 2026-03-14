@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -194,6 +198,16 @@ func main() {
 			r.Get("/insights/platform-breakdown", h.InsightsPlatformBreakdown)
 			r.Get("/insights/tags", h.InsightsTags)
 			r.Get("/insights/timeline", h.InsightsTimeline)
+
+			// Share profile
+			r.Route("/share-profile", func(r chi.Router) {
+				r.Get("/", h.GetShareProfile)
+				r.Put("/", h.UpdateShareProfile)
+				r.Get("/preview", h.SharePreview)
+			})
+
+			// Item privacy
+			r.Post("/items/{id}/privacy", h.ToggleItemPrivate)
 		})
 	})
 
@@ -202,11 +216,45 @@ func main() {
 		log.Printf("Registered plugin: %s", name)
 	}
 
+	// Start enrichment worker in background
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	go application.Worker.Start(workerCtx)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
-	log.Printf("Server starting on http://localhost:%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
+	// Graceful shutdown: listen for SIGINT/SIGTERM
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
+	}
+
+	// Start server in a goroutine
+	go func() {
+		log.Printf("Server starting on http://localhost:%s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down...")
+
+	// Stop enrichment worker
+	workerCancel()
+
+	// Graceful HTTP shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server stopped")
 }

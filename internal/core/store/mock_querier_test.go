@@ -102,6 +102,14 @@ func (m *mockQuerier) ListPendingEnrichment(ctx context.Context, limit int32) ([
 	return nil, fmt.Errorf("ListPendingEnrichment not mocked")
 }
 
+func (m *mockQuerier) ClaimPendingItems(_ context.Context, _ database.ClaimPendingItemsParams) ([]database.MediaItem, error) {
+	return nil, fmt.Errorf("ClaimPendingItems not mocked")
+}
+
+func (m *mockQuerier) UpdateEnrichmentStatusWithRetries(_ context.Context, _ database.UpdateEnrichmentStatusWithRetriesParams) error {
+	return fmt.Errorf("UpdateEnrichmentStatusWithRetries not mocked")
+}
+
 func (m *mockQuerier) GetPluginState(ctx context.Context, arg database.GetPluginStateParams) (database.PluginState, error) {
 	if m.getPluginStateFn != nil {
 		return m.getPluginStateFn(ctx, arg)
@@ -291,4 +299,36 @@ func (m *mockQuerier) PlatformBreakdownFiltered(_ context.Context, _ database.Pl
 
 func (m *mockQuerier) TagDistributionFiltered(_ context.Context, _ database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error) {
 	return nil, nil
+}
+
+func (m *mockQuerier) GetShareProfile(_ context.Context, _ pgtype.UUID) (database.ShareProfile, error) {
+	return database.ShareProfile{}, fmt.Errorf("GetShareProfile not mocked")
+}
+
+func (m *mockQuerier) GetShareProfileBySlug(_ context.Context, _ pgtype.Text) (database.GetShareProfileBySlugRow, error) {
+	return database.GetShareProfileBySlugRow{}, fmt.Errorf("GetShareProfileBySlug not mocked")
+}
+
+func (m *mockQuerier) UpsertShareProfile(_ context.Context, _ database.UpsertShareProfileParams) (database.ShareProfile, error) {
+	return database.ShareProfile{}, fmt.Errorf("UpsertShareProfile not mocked")
+}
+
+func (m *mockQuerier) SetItemPrivacy(_ context.Context, _ database.SetItemPrivacyParams) (database.SetItemPrivacyRow, error) {
+	return database.SetItemPrivacyRow{}, fmt.Errorf("SetItemPrivacy not mocked")
+}
+
+func (m *mockQuerier) GetPublicItems(_ context.Context, _ database.GetPublicItemsParams) ([]database.MediaItem, error) {
+	return nil, fmt.Errorf("GetPublicItems not mocked")
+}
+
+func (m *mockQuerier) GetPublicTagDistribution(_ context.Context, _ database.GetPublicTagDistributionParams) ([]database.GetPublicTagDistributionRow, error) {
+	return nil, fmt.Errorf("GetPublicTagDistribution not mocked")
+}
+
+func (m *mockQuerier) GetPublicTopCreators(_ context.Context, _ database.GetPublicTopCreatorsParams) ([]database.GetPublicTopCreatorsRow, error) {
+	return nil, fmt.Errorf("GetPublicTopCreators not mocked")
+}
+
+func (m *mockQuerier) GetPublicPlatformMix(_ context.Context, _ database.GetPublicPlatformMixParams) ([]database.GetPublicPlatformMixRow, error) {
+	return nil, fmt.Errorf("GetPublicPlatformMix not mocked")
 }

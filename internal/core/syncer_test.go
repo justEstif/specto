@@ -91,6 +91,12 @@ func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit in
 	}
 	return nil, nil
 }
+func (m *mockMediaItemStore) UpdateEnrichmentStatusWithRetries(_ context.Context, _ uuid.UUID, _ string, _ int32) error {
+	return nil
+}
+func (m *mockMediaItemStore) ClaimPendingItems(_ context.Context, _ int32, _ int32) ([]EnrichmentItem, error) {
+	return nil, nil
+}
 func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
 	return 0, nil
 }
@@ -250,8 +256,6 @@ func newTestSyncService(opts ...func(*SyncService)) *SyncService {
 		Plugins:     &mockPluginStateStore{},
 		Media:       &mockMediaItemStore{},
 		SyncLogs:    &mockSyncLogStore{},
-		Tags:        &mockTagStore{},
-		Enricher:    &NoOpEnricher{},
 		MinInterval: 1 * time.Millisecond, // very short for tests
 		Logger:      discardLogger(),
 	}
@@ -624,58 +628,28 @@ func TestSyncPlugin_UpstreamError(t *testing.T) {
 	}
 }
 
-func TestSyncPlugin_PluginEnrichmentFailure_NonFatal(t *testing.T) {
+func TestSyncPlugin_ItemsStoredWithPendingStatus(t *testing.T) {
+	// Verify that after sync, items are stored and enrichment happens
+	// asynchronously (not inline). The sync should just store items.
 	userID := uuid.New()
+	var createdCount int
 
 	svc := newTestSyncService(func(s *SyncService) {
 		p := newMockPlugin("spotify")
 		p.syncFn = func(_ context.Context, _ Credentials, _ string) SyncResult {
 			return SyncResult{
-				Items: []MediaItem{{Platform: "spotify", Title: "A", ExternalID: "a", Type: MediaMusic, ConsumedAt: time.Now()}},
-			}
-		}
-		p.enrichFn = func(_ context.Context, _ Credentials, _ []MediaItem) ([]MediaItem, error) {
-			return nil, errors.New("enrichment service down")
-		}
-		s.Registry.Register(p)
-	})
-
-	// Should succeed despite plugin enrichment failure
-	summary, err := svc.SyncPlugin(context.Background(), userID, "spotify")
-	if err != nil {
-		t.Fatalf("unexpected error (enrichment failure should be non-fatal): %v", err)
-	}
-	if summary.ItemsAdded != 1 {
-		t.Errorf("expected 1 item, got %d", summary.ItemsAdded)
-	}
-}
-
-func TestSyncPlugin_CoreEnrichment_TagsPersisted(t *testing.T) {
-	userID := uuid.New()
-	var taggedItems []string
-
-	svc := newTestSyncService(func(s *SyncService) {
-		p := newMockPlugin("spotify")
-		p.syncFn = func(_ context.Context, _ Credentials, _ string) SyncResult {
-			return SyncResult{
-				Items: []MediaItem{{Platform: "spotify", Title: "Song", ExternalID: "s", Type: MediaMusic, ConsumedAt: time.Now()}},
+				Items: []MediaItem{
+					{Platform: "spotify", Title: "Song A", ExternalID: "a", Type: MediaMusic, ConsumedAt: time.Now()},
+					{Platform: "spotify", Title: "Song B", ExternalID: "b", Type: MediaMusic, ConsumedAt: time.Now()},
+				},
 			}
 		}
 		s.Registry.Register(p)
 
-		s.Enricher = &mockEnricher{
-			enrichFn: func(_ context.Context, _ MediaItem, _ []string) (*TagResult, error) {
-				return &TagResult{
-					Genre: []TagScore{{Tag: "rock", Confidence: 0.9}},
-					Mood:  []TagScore{{Tag: "energetic", Confidence: 0.8}},
-				}, nil
-			},
-		}
-
-		s.Tags = &mockTagStore{
-			addMediaItemTagFn: func(_ context.Context, _ uuid.UUID, _ uuid.UUID, source string, _ *float32) error {
-				taggedItems = append(taggedItems, source)
-				return nil
+		s.Media = &mockMediaItemStore{
+			createFn: func(_ context.Context, _ uuid.UUID, _ MediaItem) (uuid.UUID, error) {
+				createdCount++
+				return uuid.New(), nil
 			},
 		}
 	})
@@ -684,16 +658,11 @@ func TestSyncPlugin_CoreEnrichment_TagsPersisted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if summary.ItemsAdded != 1 {
-		t.Errorf("expected 1 item, got %d", summary.ItemsAdded)
+	if summary.ItemsAdded != 2 {
+		t.Errorf("expected 2 items stored, got %d", summary.ItemsAdded)
 	}
-	if len(taggedItems) != 2 {
-		t.Errorf("expected 2 tags persisted, got %d", len(taggedItems))
-	}
-	for _, source := range taggedItems {
-		if source != "llm" {
-			t.Errorf("expected source 'llm', got %q", source)
-		}
+	if createdCount != 2 {
+		t.Errorf("expected 2 creates, got %d", createdCount)
 	}
 }
 
@@ -870,7 +839,7 @@ func TestSyncPlugin_FileParseError(t *testing.T) {
 
 func TestNewSyncService_Defaults(t *testing.T) {
 	reg := NewPluginRegistry()
-	svc := NewSyncService(reg, &mockPluginStateStore{}, &mockMediaItemStore{}, &mockSyncLogStore{}, &mockTagStore{}, &NoOpEnricher{}, 0, nil)
+	svc := NewSyncService(reg, &mockPluginStateStore{}, &mockMediaItemStore{}, &mockSyncLogStore{}, 0, nil)
 
 	if svc.MinInterval != DefaultMinSyncInterval {
 		t.Errorf("expected default interval %v, got %v", DefaultMinSyncInterval, svc.MinInterval)
@@ -892,49 +861,6 @@ func TestRateLimitError_Error(t *testing.T) {
 	}
 }
 
-func TestSyncPlugin_CoreEnrichment_InvalidTagsFiltered(t *testing.T) {
-	userID := uuid.New()
-	var addedTags []string
-
-	svc := newTestSyncService(func(s *SyncService) {
-		p := newMockPlugin("spotify")
-		p.syncFn = func(_ context.Context, _ Credentials, _ string) SyncResult {
-			return SyncResult{
-				Items: []MediaItem{{Platform: "spotify", Title: "Song", ExternalID: "s", Type: MediaMusic, ConsumedAt: time.Now()}},
-			}
-		}
-		s.Registry.Register(p)
-
-		// Return some valid and some invalid tags
-		s.Enricher = &mockEnricher{
-			enrichFn: func(_ context.Context, _ MediaItem, _ []string) (*TagResult, error) {
-				return &TagResult{
-					Genre: []TagScore{
-						{Tag: "rock", Confidence: 0.9},       // valid
-						{Tag: "fake-genre", Confidence: 0.5}, // invalid — not in fixed set
-					},
-				}, nil
-			},
-		}
-
-		s.Tags = &mockTagStore{
-			getOrCreateFn: func(_ context.Context, tag string) (uuid.UUID, error) {
-				addedTags = append(addedTags, tag)
-				return uuid.New(), nil
-			},
-		}
-	})
-
-	_, err := svc.SyncPlugin(context.Background(), userID, "spotify")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Only "rock" should pass validation; "fake-genre" should be filtered
-	if len(addedTags) != 1 {
-		t.Errorf("expected 1 tag to be created, got %d: %v", len(addedTags), addedTags)
-	}
-	if len(addedTags) > 0 && addedTags[0] != "rock" {
-		t.Errorf("expected tag 'rock', got %q", addedTags[0])
-	}
-}
+// NOTE: TestSyncPlugin_CoreEnrichment_* tests were removed because enrichment
+// is now decoupled from the sync flow. Enrichment tests live in
+// enrichment_test.go and worker_test.go.

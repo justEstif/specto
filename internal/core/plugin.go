@@ -67,6 +67,28 @@ type OAuthConfig struct {
 	Scopes       []string // Required OAuth scopes
 }
 
+// EnrichmentProvider is the interface for external API enrichment providers.
+// Unlike SourcePlugins (which import data), enrichment providers add metadata
+// tags to existing items by calling external APIs (Last.fm, TMDB, etc.).
+//
+// Multiple providers can enrich the same items. The EnrichmentCoordinator
+// runs all matching providers and merges their results.
+type EnrichmentProvider interface {
+	// Name returns the unique identifier for this provider (e.g., "lastfm", "tmdb").
+	Name() string
+
+	// Supports returns true if this provider can enrich items of the given
+	// media type and platform combination.
+	Supports(mediaType string, platform string) bool
+
+	// Enrich takes a batch of items and returns them with additional tags
+	// populated. Errors should be *PluginError with appropriate codes
+	// (rate_limit, upstream, auth_expired, invalid_data).
+	// Per-item failures should not abort the batch — skip the failing item
+	// and continue with the rest.
+	Enrich(ctx context.Context, items []MediaItem) ([]MediaItem, error)
+}
+
 // Credentials are passed to plugins by core. The plugin never stores these.
 type Credentials struct {
 	// OAuth plugins

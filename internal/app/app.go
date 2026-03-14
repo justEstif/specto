@@ -28,18 +28,21 @@ type Config struct {
 // shared across handlers and middleware via closures.
 type App struct {
 	// Core services
-	Auth     *auth.Service
-	OAuth    *auth.OAuthService
-	Registry *core.PluginRegistry
-	Syncer   *core.SyncService
-	Insights *core.InsightsService
+	Auth        *auth.Service
+	OAuth       *auth.OAuthService
+	Registry    *core.PluginRegistry
+	Syncer      *core.SyncService
+	Insights    *core.InsightsService
+	Coordinator *core.EnrichmentCoordinator
+	Worker      *core.EnrichmentWorker
 
 	// Core stores (exposed for handlers that need direct store access)
-	Users        core.UserStore
-	MediaItems   core.MediaItemStore
-	PluginStates core.PluginStateStore
-	SyncLogs     core.SyncLogStore
-	Tags         core.TagStore
+	Users         core.UserStore
+	MediaItems    core.MediaItemStore
+	PluginStates  core.PluginStateStore
+	SyncLogs      core.SyncLogStore
+	Tags          core.TagStore
+	ShareProfiles core.ShareProfileStore
 }
 
 // New initializes all core components and returns a fully wired App.
@@ -53,20 +56,30 @@ func New(db *database.Queries, cfg Config) *App {
 	syncLogStore := store.NewSyncLogStore(querier)
 	tagStore := store.NewTagStore(querier)
 	insightsStore := store.NewInsightsStore(querier)
+	shareProfileStore := store.NewShareProfileStore(querier)
 
 	// Build core services
 	registry := core.NewPluginRegistry()
-	enricher := &core.NoOpEnricher{}
 
 	syncer := core.NewSyncService(
 		registry,
 		pluginStateStore,
 		mediaItemStore,
 		syncLogStore,
-		tagStore,
-		enricher,
 		0,   // use default min sync interval
 		nil, // use default logger
+	)
+
+	// Build enrichment infrastructure
+	// API providers are empty for now — individual provider beans will register them.
+	// LLM enricher is nil for now — the Genkit LLM enricher bean will set it.
+	coordinator := core.NewEnrichmentCoordinator(nil, nil, nil)
+	worker := core.NewEnrichmentWorker(
+		coordinator,
+		mediaItemStore,
+		tagStore,
+		nil,                           // use default logger
+		core.EnrichmentWorkerConfig{}, // use defaults
 	)
 
 	// Wire token refresher after OAuth service is created (set below)
@@ -91,15 +104,18 @@ func New(db *database.Queries, cfg Config) *App {
 	syncer.TokenRefresher = oauthSvc
 
 	return &App{
-		Auth:         authSvc,
-		OAuth:        oauthSvc,
-		Registry:     registry,
-		Syncer:       syncer,
-		Insights:     insights,
-		Users:        userStore,
-		MediaItems:   mediaItemStore,
-		PluginStates: pluginStateStore,
-		SyncLogs:     syncLogStore,
-		Tags:         tagStore,
+		Auth:          authSvc,
+		OAuth:         oauthSvc,
+		Registry:      registry,
+		Syncer:        syncer,
+		Insights:      insights,
+		Coordinator:   coordinator,
+		Worker:        worker,
+		Users:         userStore,
+		MediaItems:    mediaItemStore,
+		PluginStates:  pluginStateStore,
+		SyncLogs:      syncLogStore,
+		Tags:          tagStore,
+		ShareProfiles: shareProfileStore,
 	}
 }
