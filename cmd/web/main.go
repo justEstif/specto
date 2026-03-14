@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,27 +18,37 @@ import (
 	"github.com/justestif/specto/internal/database"
 	"github.com/justestif/specto/internal/enrichment"
 	"github.com/justestif/specto/internal/handlers"
+	"github.com/justestif/specto/internal/logger"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
 	"github.com/justestif/specto/internal/plugins/spotify"
 	"github.com/justestif/specto/internal/plugins/youtube"
 )
 
 func main() {
+	// Initialize structured logger first — everything else uses it.
+	log := logger.New(logger.Config{
+		ServiceName: "specto",
+		Version:     version(),
+	})
+
 	// Initialize database
 	if err := database.InitDB(); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		log.Error("failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
 	// Load configuration from environment (single place for all env reads)
 	encKey := os.Getenv("ENCRYPTION_KEY")
 	if encKey == "" {
-		log.Fatal("ENCRYPTION_KEY environment variable not set (must be 64 hex chars for AES-256)")
+		log.Error("ENCRYPTION_KEY environment variable not set (must be 64 hex chars for AES-256)")
+		os.Exit(1)
 	}
 
 	sessionSecret := []byte(os.Getenv("SESSION_SECRET"))
 	if len(sessionSecret) < 32 {
-		log.Fatal("SESSION_SECRET must be at least 32 bytes long")
+		log.Error("SESSION_SECRET must be at least 32 bytes long")
+		os.Exit(1)
 	}
 
 	// Load optional OAuth client credentials from environment
@@ -84,9 +95,11 @@ func main() {
 			Provider: llmProvider,
 			Model:    os.Getenv("LLM_MODEL"),
 			APIKey:   os.Getenv("LLM_API_KEY"),
+			BaseURL:  os.Getenv("LLM_BASE_URL"),
 		}, nil)
 		if err != nil {
-			log.Fatalf("Failed to initialize LLM enricher: %v", err)
+			log.Error("failed to initialize LLM enricher", "error", err)
+			os.Exit(1)
 		}
 		llmEnricher = enricher
 	}
@@ -100,20 +113,25 @@ func main() {
 		LastfmAPIKey:  lastfmAPIKey,
 		TMDBAPIKey:    tmdbAPIKey,
 		LLMEnricher:   llmEnricher,
+		Logger:        log,
 	})
 
 	// Register plugins
 	if err := application.Registry.Register(spotify.New()); err != nil {
-		log.Fatalf("Failed to register spotify plugin: %v", err)
+		log.Error("failed to register plugin", "plugin", "spotify", "error", err)
+		os.Exit(1)
 	}
 	if err := application.Registry.Register(spotify.NewAPI()); err != nil {
-		log.Fatalf("Failed to register spotify-api plugin: %v", err)
+		log.Error("failed to register plugin", "plugin", "spotify-api", "error", err)
+		os.Exit(1)
 	}
 	if err := application.Registry.Register(youtube.NewWithEnrich()); err != nil {
-		log.Fatalf("Failed to register youtube plugin: %v", err)
+		log.Error("failed to register plugin", "plugin", "youtube", "error", err)
+		os.Exit(1)
 	}
 	if err := application.Registry.Register(youtube.NewAPI()); err != nil {
-		log.Fatalf("Failed to register youtube-api plugin: %v", err)
+		log.Error("failed to register plugin", "plugin", "youtube-api", "error", err)
+		os.Exit(1)
 	}
 
 	// Wire handlers with dependencies
@@ -121,16 +139,18 @@ func main() {
 
 	r := chi.NewRouter()
 
-	// Standard middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Standard middleware — RequestID and RealIP run first so the wide
+	// event logger can capture them.
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(customMiddleware.WideEventLogger(log))
+	r.Use(middleware.Recoverer)
 
 	// CSRF protection - set secure=true in production
 	csrfKey := []byte(os.Getenv("CSRF_KEY"))
 	if len(csrfKey) != 32 {
-		log.Fatal("CSRF_KEY must be exactly 32 bytes long")
+		log.Error("CSRF_KEY must be exactly 32 bytes long")
+		os.Exit(1)
 	}
 	csrfMw := customMiddleware.SetupCSRF(csrfKey, false)
 
@@ -236,7 +256,7 @@ func main() {
 
 	// Log registered plugins (if any)
 	for _, name := range application.Registry.List() {
-		log.Printf("Registered plugin: %s", name)
+		log.Info("registered plugin", "plugin", name)
 	}
 
 	// Start enrichment worker in background
@@ -257,9 +277,10 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Server starting on http://localhost:%s", port)
+		log.Info("server starting", "addr", fmt.Sprintf("http://localhost:%s", port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed: %v", err)
+			log.Error("server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -267,7 +288,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down...")
+	log.Info("shutting down")
 
 	// Stop enrichment worker
 	workerCancel()
@@ -276,8 +297,21 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		log.Error("server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server stopped")
+	log.Info("server stopped")
 }
+
+// version returns the application version. Override at build time with:
+//
+//	go build -ldflags="-X main.appVersion=1.0.0"
+var appVersion = "dev"
+
+func version() string {
+	return appVersion
+}
+
+// Ensure slog is used (compile guard).
+var _ *slog.Logger

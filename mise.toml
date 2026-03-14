@@ -32,10 +32,10 @@ BASE_URL = "http://127.0.0.1:3000"
 # IGDB_CLIENT_ID = ""
 # IGDB_CLIENT_SECRET = ""
 # LLM enricher (optional — leave empty to skip LLM enrichment)
-# LLM_PROVIDER = "googlegenai"         # googlegenai | ollama
-# LLM_MODEL = "gemini-2.0-flash"
+# LLM_PROVIDER = "googlegenai"         # googlegenai | openai
+# LLM_MODEL = "gemini-2.5-flash"
 # LLM_API_KEY = ""
-# LLM_OLLAMA_BASE_URL = "http://localhost:11434"
+# LLM_BASE_URL = ""                    # custom endpoint for openai provider (e.g. Zen, Ollama)
 # Enrichment worker tuning
 ENRICHMENT_BATCH_SIZE = "50"
 ENRICHMENT_POLL_INTERVAL = "5s"

@@ -195,7 +195,7 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name:    "unsupported provider",
-			cfg:     Config{Provider: "openai", Model: "gpt-4o"},
+			cfg:     Config{Provider: "anthropic", Model: "claude-3"},
 			wantErr: "unsupported LLM_PROVIDER",
 		},
 	}

@@ -372,24 +372,30 @@ LLM_API_KEY = "your-google-ai-api-key"
 
 ---
 
-### Ollama (local)
+### OpenAI-compatible (openai)
 
-Run LLM enrichment locally with no API key or cloud dependency.
+Use any OpenAI-compatible API — including OpenAI directly or Ollama with
+its OpenAI-compatible endpoint.
 
-#### 1. Install Ollama
-
-1. Go to [ollama.com](https://ollama.com/) and install for your platform
-2. Start Ollama: `ollama serve`
-3. Pull a model: `ollama pull llama3.1:8b` (or any model that supports structured output)
-
-#### 2. Set Environment Variables
+#### OpenAI Direct
 
 ```toml
-# In mise.toml
-LLM_PROVIDER = "ollama"
+LLM_PROVIDER = "openai"
+LLM_MODEL = "gpt-4o-mini"
+LLM_API_KEY = "sk-your-openai-key"
+# LLM_BASE_URL not needed (defaults to api.openai.com)
+```
+
+#### Ollama (local, OpenAI-compatible mode)
+
+1. Install [Ollama](https://ollama.com/) and pull a model: `ollama pull llama3.1:8b`
+2. Start Ollama: `ollama serve`
+
+```toml
+LLM_PROVIDER = "openai"
 LLM_MODEL = "llama3.1:8b"
-# LLM_API_KEY not needed for Ollama
-LLM_OLLAMA_BASE_URL = "http://localhost:11434"
+LLM_API_KEY = "ollama"
+LLM_BASE_URL = "http://localhost:11434/v1/"
 ```
 
 > **Note**: Local models are slower and may produce lower-quality tag
@@ -440,10 +446,11 @@ IGDB_CLIENT_SECRET = ""                   # Twitch client secret
 # MusicBrainz — no key needed (public API)
 
 # LLM enrichment
-LLM_PROVIDER = ""                         # googlegenai | ollama
-LLM_MODEL = ""                            # e.g. gemini-2.0-flash, llama3.1:8b
-LLM_API_KEY = ""                          # not needed for ollama
-# LLM_OLLAMA_BASE_URL = "http://localhost:11434"
+LLM_PROVIDER = ""                         # googlegenai | openai
+LLM_MODEL = ""                            # e.g. gemini-2.0-flash, gpt-4o-mini
+LLM_API_KEY = ""                          # required for all providers
+LLM_BASE_URL = ""                         # optional: custom endpoint for openai provider
+                                          # e.g. "http://localhost:11434/v1/" for Ollama
 
 # Enrichment worker tuning
 ENRICHMENT_BATCH_SIZE = "50"

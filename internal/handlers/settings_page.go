@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/a-h/templ"
@@ -114,7 +113,7 @@ func (h *Handler) SettingsAccountUpdate(w http.ResponseWriter, r *http.Request) 
 
 	updatedUser, err := h.App.Users.UpdateProfile(r.Context(), user.ID, displayName, user.AvatarURL, slugPtr)
 	if err != nil {
-		log.Printf("settings: update profile error: %v", err)
+		addContext(r, "settings_update_error", err.Error())
 		data := components.SettingsData{
 			User:      user,
 			ActiveTab: "account",

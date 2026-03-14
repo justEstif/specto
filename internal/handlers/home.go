@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -44,15 +43,18 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		MediaType: nilIfEmpty(filters.Type),
 	}
 
+	addContext(r, "handler", "dashboard")
+	addContext(r, "user_id", user.ID.String())
+
 	summary, err := h.App.Insights.GetSummaryFiltered(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
-		log.Printf("dashboard: summary error: %v", err)
+		addContext(r, "dashboard_summary_error", err.Error())
 		summary = &core.Summary{}
 	}
 
 	timeline, err := h.App.Insights.GetTimelineFiltered(ctx, user.ID, core.BucketDay, from, to, insightsFilter)
 	if err != nil {
-		log.Printf("dashboard: timeline error: %v", err)
+		addContext(r, "dashboard_timeline_error", err.Error())
 	}
 
 	// Recent items use ListFiltered when filters are active.
@@ -65,17 +67,17 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		recentItems, err = h.App.MediaItems.List(ctx, user.ID, from, to, 5, 0)
 	}
 	if err != nil {
-		log.Printf("dashboard: recent items error: %v", err)
+		addContext(r, "dashboard_items_error", err.Error())
 	}
 
 	tags, err := h.App.Insights.GetTagDistributionFiltered(ctx, user.ID, from, to, 5, insightsFilter)
 	if err != nil {
-		log.Printf("dashboard: tags error: %v", err)
+		addContext(r, "dashboard_tags_error", err.Error())
 	}
 
 	platforms, err := h.App.Insights.GetPlatformBreakdownFiltered(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
-		log.Printf("dashboard: platforms error: %v", err)
+		addContext(r, "dashboard_platforms_error", err.Error())
 	}
 
 	data := components.DashboardData{
@@ -113,7 +115,7 @@ func (h *Handler) ActivityChartPartial(w http.ResponseWriter, r *http.Request) {
 
 	timeline, err := h.App.Insights.GetTimeline(r.Context(), user.ID, core.BucketDay, from, to)
 	if err != nil {
-		log.Printf("activity chart partial: %v", err)
+		addContext(r, "activity_chart_error", err.Error())
 	}
 
 	components.ActivityChart(timeline).Render(r.Context(), w)
@@ -149,7 +151,7 @@ func (h *Handler) RecentItemsPartial(w http.ResponseWriter, r *http.Request) {
 		items, err = h.App.MediaItems.List(r.Context(), user.ID, from, to, int32(limit), int32(offset))
 	}
 	if err != nil {
-		log.Printf("recent items partial: %v", err)
+		addContext(r, "recent_items_error", err.Error())
 		return
 	}
 

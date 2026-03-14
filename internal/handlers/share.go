@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
@@ -131,7 +130,7 @@ func (h *Handler) UpdateShareProfile(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.App.ShareProfiles.Upsert(r.Context(), user.ID, profile)
 	if err != nil {
-		log.Printf("share: update error: %v", err)
+		addContext(r, "share_update_error", err.Error())
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update share profile")
 		return
 	}
@@ -164,7 +163,7 @@ func (h *Handler) SharePreview(w http.ResponseWriter, r *http.Request) {
 
 	blocks, err := h.renderBlocks(r.Context(), user.ID, profile)
 	if err != nil {
-		log.Printf("share: preview render error: %v", err)
+		addContext(r, "share_preview_error", err.Error())
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to render preview")
 		return
 	}
@@ -196,7 +195,7 @@ func (h *Handler) ToggleItemPrivate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.App.ShareProfiles.SetItemPrivacy(r.Context(), user.ID, itemID, req.Private); err != nil {
-		log.Printf("share: set privacy error: %v", err)
+		addContext(r, "share_privacy_error", err.Error())
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to update item privacy")
 		return
 	}

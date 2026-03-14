@@ -11,7 +11,9 @@ import (
 
 	"github.com/firebase/genkit/go/ai"
 	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/compat_oai/openai"
 	"github.com/firebase/genkit/go/plugins/googlegenai"
+	oaioption "github.com/openai/openai-go/option"
 
 	"github.com/justestif/specto/internal/core"
 )
@@ -21,9 +23,10 @@ var promptsFS embed.FS
 
 // Config holds the LLM enricher configuration.
 type Config struct {
-	Provider string // "googlegenai" or "ollama"
-	Model    string // e.g. "gemini-2.5-flash", "llama3.1:8b"
-	APIKey   string // required for googlegenai, empty for ollama
+	Provider string // "googlegenai" or "openai"
+	Model    string // e.g. "gemini-2.5-flash", "gpt-4o-mini"
+	APIKey   string // required for all providers
+	BaseURL  string // optional: custom base URL for openai provider (e.g. Ollama)
 }
 
 // ClassifyInput is the input schema for the classification prompt.
@@ -56,9 +59,10 @@ type ClassifyTagScore struct {
 
 // GenkitEnricher implements core.Enricher using Firebase Genkit with Dotprompt.
 type GenkitEnricher struct {
-	g      *genkit.Genkit
-	prompt *ai.DataPrompt[ClassifyInput, *ClassifyOutput]
-	logger *slog.Logger
+	g         *genkit.Genkit
+	prompt    *ai.DataPrompt[ClassifyInput, *ClassifyOutput]
+	modelName string // fully qualified model name (e.g. "googleai/gemini-2.5-flash", "openai/gpt-4o-mini")
+	logger    *slog.Logger
 }
 
 // Compile-time interface check.
@@ -79,14 +83,26 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*GenkitEnricher,
 	}
 
 	var opts []genkit.GenkitOption
+	var modelName string
+
 	switch cfg.Provider {
 	case "googlegenai":
 		opts = append(opts, genkit.WithPlugins(&googlegenai.GoogleAI{}))
+		modelName = "googleai/" + cfg.Model
+	case "openai":
+		plugin := &openai.OpenAI{
+			APIKey: cfg.APIKey,
+		}
+		if cfg.BaseURL != "" {
+			plugin.Opts = append(plugin.Opts, oaioption.WithBaseURL(cfg.BaseURL))
+		}
+		opts = append(opts, genkit.WithPlugins(plugin))
+		modelName = "openai/" + cfg.Model
 	default:
-		return nil, fmt.Errorf("enrichment: unsupported LLM_PROVIDER %q (supported: googlegenai)", cfg.Provider)
+		return nil, fmt.Errorf("enrichment: unsupported LLM_PROVIDER %q (supported: googlegenai, openai)", cfg.Provider)
 	}
+
 	opts = append(opts,
-		genkit.WithPromptDir("prompts"),
 		genkit.WithPromptFS(promptsFS),
 	)
 
@@ -103,13 +119,14 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*GenkitEnricher,
 
 	logger.Info("genkit enricher initialized",
 		"provider", cfg.Provider,
-		"model", cfg.Model,
+		"model", modelName,
 	)
 
 	return &GenkitEnricher{
-		g:      g,
-		prompt: prompt,
-		logger: logger,
+		g:         g,
+		prompt:    prompt,
+		modelName: modelName,
+		logger:    logger,
 	}, nil
 }
 
@@ -131,7 +148,7 @@ func (e *GenkitEnricher) Enrich(ctx context.Context, item core.MediaItem, existi
 		FormatTags:   core.FormatTags,
 	}
 
-	output, _, err := e.prompt.Execute(ctx, input)
+	output, _, err := e.prompt.Execute(ctx, input, ai.WithModelName(e.modelName))
 	if err != nil {
 		return nil, fmt.Errorf("enrichment: LLM classification failed: %w", err)
 	}

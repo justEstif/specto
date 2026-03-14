@@ -389,10 +389,12 @@ IGDB_CLIENT_ID=xxx
 IGDB_CLIENT_SECRET=xxx
 
 # LLM enrichment provider
-LLM_PROVIDER=googlegenai            # googlegenai | ollama
-LLM_MODEL=gemini-2.0-flash
-LLM_API_KEY=xxx                     # not needed for ollama
-# LLM_OLLAMA_BASE_URL=http://localhost:11434  # only for ollama
+LLM_PROVIDER=googlegenai            # googlegenai | openai
+LLM_MODEL=gemini-2.5-flash
+LLM_API_KEY=xxx
+LLM_BASE_URL=                       # custom endpoint for openai provider
+                                    # e.g. https://opencode.ai/zen/v1/ for OpenCode Zen
+                                    # e.g. http://localhost:11434/v1/ for Ollama
 
 # Worker settings (optional, sensible defaults)
 ENRICHMENT_BATCH_SIZE=50            # items per worker tick

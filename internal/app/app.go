@@ -3,6 +3,8 @@
 package app
 
 import (
+	"log/slog"
+
 	"github.com/justestif/specto/internal/auth"
 	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/core/store"
@@ -28,6 +30,7 @@ type Config struct {
 	LastfmAPIKey  string                       // Last.fm API key for music enrichment (optional)
 	TMDBAPIKey    string                       // TMDB API key for movie/TV enrichment (optional)
 	LLMEnricher   core.Enricher                // LLM enricher (nil to skip Phase 2)
+	Logger        *slog.Logger                 // structured logger; nil falls back to slog.Default()
 }
 
 // App holds all core dependencies. It is created once at startup and
@@ -42,6 +45,9 @@ type App struct {
 	Coordinator *core.EnrichmentCoordinator
 	Worker      *core.EnrichmentWorker
 
+	// Logger is the application-wide structured logger.
+	Logger *slog.Logger
+
 	// Core stores (exposed for handlers that need direct store access)
 	Users         core.UserStore
 	MediaItems    core.MediaItemStore
@@ -54,6 +60,11 @@ type App struct {
 // New initializes all core components and returns a fully wired App.
 // The database Queries instance and config are injected — no globals read.
 func New(db *database.Queries, cfg Config) *App {
+	log := cfg.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+
 	// Build store layer
 	querier := db // *database.Queries satisfies store.Querier
 	userStore := store.NewUserStore(querier)
@@ -72,8 +83,8 @@ func New(db *database.Queries, cfg Config) *App {
 		pluginStateStore,
 		mediaItemStore,
 		syncLogStore,
-		0,   // use default min sync interval
-		nil, // use default logger
+		0, // use default min sync interval
+		log,
 	)
 
 	// Build enrichment infrastructure
@@ -88,12 +99,12 @@ func New(db *database.Queries, cfg Config) *App {
 	if cfg.TMDBAPIKey != "" {
 		providers = append(providers, tmdb.New(cfg.TMDBAPIKey))
 	}
-	coordinator := core.NewEnrichmentCoordinator(providers, cfg.LLMEnricher, nil)
+	coordinator := core.NewEnrichmentCoordinator(providers, cfg.LLMEnricher, log)
 	worker := core.NewEnrichmentWorker(
 		coordinator,
 		mediaItemStore,
 		tagStore,
-		nil,                           // use default logger
+		log,
 		core.EnrichmentWorkerConfig{}, // use defaults
 	)
 
@@ -119,6 +130,7 @@ func New(db *database.Queries, cfg Config) *App {
 	syncer.TokenRefresher = oauthSvc
 
 	return &App{
+		Logger:        log,
 		Auth:          authSvc,
 		OAuth:         oauthSvc,
 		Registry:      registry,

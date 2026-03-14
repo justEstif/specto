@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -61,7 +60,7 @@ func (h *Handler) fetchTimelineItems(r *http.Request, user *core.UserInfo, f com
 
 	items, err := h.App.MediaItems.ListFiltered(r.Context(), user.ID, from, now, fetchLimit, int32(f.Offset), platform, mediaType, search)
 	if err != nil {
-		log.Printf("timeline page: list error: %v", err)
+		addContext(r, "timeline_list_error", err.Error())
 		return nil, false
 	}
 

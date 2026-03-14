@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -43,7 +42,7 @@ func (h *Handler) ShareProfilePage(w http.ResponseWriter, r *http.Request) {
 	// Render blocks with real data.
 	blocks, err := h.renderPublicBlocks(r, pub)
 	if err != nil {
-		log.Printf("share page: render blocks error: %v", err)
+		addContext(r, "share_page_render_error", err.Error())
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
