@@ -87,7 +87,7 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*GenkitEnricher,
 
 	switch cfg.Provider {
 	case "googlegenai":
-		opts = append(opts, genkit.WithPlugins(&googlegenai.GoogleAI{}))
+		opts = append(opts, genkit.WithPlugins(&googlegenai.GoogleAI{APIKey: cfg.APIKey}))
 		modelName = "googleai/" + cfg.Model
 	case "openai":
 		plugin := &openai.OpenAI{
