@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Specto — Know What You Consume</title>
+  <meta name="description" content="Personal media consumption dashboard. Aggregates your Spotify, YouTube, Netflix history into one unified view with insights and shareable profiles.">
+  <link rel="stylesheet" href="https://unpkg.com/missing.css@1.2.0">
+  <style>
+    :root {
+      --accent: #7c3aed;
+      --main-font: system-ui, -apple-system, sans-serif;
+    }
+    header.hero {
+      padding-block: 4rem 2rem;
+      text-align: center;
+    }
+    header.hero p {
+      max-width: 38rem;
+      margin-inline: auto;
+    }
+    .feature-grid {
+      --col-width: 18rem;
+    }
+    .platform-list {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .platform-list li {
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--muted-fg);
+      border-radius: 2rem;
+      font-size: 0.875rem;
+    }
+    footer {
+      text-align: center;
+      padding-block: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Specto</h1>
+  <p class="<big>">
+    Your digital life is fragmented across dozens of platforms. Specto pulls it
+    all together &mdash; one dashboard for everything you watch, listen to, and read.
+  </p>
+  <nav role="toolbar" style="justify-content: center; margin-top: 1.5rem;">
+    <a href="https://github.com/justestif/specto" class="<button>">GitHub</a>
+    <a href="self-hosting.md" class="<button>">Self-Host</a>
+  </nav>
+</header>
+
+<main>
+
+  <section>
+    <h2 class="text-align:center">What It Does</h2>
+    <div class="grid feature-grid">
+      <div class="box">
+        <strong class="titlebar">Unified Media Feed</strong>
+        <p>Pull consumption history from Spotify, YouTube, Netflix and more into a single timeline.</p>
+      </div>
+      <div class="box">
+        <strong class="titlebar">Auto-Tagging</strong>
+        <p>Content is classified by topic, genre, and mood using platform APIs and LLM enrichment.</p>
+      </div>
+      <div class="box">
+        <strong class="titlebar">Consumption Insights</strong>
+        <p>See time spent, topic distribution, platform breakdown, and trends over time.</p>
+      </div>
+      <div class="box">
+        <strong class="titlebar">Shareable Profiles</strong>
+        <p>Generate a public page of your media diet &mdash; like Spotify Wrapped, but for everything.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="text-align:center">Supported Platforms</h2>
+    <p class="text-align:center">Connect via OAuth or file import. Each platform is a plugin &mdash; disable what you don't use.</p>
+    <ul class="platform-list">
+      <li>Spotify</li>
+      <li>YouTube</li>
+      <li>Netflix</li>
+      <li>Prime Video</li>
+      <li>TikTok</li>
+      <li>Podcasts</li>
+      <li>RSS / Blogs</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="text-align:center">Tech Stack</h2>
+    <div class="text-align:center">
+      <p>
+        Go + Chi &middot; PostgreSQL + sqlc &middot; Templ + HTMX &middot;
+        DaisyUI + Tailwind CSS
+      </p>
+      <p>
+        No JavaScript framework. No build step for the frontend.
+        Server-rendered HTML with progressive enhancement.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="text-align:center">Self-Host in Minutes</h2>
+    <pre><code>git clone https://github.com/justestif/specto
+cd specto
+docker-compose up -d
+mise install && mise run setup
+mise run build
+./bin/app</code></pre>
+    <p class="text-align:center">
+      See the <a href="self-hosting.md">self-hosting guide</a> for full
+      configuration (env vars, OAuth setup, reverse proxy).
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-align:center">How It Works</h2>
+    <ol>
+      <li><strong>Connect</strong> your platforms via OAuth or upload an export file</li>
+      <li><strong>Sync</strong> pulls your history into a normalized schema</li>
+      <li><strong>Enrich</strong> auto-tags content using Last.fm, TMDB, AniList, and LLMs</li>
+      <li><strong>Explore</strong> your consumption through the insights dashboard</li>
+      <li><strong>Share</strong> a curated public profile of your media diet</li>
+    </ol>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    <a href="https://github.com/justestif/specto">Source</a> &middot;
+    <a href="self-hosting.md">Self-Hosting</a> &middot;
+    <a href="api-key-setup.md">API Keys</a>
+  </p>
+  <p><small>MIT License</small></p>
+</footer>
+
+</body>
+</html>

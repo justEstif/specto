@@ -94,6 +94,7 @@ Run `mise tasks` to see all available tasks:
 - [Architecture](docs/architecture.md) — System design and layers
 - [API](docs/api.md) — HTTP API contract
 - [Schema](docs/schema.md) — Database schema
+- [Self-Hosting](docs/self-hosting.md) — Deploy your own instance
 - [Development Workflow](docs/development-workflow.md) — How to develop
 - [Plugin Guide](docs/plugin-guide.md) — Plugin interface
 
