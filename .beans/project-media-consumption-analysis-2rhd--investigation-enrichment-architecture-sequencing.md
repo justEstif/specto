@@ -5,7 +5,7 @@ status: in-progress
 type: task
 priority: high
 created_at: 2026-03-14T03:52:42Z
-updated_at: 2026-03-14T14:28:11Z
+updated_at: 2026-03-14T14:48:50Z
 parent: project-media-consumption-analysis-eo0f
 ---
 
@@ -13,7 +13,7 @@ Resolve key design questions before implementing enrichment:
 
 ## Questions to resolve
 
-- [ ] Plugin-type split: should SourcePlugin be split into DataSource vs EnrichmentProvider interfaces? (absorbs bean xx0d)
+- [x] Plugin-type split: **Yes — split into SourcePlugin (import only) and EnrichmentProvider (enrich by media type/platform).** Multiple enrichers can run per item. YouTube API becomes an EnrichmentProvider, not a source. The existing core Enricher (LLM) becomes just another EnrichmentProvider. (absorbs bean xx0d)
 - [ ] Enrichment trigger timing: sync-time (inline) vs async background job vs hybrid?
 - [ ] How do plugin enrichment (Layer 1) and core/LLM enrichment (Layer 2) coordinate? What status transitions?
 - [ ] Batch strategy: per-item vs batched calls for each enrichment source
