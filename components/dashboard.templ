@@ -25,6 +25,7 @@ type DashboardData struct {
 	ActiveRange       string // "7d", "30d", "90d"
 	Timeline          []core.TimelineEntry
 	Filters           DashboardFilters
+	OnThisDay         []OnThisDayGroup
 }
 
 // Dashboard renders the authenticated dashboard page.
@@ -49,6 +50,12 @@ templ DashboardContent(data DashboardData) {
 	@dashboardActivity(data.Timeline)
 	<!-- Recent items -->
 	@dashboardRecent(data.RecentItems, data.Filters)
+	<!-- On This Day -->
+	if len(data.OnThisDay) > 0 {
+		<div class="mt-8">
+			@OnThisDayCard(data.OnThisDay)
+		</div>
+	}
 	<!-- Bottom row: tags + platform breakdown -->
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
 		@dashboardTags(data.Tags)
@@ -66,7 +73,7 @@ templ dashboardFilterBar(f DashboardFilters) {
 			hx-get="/partials/dashboard"
 			hx-target="#dashboard-content"
 			hx-swap="innerHTML"
-			hx-push-url="true"
+			hx-push-url="false"
 			hx-include="[name='type'], [name='range']"
 		>
 			<option value="" selected?={ f.Platform == "" }>All platforms</option>
@@ -81,7 +88,7 @@ templ dashboardFilterBar(f DashboardFilters) {
 			hx-get="/partials/dashboard"
 			hx-target="#dashboard-content"
 			hx-swap="innerHTML"
-			hx-push-url="true"
+			hx-push-url="false"
 			hx-include="[name='platform'], [name='range']"
 		>
 			<option value="" selected?={ f.Type == "" }>All types</option>
@@ -109,7 +116,7 @@ templ dashboardRangeTab(value string, f DashboardFilters) {
 		hx-get={ "/partials/dashboard?range=" + value + dashboardFilterQuery(f) }
 		hx-target="#dashboard-content"
 		hx-swap="innerHTML"
-		hx-push-url="true"
+		hx-push-url="false"
 	>
 		{ value }
 	</button>

@@ -188,6 +188,7 @@ func main() {
 		r.Use(customMiddleware.RequireAuth(application.Auth))
 
 		r.Get("/timeline", h.TimelinePage)
+		r.Get("/attention", h.AttentionPage)
 		r.Get("/plugins", h.PluginsPage)
 		r.Get("/settings", h.SettingsPage)
 		r.Get("/settings/{tab}", h.SettingsPage)
@@ -204,6 +205,8 @@ func main() {
 		r.Get("/partials/timeline", h.RecentItemsPartial)
 		r.Get("/partials/timeline-page", h.TimelinePagePartial)
 		r.Get("/partials/settings/{tab}", h.SettingsPartial)
+		r.Get("/partials/on-this-day", h.OnThisDayPartial)
+		r.Get("/partials/attention", h.AttentionPartial)
 	})
 
 	// JSON API (v1)
@@ -243,6 +246,9 @@ func main() {
 			r.Get("/insights/platform-breakdown", h.InsightsPlatformBreakdown)
 			r.Get("/insights/tags", h.InsightsTags)
 			r.Get("/insights/timeline", h.InsightsTimeline)
+			r.Get("/insights/on-this-day", h.OnThisDay)
+			r.Get("/insights/attention-by-type", h.InsightsAttentionByType)
+			r.Get("/insights/tags-by-category", h.InsightsTagsByCategory)
 
 			// Share profile
 			r.Route("/share-profile", func(r chi.Router) {

@@ -60,9 +60,23 @@ func NewWithBaseURL(apiKey, baseURL string) *Provider {
 // Name returns the unique identifier for this provider.
 func (p *Provider) Name() string { return "tmdb" }
 
-// Supports returns true for all video items regardless of platform.
-func (p *Provider) Supports(mediaType string, _ string) bool {
-	return mediaType == string(core.MediaVideo)
+// animePlatforms are platforms primarily serving anime content where TMDB
+// lookups would be unlikely to match. AniList handles these instead.
+var animePlatforms = map[string]bool{
+	"crunchyroll": true,
+	"funimation":  true,
+	"hidive":      true,
+	"animelab":    true,
+	"vrv":         true,
+}
+
+// Supports returns true for video items from non-anime platforms.
+// Anime platforms are handled by the AniList provider instead.
+func (p *Provider) Supports(mediaType string, platform string) bool {
+	if mediaType != string(core.MediaVideo) {
+		return false
+	}
+	return !animePlatforms[strings.ToLower(platform)]
 }
 
 // Enrich searches TMDB for each item, retrieves genre and keyword data,

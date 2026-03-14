@@ -1,0 +1,292 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// AttentionFilters holds the active filter state for the attention audit page.
+type AttentionFilters struct {
+	Platform string
+	Type     string
+	Range    string // "7d", "30d", "90d"
+}
+
+// AttentionData holds all pre-fetched data for the attention audit page.
+type AttentionData struct {
+	User            *core.UserInfo
+	Filters         AttentionFilters
+	AttentionByType []core.AttentionByTypeEntry
+	Genres          []core.TagDistributionEntry
+	Topics          []core.TagDistributionEntry
+	Moods           []core.TagDistributionEntry
+	Platforms       []core.PlatformBreakdownEntry
+}
+
+// AttentionPage renders the full attention audit page.
+templ AttentionPage(data AttentionData) {
+	@Layout("Attention Audit — Specto", data.User) {
+		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-2">Attention Audit</h1>
+		<p class="text-base-content/50 text-sm mb-6">Where your attention actually goes.</p>
+		@attentionFilterBar(data.Filters)
+		<div id="attention-content">
+			@AttentionContent(data)
+		</div>
+	}
+}
+
+// AttentionContent renders the attention audit content (HTMX swap target).
+templ AttentionContent(data AttentionData) {
+	<!-- Attention by type -->
+	@attentionByTypeSection(data.AttentionByType)
+	<!-- Tag breakdowns -->
+	<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+		@attentionTagList("Genres", "genre", data.Genres)
+		@attentionTagList("Topics", "topic", data.Topics)
+		@attentionTagList("Moods", "mood", data.Moods)
+	</div>
+	<!-- Platform attention -->
+	<div class="mt-8">
+		@attentionPlatforms(data.Platforms)
+	</div>
+}
+
+templ attentionFilterBar(f AttentionFilters) {
+	<div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
+		<select
+			name="platform"
+			aria-label="Filter by platform"
+			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-40"
+			hx-get="/partials/attention"
+			hx-target="#attention-content"
+			hx-swap="innerHTML"
+			hx-push-url="false"
+			hx-include="[name='type'], [name='range']"
+		>
+			<option value="" selected?={ f.Platform == "" }>All platforms</option>
+			<option value="spotify" selected?={ f.Platform == "spotify" }>Spotify</option>
+			<option value="youtube" selected?={ f.Platform == "youtube" }>YouTube</option>
+			<option value="netflix" selected?={ f.Platform == "netflix" }>Netflix</option>
+		</select>
+		<select
+			name="type"
+			aria-label="Filter by type"
+			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-36"
+			hx-get="/partials/attention"
+			hx-target="#attention-content"
+			hx-swap="innerHTML"
+			hx-push-url="false"
+			hx-include="[name='platform'], [name='range']"
+		>
+			<option value="" selected?={ f.Type == "" }>All types</option>
+			<option value="music" selected?={ f.Type == "music" }>Music</option>
+			<option value="video" selected?={ f.Type == "video" }>Video</option>
+			<option value="podcast" selected?={ f.Type == "podcast" }>Podcast</option>
+			<option value="article" selected?={ f.Type == "article" }>Article</option>
+		</select>
+		<div class="sm:ml-auto">
+			<div role="tablist" class="tabs tabs-box tabs-sm bg-base-200">
+				@attentionRangeTab("7d", f)
+				@attentionRangeTab("30d", f)
+				@attentionRangeTab("90d", f)
+			</div>
+		</div>
+	</div>
+}
+
+templ attentionRangeTab(value string, f AttentionFilters) {
+	<button
+		role="tab"
+		name="range"
+		value={ value }
+		class={ "tab", templ.KV("tab-active", value == f.Range) }
+		hx-get={ "/partials/attention?range=" + value + attentionFilterQuery(f) }
+		hx-target="#attention-content"
+		hx-swap="innerHTML"
+		hx-push-url="false"
+	>
+		{ value }
+	</button>
+}
+
+// attentionByTypeSection shows how attention is distributed across media types.
+templ attentionByTypeSection(entries []core.AttentionByTypeEntry) {
+	<div>
+		<h2 class="text-display text-xl font-semibold mb-4">By Type</h2>
+		if len(entries) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+				No consumption data yet.
+			</div>
+		} else {
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				for _, entry := range entries {
+					@attentionTypeCard(entry, totalAttentionItems(entries))
+				}
+			</div>
+		}
+	</div>
+}
+
+templ attentionTypeCard(entry core.AttentionByTypeEntry, total int64) {
+	<div class="stat bg-neutral border border-base-300 rounded-box p-4">
+		<div class="stat-title text-base-content/50 text-xs uppercase tracking-wider flex items-center gap-1.5">
+			<span>{ mediaIcon(entry.MediaType) }</span>
+			<span>{ entry.MediaType }</span>
+		</div>
+		<div class="stat-value text-2xl font-bold text-base-content tabular-nums">
+			{ formatCount(entry.Count) }
+		</div>
+		<div class="stat-desc text-base-content/40 tabular-nums">
+			if total > 0 {
+				{ fmt.Sprintf("%d%%", entry.Count*100/total) } of items
+			}
+			if entry.TotalTimeSpent > 0 {
+				<span class="ml-1">{ formatDuration(entry.TotalTimeSpent) } spent</span>
+			}
+		</div>
+	</div>
+}
+
+// attentionTagList renders a tag distribution list for a specific category.
+templ attentionTagList(title, category string, tags []core.TagDistributionEntry) {
+	<div>
+		<h2 class="text-display text-lg font-semibold mb-3">{ title }</h2>
+		if len(tags) == 0 {
+			<div class="bg-neutral border border-base-300 rounded-box p-6 text-center text-base-content/40 text-sm">
+				No { strings.ToLower(title) } data yet.
+			</div>
+		} else {
+			<div class="bg-neutral border border-base-300 rounded-box p-4 space-y-3">
+				for _, tag := range tags {
+					<div>
+						<div class="flex justify-between text-sm mb-1">
+							<span class="text-base-content/80">{ tag.Name }</span>
+							<span class="text-base-content/40 font-mono">{ formatCount(tag.Count) }</span>
+						</div>
+						<progress
+							class={ "progress w-full", tagProgressColor(category) }
+							value={ fmt.Sprintf("%d", tagPct(tag.Count, tags)) }
+							max="100"
+						></progress>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// attentionPlatforms renders the platform attention breakdown with time data.
+templ attentionPlatforms(entries []core.PlatformBreakdownEntry) {
+	<h2 class="text-display text-xl font-semibold mb-4">By Platform</h2>
+	if len(entries) == 0 {
+		<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+			No platform data yet.
+		</div>
+	} else {
+		<div class="bg-neutral border border-base-300 rounded-box p-4 space-y-3">
+			for _, entry := range aggregatePlatformsWithDuration(entries) {
+				<div>
+					<div class="flex justify-between text-sm mb-1">
+						<span class="text-base-content/80">{ entry.name }</span>
+						<div class="text-base-content/40 font-mono text-xs space-x-2">
+							<span>{ formatCount(entry.count) } items</span>
+							if entry.durationSec > 0 {
+								<span>{ formatDuration(entry.durationSec) }</span>
+							}
+							<span>{ fmt.Sprintf("%d%%", entry.pct) }</span>
+						</div>
+					</div>
+					<progress class="progress progress-primary w-full" value={ fmt.Sprintf("%d", entry.pct) } max="100"></progress>
+				</div>
+			}
+		</div>
+	}
+}
+
+// --- Helper functions ---
+
+func attentionFilterQuery(f AttentionFilters) string {
+	var parts []string
+	if f.Platform != "" {
+		parts = append(parts, "platform="+f.Platform)
+	}
+	if f.Type != "" {
+		parts = append(parts, "type="+f.Type)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "&" + strings.Join(parts, "&")
+}
+
+func totalAttentionItems(entries []core.AttentionByTypeEntry) int64 {
+	var total int64
+	for _, e := range entries {
+		total += e.Count
+	}
+	return total
+}
+
+func tagProgressColor(category string) string {
+	switch category {
+	case "genre":
+		return "progress-primary"
+	case "topic":
+		return "progress-secondary"
+	case "mood":
+		return "progress-accent"
+	default:
+		return "progress-primary"
+	}
+}
+
+func tagPct(count int64, tags []core.TagDistributionEntry) int {
+	if len(tags) == 0 || tags[0].Count == 0 {
+		return 0
+	}
+	return int(count * 100 / tags[0].Count)
+}
+
+type platformDurationAgg struct {
+	name        string
+	count       int64
+	durationSec int64
+	pct         int
+}
+
+func aggregatePlatformsWithDuration(entries []core.PlatformBreakdownEntry) []platformDurationAgg {
+	type agg struct {
+		count    int64
+		duration int64
+	}
+	totals := make(map[string]*agg)
+	var totalCount int64
+	for _, e := range entries {
+		if _, ok := totals[e.Platform]; !ok {
+			totals[e.Platform] = &agg{}
+		}
+		totals[e.Platform].count += e.Count
+		totals[e.Platform].duration += e.TotalDurationSec
+		totalCount += e.Count
+	}
+	result := make([]platformDurationAgg, 0, len(totals))
+	for name, a := range totals {
+		pct := 0
+		if totalCount > 0 {
+			pct = int(a.count * 100 / totalCount)
+		}
+		result = append(result, platformDurationAgg{
+			name: name, count: a.count, durationSec: a.duration, pct: pct,
+		})
+	}
+	for i := range result {
+		for j := i + 1; j < len(result); j++ {
+			if result[j].count > result[i].count {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+	return result
+}

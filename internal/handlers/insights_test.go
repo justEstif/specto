@@ -49,6 +49,12 @@ func (m *mockInsightsStore) TagDistributionFiltered(ctx context.Context, userID 
 func (m *mockInsightsStore) ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, _ core.InsightsFilter) ([]core.MediaItem, error) {
 	return m.ListMediaItems(ctx, userID, from, to, limit, offset)
 }
+func (m *mockInsightsStore) TagDistributionByCategory(_ context.Context, _ uuid.UUID, _, _ time.Time, _ int32, _ string, _ core.InsightsFilter) ([]core.TagDistributionEntry, error) {
+	return nil, nil
+}
+func (m *mockInsightsStore) AttentionByType(_ context.Context, _ uuid.UUID, _, _ time.Time, _ *string) ([]core.AttentionByTypeEntry, error) {
+	return nil, nil
+}
 
 func newInsightsTestHandler(insightsStore core.InsightsStore) *handlers.Handler {
 	insights := core.NewInsightsService(insightsStore)

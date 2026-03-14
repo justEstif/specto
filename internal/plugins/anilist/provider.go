@@ -61,10 +61,15 @@ func newForTest(endpoint string) *Provider {
 // Name returns the provider identifier.
 func (p *Provider) Name() string { return "anilist" }
 
-// Supports returns true for video items, which may include anime content.
-// The search will simply not match for non-anime video items.
-func (p *Provider) Supports(mediaType string, _ string) bool {
-	return mediaType == string(core.MediaVideo)
+// Supports returns true for video items from anime or manga platforms.
+// Items from general video platforms (YouTube, Netflix, etc.) are skipped
+// to avoid unnecessary API calls that could trigger rate limiting.
+func (p *Provider) Supports(mediaType string, platform string) bool {
+	if mediaType != string(core.MediaVideo) {
+		return false
+	}
+	lower := strings.ToLower(platform)
+	return animePlatforms[lower] || mangaPlatforms[lower]
 }
 
 // Enrich adds genre, mood, topic, and format tags to items by querying AniList.

@@ -59,11 +59,16 @@ type Querier interface {
 	AddMediaItemTag(ctx context.Context, arg database.AddMediaItemTagParams) error
 	ListMediaItemTags(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
 
+	// On This Day
+	OnThisDay(ctx context.Context, arg database.OnThisDayParams) ([]database.MediaItem, error)
+
 	// Insights / analytics
 	PlatformBreakdown(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
 	PlatformBreakdownFiltered(ctx context.Context, arg database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error)
 	TagDistribution(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
 	TagDistributionFiltered(ctx context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error)
+	TagDistributionByCategory(ctx context.Context, arg database.TagDistributionByCategoryParams) ([]database.TagDistributionByCategoryRow, error)
+	AttentionByType(ctx context.Context, arg database.AttentionByTypeParams) ([]database.AttentionByTypeRow, error)
 
 	// Share profiles
 	GetShareProfile(ctx context.Context, userID pgtype.UUID) (database.ShareProfile, error)

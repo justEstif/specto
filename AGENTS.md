@@ -3,7 +3,7 @@
 ## Project Overview
 
 Specto is a Go web application for tracking media consumption across platforms.
-Built with Chi router, PostgreSQL (pgx), templ templates, and Tailwind CSS.
+Built with Chi router, PostgreSQL (pgx), templ templates, HTMX, and DaisyUI/Tailwind CSS.
 
 **Module:** `github.com/justestif/specto` | **Go version:** 1.25+
 
@@ -20,6 +20,7 @@ mise run sqlc             # Regenerate type-safe DB code from SQL
 mise run db-migrate       # Run pending database migrations
 mise run db-rollback      # Rollback last migration
 mise run api-test         # Run httpyac API integration tests
+mise run pre-commit       # Pre-commit checks (vet, build, test)
 ```
 
 ### Testing
@@ -52,24 +53,40 @@ docker compose up -d      # Start PostgreSQL 16 on localhost:5432
 DB: `specto_dev`, user/pass: `postgres/postgres`
 
 Required env vars: `DATABASE_URL`, `ENCRYPTION_KEY` (64 hex chars),
-`SESSION_SECRET` (32+ bytes), `CSRF_KEY` (exactly 32 bytes), `PORT`.
-These are set in `mise.toml` for local dev.
+`SESSION_SECRET` (32+ bytes), `CSRF_KEY` (exactly 32 bytes), `PORT`, `BASE_URL`.
+
+Optional env vars (set in `mise.toml`/`mise.local.toml`):
+- OAuth: `SPOTIFY_CLIENT_ID/SECRET`, `YOUTUBE_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `GITHUB_CLIENT_ID/SECRET`
+- Enrichment: `ENRICHMENT_BATCH_SIZE`, `ENRICHMENT_POLL_INTERVAL`, `ENRICHMENT_MAX_RETRIES`, `ENRICHMENT_MIN_CONFIDENCE`
+- API keys: `LASTFM_API_KEY`, `TMDB_API_KEY`, `OMDB_API_KEY`, `IGDB_CLIENT_ID/SECRET`
+- LLM: `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`
+
+CI runs via `.github/workflows/ci.yml` (migrations, vet, test, build).
 
 ## Project Structure
 
 ```
-cmd/web/main.go          # Entry point, wiring, routes
+cmd/web/main.go          # Entry point, wiring, routes, graceful shutdown
 internal/
   app/                   # Application layer - Config, dependency wiring
-  auth/                  # Authentication service + session management
-  core/                  # Domain logic (pure, no DB imports)
-    store/               # Store implementations (pgx, crypto)
+  auth/                  # Authentication service, sessions, OAuth
+  core/                  # Domain types, interfaces, and service orchestration
+    store/               # Store implementations (pgx, crypto, conversions)
   database/              # sqlc-generated code + DB connection pool
+  enrichment/            # LLM enrichment via Genkit (genkit.go, prompts/)
   handlers/              # HTTP handlers (methods on *Handler)
-  middleware/            # HTTP middleware (auth, CSRF)
-components/              # Templ UI templates
+  llm/                   # LLM provider abstraction
+  logger/                # Structured JSON logging, wide events (canonical log lines)
+  middleware/            # HTTP middleware (auth, CSRF, wide event logging)
+  plugins/               # Platform plugin implementations
+    anilist/             # AniList (anime/manga)
+    lastfm/              # Last.fm (music scrobbles)
+    spotify/             # Spotify (file import + OAuth API)
+    tmdb/                # TMDB (movies/TV)
+    youtube/             # YouTube (file import + OAuth API)
+components/              # Templ UI templates (.templ files)
 migrations/              # SQL migration files (up/down pairs)
-http/                    # httpyac integration test files
+http/                    # httpyac integration test files + fixtures/
 styles/                  # Tailwind CSS source
 static/                  # Built CSS output
 ```
@@ -109,7 +126,7 @@ import (
 | Constants (exported)| PascalCase      | `MediaMusic`, `BucketDay`                |
 | Context keys        | typed constant  | `contextKey("user")`                      |
 | Constructors        | `New` / `NewX`  | `app.New()`, `handlers.New()`             |
-| Test helpers         | camelCase       | `newTestSyncService`, `discardLogger`     |
+| Test helpers        | camelCase       | `newTestSyncService`, `discardLogger`     |
 
 ### Architecture Patterns
 
@@ -118,6 +135,10 @@ import (
 - **Compile-time interface checks**: `var _ Enricher = (*NoOpEnricher)(nil)`
 - **Domain types separate from DB models** -- conversions in `store/convert.go`
 - **Handlers are methods on `*Handler` struct**, not standalone functions
+- **Wide event logging** -- structured canonical log lines via `internal/logger/`
+  and `middleware/logging.go` (one log line per request with all context)
+- **Background enrichment worker** -- `core.EnrichmentWorker` runs as a goroutine,
+  polls for pending items, enriches via `internal/enrichment/` (Genkit/LLM)
 
 ### Error Handling
 
@@ -130,7 +151,8 @@ import (
 
 ### HTTP Conventions
 
-- Routes: API under `/api/v1/`, static files under `/static/`
+- Routes: API under `/api/v1/`, HTMX partials under `/partials/`, static under `/static/`
+- OAuth flows: `/auth/{provider}/login`, `/auth/{provider}/callback`
 - JSON responses: `{"data": {...}}` on success, `{"error": {"code": "...", "message": "..."}}` on failure
 - Use `writeJSON()` and `writeError()` helpers in handlers
 - Middleware signature: `func(http.Handler) http.Handler`
@@ -142,16 +164,17 @@ import (
 - Table-driven tests for value/boundary checks
 - Both internal (`package core`) and external (`package core_test`) test packages used
 - Test helpers: `newMockPlugin()`, `discardLogger()`, `newTestSyncService()`
-- Inline test data, no fixture files
+- Inline test data, no fixture files (except `http/fixtures/` for integration tests)
 
 ### Templates & Frontend
 
 - Templ for type-safe Go HTML templates (`.templ` files)
 - HTMX for dynamic interactions (CDN-loaded, `hx-boost` on `<body>`)
-- DaisyUI + Tailwind CSS via standalone binary (not npm)
+- DaisyUI 5 + Tailwind CSS 4 via standalone binary (not npm)
 - Custom themes (`specto-dark`, `specto-light`) defined in `styles/input.css`
 - View Transition API enabled globally for all htmx swaps
 - HTMX CSS state classes styled for loading/transition feedback (no JS needed)
+- Copilot instructions for DaisyUI 5 usage in `.github/instructions/daisyui.instructions.md`
 - See [`docs/styling.md`](docs/styling.md) for full details
 
 ## Documentation
@@ -170,4 +193,7 @@ relevant subsystem:
 - [`docs/styling.md`](docs/styling.md) -- DaisyUI themes, typography, HTMX CSS states, View Transitions
 - [`docs/ui-design.md`](docs/ui-design.md) -- Page wireframes, layout, responsive breakpoints, HTMX patterns
 - [`docs/MVP.md`](docs/MVP.md) -- Product scope and feature list
+- [`docs/api-key-setup.md`](docs/api-key-setup.md) -- External API key configuration
+- [`docs/self-hosting.md`](docs/self-hosting.md) -- Self-hosting guide
 - [`docs/plugins/`](docs/plugins/) -- Platform-specific API research (spotify, youtube, etc.)
+- [`docs/research/`](docs/research/) -- Market evaluation, UX use cases

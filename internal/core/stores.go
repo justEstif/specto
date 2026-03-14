@@ -63,6 +63,16 @@ type MediaItemStore interface {
 	// DeleteByPlatform removes all media items for a user on a given platform.
 	// Returns the number of items deleted.
 	DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error)
+
+	// OnThisDay returns media items consumed on this day (month+day) in
+	// previous years. Items are ordered by consumed_at descending.
+	OnThisDay(ctx context.Context, userID uuid.UUID, limit int32) ([]OnThisDayItem, error)
+}
+
+// OnThisDayItem wraps a MediaItem with the year it was consumed.
+type OnThisDayItem struct {
+	Year int
+	Item MediaItem
 }
 
 // PluginStateStore manages plugin connection state and credentials.
@@ -186,6 +196,14 @@ type InsightsStore interface {
 	// ListMediaItemsFiltered returns media items with optional filters
 	// (used internally by InsightsService for filtered timeline aggregation).
 	ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, filter InsightsFilter) ([]MediaItem, error)
+
+	// TagDistributionByCategory returns tag distribution filtered to a
+	// specific category (genre/topic/mood/format).
+	TagDistributionByCategory(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, category string, filter InsightsFilter) ([]TagDistributionEntry, error)
+
+	// AttentionByType returns consumption counts and time breakdowns
+	// grouped by media type, optionally filtered by platform.
+	AttentionByType(ctx context.Context, userID uuid.UUID, from, to time.Time, platform *string) ([]AttentionByTypeEntry, error)
 }
 
 // --- Domain types used by store interfaces ---
@@ -383,4 +401,13 @@ type TopCreatorEntry struct {
 type PlatformMixEntry struct {
 	Platform string
 	Count    int64
+}
+
+// AttentionByTypeEntry represents consumption stats grouped by media type,
+// including both content duration and actual time spent.
+type AttentionByTypeEntry struct {
+	MediaType        string
+	Count            int64
+	TotalTimeSpent   int64 // seconds of actual engagement
+	TotalDurationSec int64 // seconds of content duration
 }

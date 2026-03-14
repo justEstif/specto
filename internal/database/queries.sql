@@ -267,6 +267,34 @@ GROUP BY t.name, t.category
 ORDER BY count DESC
 LIMIT $4;
 
+-- name: TagDistributionByCategory :many
+SELECT t.name, t.category, COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND (sqlc.narg('platform')::TEXT IS NULL OR mi.platform = sqlc.narg('platform'))
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR mi.type = sqlc.narg('media_type'))
+    AND t.category = @category
+GROUP BY t.name, t.category
+ORDER BY count DESC
+LIMIT $4;
+
+-- name: AttentionByType :many
+SELECT type, COUNT(*) AS count,
+       COALESCE(SUM(EXTRACT(EPOCH FROM time_spent)), 0)::BIGINT AS total_time_spent_sec,
+       COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
+FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND (sqlc.narg('platform')::TEXT IS NULL OR platform = sqlc.narg('platform'))
+GROUP BY type
+ORDER BY total_time_spent_sec DESC;
+
 -- name: DeleteMediaItemsByPlatform :execrows
 DELETE FROM media_items WHERE user_id = $1 AND platform = $2;
 
@@ -340,6 +368,15 @@ WHERE mi.user_id = $1
 GROUP BY mi.creator, mi.platform, mi.type
 ORDER BY count DESC
 LIMIT $4;
+
+-- name: OnThisDay :many
+SELECT * FROM media_items
+WHERE user_id = $1
+    AND EXTRACT(MONTH FROM consumed_at) = @target_month::INT
+    AND EXTRACT(DAY FROM consumed_at) = @target_day::INT
+    AND consumed_at < $2
+ORDER BY consumed_at DESC
+LIMIT $3;
 
 -- name: GetPublicPlatformMix :many
 SELECT mi.platform, COUNT(*) AS count

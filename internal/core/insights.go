@@ -162,6 +162,27 @@ func (s *InsightsService) GetTagDistributionFiltered(ctx context.Context, userID
 	return entries, nil
 }
 
+// GetTagDistributionByCategory returns tag distribution for a specific
+// category (genre, topic, mood, format) with optional filters.
+func (s *InsightsService) GetTagDistributionByCategory(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, category string, filter InsightsFilter) ([]TagDistributionEntry, error) {
+	if err := validateDateRange(from, to); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	return s.store.TagDistributionByCategory(ctx, userID, from, to, limit, category, filter)
+}
+
+// GetAttentionByType returns consumption stats grouped by media type
+// including both item counts and time spent.
+func (s *InsightsService) GetAttentionByType(ctx context.Context, userID uuid.UUID, from, to time.Time, platform *string) ([]AttentionByTypeEntry, error) {
+	if err := validateDateRange(from, to); err != nil {
+		return nil, err
+	}
+	return s.store.AttentionByType(ctx, userID, from, to, platform)
+}
+
 // --- helpers ---
 
 func validateDateRange(from, to time.Time) error {

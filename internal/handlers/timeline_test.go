@@ -82,6 +82,9 @@ func (m *mockMediaItemStore) ResetEnrichmentByID(_ context.Context, _, _ uuid.UU
 func (m *mockMediaItemStore) EnrichmentStats(_ context.Context, _ uuid.UUID) (*core.EnrichmentStatusCounts, error) {
 	return &core.EnrichmentStatusCounts{}, nil
 }
+func (m *mockMediaItemStore) OnThisDay(_ context.Context, _ uuid.UUID, _ int32) ([]core.OnThisDayItem, error) {
+	return nil, nil
+}
 
 func TestTimeline(t *testing.T) {
 	duration := 3 * time.Minute

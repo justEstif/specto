@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/justestif/specto/components"
+	"github.com/justestif/specto/internal/auth"
 	"github.com/justestif/specto/internal/core"
 )
 
@@ -23,20 +25,46 @@ func (h *Handler) ShareProfilePage(w http.ResponseWriter, r *http.Request) {
 	// GetBySlug only returns published profiles.
 	pub, err := h.App.ShareProfiles.GetBySlug(r.Context(), slug)
 	if err != nil {
-		// Fall back to user lookup for backward compatibility (profile not yet created).
+		// Fall back to user lookup for backward compatibility (profile not yet created
+		// or not yet published).
 		user, userErr := h.App.Users.GetByProfileSlug(r.Context(), slug)
 		if userErr != nil {
 			http.NotFound(w, r)
 			return
 		}
-		// User exists but no share profile — show empty placeholder.
-		data := components.ShareProfileData{
-			DisplayName: user.DisplayName,
-			Slug:        slug,
-			Blocks:      nil,
+
+		// Check if the current viewer is the profile owner — if so, render
+		// a preview with their blocks even if unpublished.
+		if viewer, ok := auth.UserFromContext(r.Context()); ok && viewer.ID == user.ID {
+			profile, profErr := h.App.ShareProfiles.Get(r.Context(), user.ID)
+			if profErr == nil && len(profile.Blocks) > 0 {
+				pub = &core.PublicShareProfile{
+					DisplayName: user.DisplayName,
+					AvatarURL:   user.AvatarURL,
+					Slug:        slug,
+					Profile:     *profile,
+				}
+				// Fall through to the normal render path below.
+			} else {
+				data := components.ShareProfileData{
+					DisplayName: user.DisplayName,
+					AvatarURL:   user.AvatarURL,
+					Slug:        slug,
+					Blocks:      nil,
+				}
+				components.ShareProfilePage(data).Render(r.Context(), w)
+				return
+			}
+		} else {
+			// Not the owner — show empty placeholder.
+			data := components.ShareProfileData{
+				DisplayName: user.DisplayName,
+				Slug:        slug,
+				Blocks:      nil,
+			}
+			components.ShareProfilePage(data).Render(r.Context(), w)
+			return
 		}
-		components.ShareProfilePage(data).Render(r.Context(), w)
-		return
 	}
 
 	// Render blocks with real data.
@@ -49,6 +77,7 @@ func (h *Handler) ShareProfilePage(w http.ResponseWriter, r *http.Request) {
 
 	data := components.ShareProfileData{
 		DisplayName: pub.DisplayName,
+		AvatarURL:   pub.AvatarURL,
 		Slug:        pub.Slug,
 		Blocks:      blocks,
 	}
@@ -160,6 +189,54 @@ func (h *Handler) renderPublicBlocks(r *http.Request, pub *core.PublicShareProfi
 				Type:    "currently_into",
 				Enabled: true,
 				Text:    block.Text,
+			})
+
+		case "recent_favorites":
+			if len(block.ItemIDs) == 0 {
+				continue
+			}
+			var items []components.ShareFavorite
+			for _, idStr := range block.ItemIDs {
+				id, err := uuid.Parse(idStr)
+				if err != nil {
+					continue
+				}
+				item, err := h.App.MediaItems.Get(r.Context(), profile.UserID, id)
+				if err != nil || item == nil {
+					continue
+				}
+				items = append(items, components.ShareFavorite{
+					Title:    item.Title,
+					Creator:  item.Creator,
+					Platform: item.Platform,
+					Type:     string(item.Type),
+					Icon:     mediaTypeIcon(string(item.Type)),
+				})
+			}
+			if len(items) > 0 {
+				result = append(result, components.ShareBlock{
+					Type:      "recent_favorites",
+					Enabled:   true,
+					Favorites: items,
+				})
+			}
+
+		case "listening_stats":
+			entries, err := h.App.ShareProfiles.GetPublicPlatformMix(
+				r.Context(), profile.UserID, from, to,
+				profile.ExcludedPlatforms,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("listening_stats: %w", err)
+			}
+			var totalItems int64
+			for _, e := range entries {
+				totalItems += e.Count
+			}
+			result = append(result, components.ShareBlock{
+				Type:       "listening_stats",
+				Enabled:    true,
+				TotalItems: totalItems,
 			})
 		}
 	}

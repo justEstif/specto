@@ -80,6 +80,17 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		addContext(r, "dashboard_platforms_error", err.Error())
 	}
 
+	// On This Day — only on unfiltered view (no platform/type filter)
+	var onThisDayGroups []components.OnThisDayGroup
+	if filters.Platform == "" && filters.Type == "" {
+		otdItems, otdErr := h.App.MediaItems.OnThisDay(ctx, user.ID, 10)
+		if otdErr != nil {
+			addContext(r, "dashboard_on_this_day_error", otdErr.Error())
+		} else {
+			onThisDayGroups = groupOnThisDayByYear(otdItems)
+		}
+	}
+
 	data := components.DashboardData{
 		User:              user,
 		Summary:           summary,
@@ -89,6 +100,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		PlatformBreakdown: platforms,
 		ActiveRange:       filters.Range,
 		Filters:           filters,
+		OnThisDay:         onThisDayGroups,
 	}
 
 	if partial {

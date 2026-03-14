@@ -5,19 +5,22 @@ import "fmt"
 // ShareProfileData holds all data for the public share profile page.
 type ShareProfileData struct {
 	DisplayName string
+	AvatarURL   *string
 	Slug        string
 	Blocks      []ShareBlock
 }
 
 // ShareBlock represents a single block on the public profile.
 type ShareBlock struct {
-	Type    string // "top_genres", "mood_profile", "top_creators", "platform_mix", "currently_into"
+	Type    string // "top_genres", "mood_profile", "top_creators", "platform_mix", "currently_into", "recent_favorites", "listening_stats"
 	Enabled bool
 	// Data varies by type — use the typed fields below.
-	Bars    []ShareBar    // for genres, mood, platform_mix
-	Entries []ShareEntry  // for top_creators
-	Text    string        // for currently_into
-	Summary string        // for mood_profile summary line
+	Bars       []ShareBar       // for genres, mood, platform_mix
+	Entries    []ShareEntry     // for top_creators
+	Favorites  []ShareFavorite  // for recent_favorites
+	Text       string           // for currently_into
+	Summary    string           // for mood_profile summary line
+	TotalItems int64            // for listening_stats
 }
 
 // ShareBar represents a labeled bar with percentage.
@@ -34,7 +37,17 @@ type ShareEntry struct {
 	Platform string
 }
 
+// ShareFavorite represents a pinned favorite item.
+type ShareFavorite struct {
+	Title    string
+	Creator  string
+	Platform string
+	Type     string
+	Icon     string
+}
+
 // ShareProfilePage renders the standalone public profile (no navbar, no HTMX).
+// Design direction: editorial taste resume — cinematic, warm, magazine-like.
 templ ShareProfilePage(data ShareProfileData) {
 	<!DOCTYPE html>
 	<html lang="en" data-theme="specto-dark">
@@ -45,43 +58,91 @@ templ ShareProfilePage(data ShareProfileData) {
 		<link rel="preconnect" href="https://fonts.googleapis.com"/>
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 		<link
-			href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap"
+			href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
 			rel="stylesheet"
 		/>
 		<link rel="stylesheet" href="/static/css/tailwind.css"/>
+		<style>
+			@keyframes profile-enter {
+				from { opacity: 0; transform: translateY(12px); }
+				to { opacity: 1; transform: translateY(0); }
+			}
+			.profile-block {
+				animation: profile-enter 500ms cubic-bezier(0.25, 1, 0.5, 1) both;
+			}
+			.profile-block:nth-child(1) { animation-delay: 100ms; }
+			.profile-block:nth-child(2) { animation-delay: 180ms; }
+			.profile-block:nth-child(3) { animation-delay: 260ms; }
+			.profile-block:nth-child(4) { animation-delay: 340ms; }
+			.profile-block:nth-child(5) { animation-delay: 420ms; }
+			.profile-block:nth-child(6) { animation-delay: 500ms; }
+			.profile-block:nth-child(7) { animation-delay: 580ms; }
+			@media (prefers-reduced-motion: reduce) {
+				.profile-block { animation: none; }
+			}
+		</style>
 	</head>
 	<body class="bg-base-100 text-base-content min-h-screen font-sans antialiased">
-		<div class="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
-			<!-- Header -->
-			<header class="text-center mb-12 grain relative overflow-hidden rounded-box p-8 bg-neutral border border-base-300">
-				<h1 class="text-display text-4xl sm:text-5xl font-bold tracking-tight relative z-10">
-					{ data.DisplayName }
-				</h1>
-				<p class="text-base-content/40 text-sm mt-2 relative z-10">{ "@" + data.Slug }</p>
+		<div class="mx-auto max-w-2xl px-4 sm:px-6 pt-16 sm:pt-24 pb-12">
+			<!-- Header — editorial, asymmetric, no card wrapper -->
+			<header class="mb-16 relative">
+				<div class="grain relative overflow-hidden rounded-box px-8 py-12 sm:px-12 sm:py-16 bg-neutral border border-base-300">
+					if data.AvatarURL != nil && *data.AvatarURL != "" {
+						<div class="mb-6">
+							<img
+								src={ *data.AvatarURL }
+								alt={ data.DisplayName }
+								class="w-16 h-16 rounded-full border-2 border-base-300 object-cover"
+							/>
+						</div>
+					}
+					<h1 class="text-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-none relative z-10">
+						{ data.DisplayName }
+					</h1>
+					<div class="mt-4 flex items-center gap-3 relative z-10">
+						<span class="text-base-content/30 text-sm font-mono">{ "@" + data.Slug }</span>
+						if len(data.Blocks) > 0 {
+							<span class="w-8 border-t border-primary/40"></span>
+							<span class="text-primary/60 text-xs uppercase tracking-widest font-sans">taste profile</span>
+						}
+					</div>
+				</div>
 			</header>
-			<!-- Blocks -->
-			<div class="space-y-6">
-				for _, block := range data.Blocks {
-					if block.Enabled {
-						switch block.Type {
-						case "top_genres":
-							@shareBarBlock("Top Genres", block.Bars)
-						case "mood_profile":
-							@shareMoodBlock(block.Summary, block.Bars)
-						case "top_creators":
-							@shareCreatorsBlock(block.Entries)
-						case "platform_mix":
-							@shareBarBlock("Platform Mix", block.Bars)
-						case "currently_into":
-							@shareCurrentlyInto(block.Text)
+			<!-- Blocks — staggered entrance -->
+			if len(data.Blocks) == 0 {
+				<div class="text-center py-16">
+					<p class="text-base-content/30 text-sm">This profile is still being curated.</p>
+				</div>
+			} else {
+				<div class="space-y-8">
+					for _, block := range data.Blocks {
+						if block.Enabled {
+							<div class="profile-block">
+								switch block.Type {
+								case "top_genres":
+									@shareGenresBlock(block.Bars)
+								case "mood_profile":
+									@shareMoodBlock(block.Summary, block.Bars)
+								case "top_creators":
+									@shareCreatorsBlock(block.Entries)
+								case "platform_mix":
+									@sharePlatformMix(block.Bars)
+								case "currently_into":
+									@shareCurrentlyInto(block.Text)
+								case "recent_favorites":
+									@shareFavoritesBlock(block.Favorites)
+								case "listening_stats":
+									@shareStatsBlock(block.TotalItems)
+								}
+							</div>
 						}
 					}
-				}
-			</div>
+				</div>
+			}
 			<!-- Footer -->
-			<footer class="text-center mt-16 pb-8">
-				<a href="/" class="text-base-content/30 text-xs hover:text-base-content/50 transition-colors">
-					powered by Specto
+			<footer class="mt-20 pt-8 border-t border-base-300/50 text-center">
+				<a href="/" class="text-base-content/20 text-xs hover:text-base-content/40 transition-colors tracking-wider uppercase">
+					Specto
 				</a>
 			</footer>
 		</div>
@@ -89,78 +150,192 @@ templ ShareProfilePage(data ShareProfileData) {
 	</html>
 }
 
-// shareBarBlock renders a block with horizontal bars (genres, platform mix).
-templ shareBarBlock(title string, bars []ShareBar) {
-	<div class="card bg-neutral border border-base-300 p-6">
-		<h2 class="text-display text-lg font-semibold mb-4">{ title }</h2>
+// shareGenresBlock — horizontal bars with ranked layout, no card.
+templ shareGenresBlock(bars []ShareBar) {
+	<section>
+		<h2 class="text-display text-2xl font-semibold tracking-tight mb-6">Top Genres</h2>
 		if len(bars) == 0 {
-			<p class="text-base-content/40 text-sm">No data yet.</p>
+			<p class="text-base-content/30 text-sm">No genre data yet.</p>
 		} else {
-			<div class="space-y-3">
-				for _, bar := range bars {
-					<div>
-						<div class="flex justify-between text-sm mb-1">
-							<span class="text-base-content/80">{ bar.Label }</span>
-							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
+			<div class="space-y-4">
+				for i, bar := range bars {
+					<div class="flex items-center gap-4">
+						<span class="text-base-content/20 font-mono text-xs w-5 text-right shrink-0">{ fmt.Sprintf("%d", i+1) }</span>
+						<div class="flex-1 min-w-0">
+							<div class="flex justify-between items-baseline mb-1.5">
+								<span class="text-base-content/90 text-sm font-medium">{ bar.Label }</span>
+								<span class="text-base-content/30 font-mono text-xs tabular-nums">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
+							</div>
+							<div class="h-1 bg-base-300/50 rounded-full overflow-hidden">
+								<div
+									class="h-full bg-primary/70 rounded-full"
+									style={ fmt.Sprintf("width: %d%%", bar.Pct) }
+								></div>
+							</div>
 						</div>
-						<progress class="progress progress-primary w-full" value={ fmt.Sprintf("%d", bar.Pct) } max="100"></progress>
 					</div>
 				}
 			</div>
 		}
-	</div>
+	</section>
 }
 
-// shareMoodBlock renders the mood profile block with summary text + bars.
+// shareMoodBlock — mood profile with emphasis on the summary.
+// Hidden entirely when there are no mood tags.
 templ shareMoodBlock(summary string, bars []ShareBar) {
-	<div class="card bg-neutral border border-base-300 p-6">
-		<h2 class="text-display text-lg font-semibold mb-2">Mood Profile</h2>
-		if summary != "" {
-			<p class="text-base-content/60 text-sm mb-4 italic">{ summary }</p>
-		}
-		if len(bars) > 0 {
-			<div class="space-y-3">
+	if len(bars) > 0 {
+		<section>
+			<h2 class="text-display text-2xl font-semibold tracking-tight mb-2">Mood</h2>
+			if summary != "" {
+				<p class="text-base-content/50 text-sm mb-6 italic">{ summary }</p>
+			}
+			<div class="flex flex-wrap gap-2">
 				for _, bar := range bars {
-					<div>
-						<div class="flex justify-between text-sm mb-1">
-							<span class="text-base-content/80">{ bar.Label }</span>
-							<span class="text-base-content/40 font-mono">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
-						</div>
-						<progress class="progress progress-secondary w-full" value={ fmt.Sprintf("%d", bar.Pct) } max="100"></progress>
-					</div>
+					<span
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-secondary/20 bg-secondary/5 text-sm"
+					>
+						<span class="text-base-content/70">{ bar.Label }</span>
+						<span class="text-secondary/60 font-mono text-xs">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
+					</span>
 				}
 			</div>
-		}
-	</div>
+		</section>
+	}
 }
 
-// shareCreatorsBlock renders the top creators numbered list.
+// shareCreatorsBlock — clean list, stronger hierarchy.
 templ shareCreatorsBlock(entries []ShareEntry) {
-	<div class="card bg-neutral border border-base-300 p-6">
-		<h2 class="text-display text-lg font-semibold mb-4">Top Creators</h2>
+	<section>
+		<h2 class="text-display text-2xl font-semibold tracking-tight mb-6">Top Creators</h2>
 		if len(entries) == 0 {
-			<p class="text-base-content/40 text-sm">No data yet.</p>
+			<p class="text-base-content/30 text-sm">No creator data yet.</p>
 		} else {
-			<div class="space-y-2">
+			<div class="divide-y divide-base-300/30">
 				for _, entry := range entries {
-					<div class="flex items-center gap-3">
-						<span class="text-base-content/40 font-mono text-sm w-6 text-right">{ fmt.Sprintf("%d.", entry.Rank) }</span>
-						<span class="text-base-content/40">{ entry.Icon }</span>
-						<span class="text-sm text-base-content/80 flex-1">{ entry.Name }</span>
-						<span class="badge badge-sm badge-outline text-xs">{ entry.Platform }</span>
+					<div class="flex items-center gap-4 py-3">
+						<span class="text-primary/50 font-mono text-xs w-5 text-right tabular-nums shrink-0">{ fmt.Sprintf("%02d", entry.Rank) }</span>
+						<span class="text-base-content/30 text-sm shrink-0">{ entry.Icon }</span>
+						<span class="text-base-content/80 text-sm flex-1 truncate">{ entry.Name }</span>
+						<span class="text-base-content/20 text-xs font-mono uppercase tracking-wider shrink-0">{ entry.Platform }</span>
 					</div>
 				}
 			</div>
 		}
-	</div>
+	</section>
 }
 
-// shareCurrentlyInto renders the quoted free-text block.
+// sharePlatformMix — visual weight via proportional segments.
+templ sharePlatformMix(bars []ShareBar) {
+	<section>
+		<h2 class="text-display text-2xl font-semibold tracking-tight mb-6">Platforms</h2>
+		if len(bars) == 0 {
+			<p class="text-base-content/30 text-sm">No platform data yet.</p>
+		} else {
+			<!-- Proportional bar -->
+			<div class="h-2 rounded-full overflow-hidden flex mb-4">
+				for i, bar := range bars {
+					<div
+						class={ "h-full", platformColor(i) }
+						style={ fmt.Sprintf("width: %d%%", maxInt(bar.Pct, 2)) }
+					></div>
+				}
+			</div>
+			<!-- Legend -->
+			<div class="flex flex-wrap gap-x-6 gap-y-2">
+				for i, bar := range bars {
+					<div class="flex items-center gap-2">
+						<span class={ "w-2 h-2 rounded-full shrink-0", platformColor(i) }></span>
+						<span class="text-base-content/60 text-sm">{ bar.Label }</span>
+						<span class="text-base-content/30 font-mono text-xs tabular-nums">{ fmt.Sprintf("%d%%", bar.Pct) }</span>
+					</div>
+				}
+			</div>
+		}
+	</section>
+}
+
+// shareCurrentlyInto — large pull-quote style.
+// Hidden entirely when text is empty.
 templ shareCurrentlyInto(text string) {
-	<div class="card bg-neutral border border-base-300 p-6">
-		<h2 class="text-display text-lg font-semibold mb-3">Currently Into</h2>
-		<blockquote class="text-base-content/70 text-sm italic border-l-2 border-primary/40 pl-4">
-			"{ text }"
-		</blockquote>
-	</div>
+	if text != "" {
+		<section class="py-4">
+			<h2 class="text-display text-2xl font-semibold tracking-tight mb-4">Currently Into</h2>
+			<blockquote class="text-base-content/60 text-lg leading-relaxed border-l-2 border-primary/30 pl-6">
+				{ text }
+			</blockquote>
+		</section>
+	}
+}
+
+// shareFavoritesBlock renders pinned favorite items.
+templ shareFavoritesBlock(favorites []ShareFavorite) {
+	<section>
+		<h2 class="text-display text-2xl font-semibold tracking-tight mb-6">Favorites</h2>
+		if len(favorites) == 0 {
+			<p class="text-base-content/30 text-sm">No favorites pinned yet.</p>
+		} else {
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+				for _, fav := range favorites {
+					<div class="flex items-start gap-3 p-3 rounded-box bg-neutral/50 border border-base-300/30">
+						<span class="text-base-content/30 text-lg mt-0.5 shrink-0">{ fav.Icon }</span>
+						<div class="min-w-0 flex-1">
+							<div class="text-sm text-base-content/80 font-medium truncate">{ fav.Title }</div>
+							<div class="text-xs text-base-content/40 truncate mt-0.5">
+								{ fav.Creator }
+								<span class="text-base-content/20 ml-1">{ fav.Platform }</span>
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</section>
+}
+
+// shareStatsBlock renders an aggregate listening/consumption stat.
+templ shareStatsBlock(totalItems int64) {
+	<section class="py-4">
+		<div class="flex items-baseline gap-3">
+			<span class="text-display text-5xl sm:text-6xl font-bold tracking-tight text-primary/80 tabular-nums">
+				{ formatShareCount(totalItems) }
+			</span>
+			<span class="text-base-content/30 text-sm">items tracked</span>
+		</div>
+	</section>
+}
+
+// --- Helpers ---
+
+func platformColor(i int) string {
+	colors := []string{
+		"bg-primary/70",
+		"bg-secondary/70",
+		"bg-accent/70",
+		"bg-info/70",
+		"bg-success/70",
+	}
+	if i < len(colors) {
+		return colors[i]
+	}
+	return "bg-base-content/20"
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func formatShareCount(n int64) string {
+	if n >= 1_000_000 {
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	}
+	if n >= 10_000 {
+		return fmt.Sprintf("%.1fK", float64(n)/1_000)
+	}
+	if n >= 1_000 {
+		return fmt.Sprintf("%d,%03d", n/1000, n%1000)
+	}
+	return fmt.Sprintf("%d", n)
 }

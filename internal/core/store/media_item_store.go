@@ -227,3 +227,27 @@ func (s *PgMediaItemStore) DeleteByPlatform(ctx context.Context, userID uuid.UUI
 	}
 	return count, nil
 }
+
+func (s *PgMediaItemStore) OnThisDay(ctx context.Context, userID uuid.UUID, limit int32) ([]core.OnThisDayItem, error) {
+	now := time.Now().UTC()
+	rows, err := s.q.OnThisDay(ctx, database.OnThisDayParams{
+		UserID:      uuidToPgx(userID),
+		ConsumedAt:  timestamptz(now.AddDate(0, 0, -1)), // before today (only past years)
+		Limit:       limit,
+		TargetMonth: int32(now.Month()),
+		TargetDay:   int32(now.Day()),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("querying on-this-day items: %w", err)
+	}
+
+	items := make([]core.OnThisDayItem, len(rows))
+	for i, row := range rows {
+		item := mediaItemFromDB(row)
+		items[i] = core.OnThisDayItem{
+			Year: item.ConsumedAt.Year(),
+			Item: item,
+		}
+	}
+	return items, nil
+}

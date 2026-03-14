@@ -35,6 +35,63 @@ func (q *Queries) AddMediaItemTag(ctx context.Context, arg AddMediaItemTagParams
 	return err
 }
 
+const attentionByType = `-- name: AttentionByType :many
+SELECT type, COUNT(*) AS count,
+       COALESCE(SUM(EXTRACT(EPOCH FROM time_spent)), 0)::BIGINT AS total_time_spent_sec,
+       COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
+FROM media_items
+WHERE user_id = $1
+    AND consumed_at >= $2
+    AND consumed_at <= $3
+    AND ($4::TEXT IS NULL OR platform = $4)
+GROUP BY type
+ORDER BY total_time_spent_sec DESC
+`
+
+type AttentionByTypeParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Platform     pgtype.Text        `json:"platform"`
+}
+
+type AttentionByTypeRow struct {
+	Type              string `json:"type"`
+	Count             int64  `json:"count"`
+	TotalTimeSpentSec int64  `json:"total_time_spent_sec"`
+	TotalDurationSec  int64  `json:"total_duration_sec"`
+}
+
+func (q *Queries) AttentionByType(ctx context.Context, arg AttentionByTypeParams) ([]AttentionByTypeRow, error) {
+	rows, err := q.db.Query(ctx, attentionByType,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Platform,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AttentionByTypeRow{}
+	for rows.Next() {
+		var i AttentionByTypeRow
+		if err := rows.Scan(
+			&i.Type,
+			&i.Count,
+			&i.TotalTimeSpentSec,
+			&i.TotalDurationSec,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const claimPendingItems = `-- name: ClaimPendingItems :many
 SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
 WHERE enrichment_status = 'pending'
@@ -1271,6 +1328,68 @@ func (q *Queries) ListSyncLogs(ctx context.Context, arg ListSyncLogsParams) ([]S
 	return items, nil
 }
 
+const onThisDay = `-- name: OnThisDay :many
+SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items
+WHERE user_id = $1
+    AND EXTRACT(MONTH FROM consumed_at) = $4::INT
+    AND EXTRACT(DAY FROM consumed_at) = $5::INT
+    AND consumed_at < $2
+ORDER BY consumed_at DESC
+LIMIT $3
+`
+
+type OnThisDayParams struct {
+	UserID      pgtype.UUID        `json:"user_id"`
+	ConsumedAt  pgtype.Timestamptz `json:"consumed_at"`
+	Limit       int32              `json:"limit"`
+	TargetMonth int32              `json:"target_month"`
+	TargetDay   int32              `json:"target_day"`
+}
+
+func (q *Queries) OnThisDay(ctx context.Context, arg OnThisDayParams) ([]MediaItem, error) {
+	rows, err := q.db.Query(ctx, onThisDay,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.Limit,
+		arg.TargetMonth,
+		arg.TargetDay,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MediaItem{}
+	for rows.Next() {
+		var i MediaItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Platform,
+			&i.Type,
+			&i.Title,
+			&i.Creator,
+			&i.ConsumedAt,
+			&i.Duration,
+			&i.TimeSpent,
+			&i.Url,
+			&i.ExternalID,
+			&i.EnrichmentStatus,
+			&i.RawMetadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.EnrichmentRetries,
+			&i.Private,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const platformBreakdown = `-- name: PlatformBreakdown :many
 SELECT platform, type, COUNT(*) AS count,
        COALESCE(SUM(EXTRACT(EPOCH FROM duration)), 0)::BIGINT AS total_duration_sec
@@ -1479,6 +1598,67 @@ func (q *Queries) TagDistribution(ctx context.Context, arg TagDistributionParams
 	items := []TagDistributionRow{}
 	for rows.Next() {
 		var i TagDistributionRow
+		if err := rows.Scan(&i.Name, &i.Category, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const tagDistributionByCategory = `-- name: TagDistributionByCategory :many
+SELECT t.name, t.category, COUNT(*) AS count
+FROM media_item_tags mit
+JOIN tags t ON mit.tag_id = t.id
+JOIN media_items mi ON mit.media_item_id = mi.id
+WHERE mi.user_id = $1
+    AND mi.consumed_at >= $2
+    AND mi.consumed_at <= $3
+    AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    AND ($5::TEXT IS NULL OR mi.platform = $5)
+    AND ($6::TEXT IS NULL OR mi.type = $6)
+    AND t.category = $7
+GROUP BY t.name, t.category
+ORDER BY count DESC
+LIMIT $4
+`
+
+type TagDistributionByCategoryParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Limit        int32              `json:"limit"`
+	Platform     pgtype.Text        `json:"platform"`
+	MediaType    pgtype.Text        `json:"media_type"`
+	Category     pgtype.Text        `json:"category"`
+}
+
+type TagDistributionByCategoryRow struct {
+	Name     string      `json:"name"`
+	Category pgtype.Text `json:"category"`
+	Count    int64       `json:"count"`
+}
+
+func (q *Queries) TagDistributionByCategory(ctx context.Context, arg TagDistributionByCategoryParams) ([]TagDistributionByCategoryRow, error) {
+	rows, err := q.db.Query(ctx, tagDistributionByCategory,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Limit,
+		arg.Platform,
+		arg.MediaType,
+		arg.Category,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TagDistributionByCategoryRow{}
+	for rows.Next() {
+		var i TagDistributionByCategoryRow
 		if err := rows.Scan(&i.Name, &i.Category, &i.Count); err != nil {
 			return nil, err
 		}

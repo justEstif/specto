@@ -109,6 +109,9 @@ func (m *mockMediaItemStore) ResetEnrichmentByID(_ context.Context, _, _ uuid.UU
 func (m *mockMediaItemStore) EnrichmentStats(_ context.Context, _ uuid.UUID) (*EnrichmentStatusCounts, error) {
 	return &EnrichmentStatusCounts{}, nil
 }
+func (m *mockMediaItemStore) OnThisDay(_ context.Context, _ uuid.UUID, _ int32) ([]OnThisDayItem, error) {
+	return nil, nil
+}
 
 // mockPluginStateStore implements PluginStateStore for testing.
 type mockPluginStateStore struct {

@@ -1,0 +1,67 @@
+package components
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/justestif/specto/internal/core"
+)
+
+// OnThisDayGroup holds items consumed in a specific past year on today's date.
+type OnThisDayGroup struct {
+	Year  int
+	Items []core.MediaItem
+}
+
+// OnThisDayCard renders the "On This Day" nostalgia card for the dashboard.
+templ OnThisDayCard(groups []OnThisDayGroup) {
+	<div class="card bg-neutral border border-base-300 p-6">
+		<h2 class="text-display text-xl font-semibold mb-4">
+			On This Day
+			<span class="text-base-content/40 text-sm font-normal ml-2">{ time.Now().Format("January 2") }</span>
+		</h2>
+		if len(groups) == 0 {
+			<p class="text-base-content/40 text-sm">
+				No history for this date yet. Keep tracking to build your nostalgia archive.
+			</p>
+		} else {
+			<div class="space-y-5">
+				for _, group := range groups {
+					@onThisDayYear(group)
+				}
+			</div>
+		}
+	</div>
+}
+
+// onThisDayYear renders a year section with its items.
+templ onThisDayYear(group OnThisDayGroup) {
+	<div>
+		<div class="flex items-center gap-2 mb-2">
+			<span class="text-sm font-mono text-primary font-semibold">{ fmt.Sprintf("%d", group.Year) }</span>
+			<span class="text-xs text-base-content/30">{ yearsAgo(group.Year) }</span>
+			<div class="flex-1 border-t border-base-300"></div>
+		</div>
+		<div class="space-y-1">
+			for _, item := range group.Items {
+				<div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-base-200/30 transition-colors">
+					<span class="text-base-content/40 text-sm shrink-0 w-5 text-center">
+						{ mediaIcon(string(item.Type)) }
+					</span>
+					<span class="text-sm text-base-content/80 truncate flex-1">{ item.Title }</span>
+					<span class="text-xs text-base-content/40 truncate max-w-24">{ item.Creator }</span>
+					<span class="badge badge-sm badge-outline text-xs shrink-0">{ item.Platform }</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// yearsAgo returns a relative label like "3 years ago".
+func yearsAgo(year int) string {
+	diff := time.Now().Year() - year
+	if diff == 1 {
+		return "1 year ago"
+	}
+	return fmt.Sprintf("%d years ago", diff)
+}

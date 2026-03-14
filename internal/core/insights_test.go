@@ -52,6 +52,14 @@ func (m *mockInsightsStore) ListMediaItemsFiltered(ctx context.Context, userID u
 	return m.ListMediaItems(ctx, userID, from, to, limit, offset)
 }
 
+func (m *mockInsightsStore) TagDistributionByCategory(_ context.Context, _ uuid.UUID, _, _ time.Time, _ int32, _ string, _ InsightsFilter) ([]TagDistributionEntry, error) {
+	return nil, nil
+}
+
+func (m *mockInsightsStore) AttentionByType(_ context.Context, _ uuid.UUID, _, _ time.Time, _ *string) ([]AttentionByTypeEntry, error) {
+	return nil, nil
+}
+
 // --- test helpers ---
 
 var (

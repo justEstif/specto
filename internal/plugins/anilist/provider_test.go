@@ -61,8 +61,12 @@ func TestSupportsVideoOnly(t *testing.T) {
 		want      bool
 	}{
 		{"video", "crunchyroll", true},
-		{"video", "youtube", true},
-		{"video", "", true},
+		{"video", "funimation", true},
+		{"video", "hidive", true},
+		{"video", "mangadex", true},
+		{"video", "youtube", false},
+		{"video", "netflix", false},
+		{"video", "", false},
 		{"music", "spotify", false},
 		{"article", "medium", false},
 		{"podcast", "apple", false},
