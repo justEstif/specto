@@ -91,11 +91,17 @@ func (w *EnrichmentWorker) Start(ctx context.Context) {
 }
 
 // tick runs one poll cycle: claim pending items, enrich them, update status.
+// Emits a single wide event per batch with all context.
 func (w *EnrichmentWorker) tick(ctx context.Context) {
+	start := time.Now()
+
 	// Claim pending items with row-level locking
 	claimed, err := w.media.ClaimPendingItems(ctx, w.batchSize, w.maxRetries)
 	if err != nil {
-		w.logger.Error("failed to claim pending items", "error", err)
+		w.logger.Error("enrichment_tick",
+			"outcome", "claim_failed",
+			"error", err,
+		)
 		return
 	}
 
@@ -103,12 +109,21 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 		return
 	}
 
-	w.logger.Info("claimed items for enrichment", "count", len(claimed))
+	// Wide event: one log per batch tick
+	we := map[string]any{
+		"batch_size":     len(claimed),
+		"items_enriched": 0,
+		"items_failed":   0,
+		"items_retried":  0,
+		"tags_persisted": 0,
+		"tag_errors":     0,
+	}
 
 	// Mark items as 'enriching'
 	for _, ei := range claimed {
 		if err := w.media.UpdateEnrichmentStatus(ctx, ei.ID, "enriching"); err != nil {
-			w.logger.Error("failed to mark item as enriching",
+			w.logger.Error("enrichment_tick",
+				"outcome", "status_update_failed",
 				"item_id", ei.ID,
 				"error", err,
 			)
@@ -122,39 +137,68 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 	}
 
 	// Run enrichment
-	results, err := w.coordinator.Run(ctx, items)
+	results, stats, err := w.coordinator.Run(ctx, items)
 	if err != nil {
-		w.logger.Error("coordinator run failed", "error", err)
-		// Mark all items for retry
+		we["outcome"] = "coordinator_failed"
+		we["error"] = err.Error()
+		we["duration_ms"] = time.Since(start).Milliseconds()
+		w.logger.Error("enrichment_tick", wideAttrs(we)...)
 		for _, ei := range claimed {
-			w.markRetry(ctx, ei)
+			w.markRetry(ctx, ei, we)
 		}
 		return
 	}
 
-	// Update status for each item
-	for i, ei := range claimed {
-		result := results[i]
+	// Record provider stats
+	if stats != nil {
+		providerSummary := make(map[string]any, len(stats.Providers))
+		for _, ps := range stats.Providers {
+			entry := map[string]any{
+				"items_received": ps.ItemsReceived,
+				"items_enriched": ps.ItemsEnriched,
+				"tags_assigned":  ps.TagsAssigned,
+			}
+			if ps.Failed {
+				entry["error"] = ps.Error
+			}
+			providerSummary[ps.Name] = entry
+		}
+		we["providers"] = providerSummary
 
-		// Persist tags from enrichment
-		w.persistTags(ctx, ei, result)
-
-		// Mark as enriched
-		if err := w.media.UpdateEnrichmentStatus(ctx, ei.ID, "enriched"); err != nil {
-			w.logger.Error("failed to mark item as enriched",
-				"item_id", ei.ID,
-				"error", err,
-			)
+		if stats.LLMItems > 0 {
+			we["llm_items"] = stats.LLMItems
+			we["llm_tags"] = stats.LLMTags
+			we["llm_errors"] = stats.LLMErrors
 		}
 	}
 
-	w.logger.Info("enrichment batch completed", "count", len(claimed))
+	// Persist results
+	for i, ei := range claimed {
+		result := results[i]
+		tagCount, tagErrors := w.persistTags(ctx, ei, result)
+		we["tags_persisted"] = we["tags_persisted"].(int) + tagCount
+		we["tag_errors"] = we["tag_errors"].(int) + tagErrors
+
+		if err := w.media.UpdateEnrichmentStatus(ctx, ei.ID, "enriched"); err != nil {
+			w.logger.Error("enrichment_tick",
+				"outcome", "status_update_failed",
+				"item_id", ei.ID,
+				"error", err,
+			)
+			we["items_failed"] = we["items_failed"].(int) + 1
+			continue
+		}
+		we["items_enriched"] = we["items_enriched"].(int) + 1
+	}
+
+	we["outcome"] = "success"
+	we["duration_ms"] = time.Since(start).Milliseconds()
+	w.logger.Info("enrichment_tick", wideAttrs(we)...)
 }
 
 // persistTags saves tags from the enrichment result to the database.
-// LLM-sourced tags are identified via the typed LLMTagResult field;
-// all other tags are treated as authoritative API-provider tags.
-func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, result EnrichmentResult) {
+// Returns the count of tags persisted and tag errors.
+func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, result EnrichmentResult) (persisted int, errors int) {
 	// Build a lookup of LLM tags for source/confidence attribution.
 	llmTags := make(map[string]float32)
 	if result.LLMTagResult != nil {
@@ -170,10 +214,7 @@ func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, r
 
 		tagID, err := w.tags.GetOrCreate(ctx, tag)
 		if err != nil {
-			w.logger.Warn("failed to get/create tag",
-				"tag", tag,
-				"error", err,
-			)
+			errors++
 			continue
 		}
 
@@ -185,31 +226,40 @@ func (w *EnrichmentWorker) persistTags(ctx context.Context, ei EnrichmentItem, r
 		}
 
 		if err := w.tags.AddMediaItemTag(ctx, ei.ID, tagID, source, confidence); err != nil {
-			w.logger.Warn("failed to add tag to item",
-				"tag", tag,
-				"item_id", ei.ID,
-				"error", err,
-			)
+			errors++
+			continue
 		}
+		persisted++
 	}
+
+	return persisted, errors
 }
 
 // markRetry increments the retry count or marks as failed if max retries reached.
-func (w *EnrichmentWorker) markRetry(ctx context.Context, ei EnrichmentItem) {
+func (w *EnrichmentWorker) markRetry(ctx context.Context, ei EnrichmentItem, we map[string]any) {
 	newRetries := ei.Retries + 1
 	status := "pending" // will be retried next tick
 	if newRetries >= w.maxRetries {
 		status = "failed"
-		w.logger.Warn("item exceeded max retries, marking as failed",
-			"item_id", ei.ID,
-			"retries", newRetries,
-		)
+		we["items_failed"] = we["items_failed"].(int) + 1
+	} else {
+		we["items_retried"] = we["items_retried"].(int) + 1
 	}
 
 	if err := w.media.UpdateEnrichmentStatusWithRetries(ctx, ei.ID, status, newRetries); err != nil {
-		w.logger.Error("failed to update retry status",
+		w.logger.Error("enrichment_tick",
+			"outcome", "retry_update_failed",
 			"item_id", ei.ID,
 			"error", err,
 		)
 	}
+}
+
+// wideAttrs flattens a map to slog key-value pairs.
+func wideAttrs(m map[string]any) []any {
+	attrs := make([]any, 0, len(m)*2)
+	for k, v := range m {
+		attrs = append(attrs, k, v)
+	}
+	return attrs
 }

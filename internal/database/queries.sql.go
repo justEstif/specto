@@ -374,6 +374,35 @@ func (q *Queries) DeleteSyncLogsByPlugin(ctx context.Context, arg DeleteSyncLogs
 	return err
 }
 
+const enrichmentStats = `-- name: EnrichmentStats :one
+SELECT
+    count(*) FILTER (WHERE enrichment_status = 'pending') AS pending,
+    count(*) FILTER (WHERE enrichment_status = 'enriching') AS enriching,
+    count(*) FILTER (WHERE enrichment_status = 'enriched') AS enriched,
+    count(*) FILTER (WHERE enrichment_status = 'failed') AS failed
+FROM media_items
+WHERE user_id = $1
+`
+
+type EnrichmentStatsRow struct {
+	Pending   int64 `json:"pending"`
+	Enriching int64 `json:"enriching"`
+	Enriched  int64 `json:"enriched"`
+	Failed    int64 `json:"failed"`
+}
+
+func (q *Queries) EnrichmentStats(ctx context.Context, userID pgtype.UUID) (EnrichmentStatsRow, error) {
+	row := q.db.QueryRow(ctx, enrichmentStats, userID)
+	var i EnrichmentStatsRow
+	err := row.Scan(
+		&i.Pending,
+		&i.Enriching,
+		&i.Enriched,
+		&i.Failed,
+	)
+	return i, err
+}
+
 const getMediaItemByExternalID = `-- name: GetMediaItemByExternalID :one
 SELECT id, user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, enrichment_status, raw_metadata, created_at, updated_at, enrichment_retries, private FROM media_items WHERE user_id = $1 AND platform = $2 AND external_id = $3
 `
@@ -1348,6 +1377,41 @@ func (q *Queries) PlatformBreakdownFiltered(ctx context.Context, arg PlatformBre
 		return nil, err
 	}
 	return items, nil
+}
+
+const resetEnrichmentByID = `-- name: ResetEnrichmentByID :exec
+UPDATE media_items SET
+    enrichment_status = 'pending',
+    enrichment_retries = 0,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
+`
+
+type ResetEnrichmentByIDParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) ResetEnrichmentByID(ctx context.Context, arg ResetEnrichmentByIDParams) error {
+	_, err := q.db.Exec(ctx, resetEnrichmentByID, arg.ID, arg.UserID)
+	return err
+}
+
+const resetEnrichmentByUser = `-- name: ResetEnrichmentByUser :execrows
+UPDATE media_items SET
+    enrichment_status = 'pending',
+    enrichment_retries = 0,
+    updated_at = now()
+WHERE user_id = $1
+    AND enrichment_status IN ('enriched', 'failed')
+`
+
+func (q *Queries) ResetEnrichmentByUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, resetEnrichmentByUser, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setItemPrivacy = `-- name: SetItemPrivacy :one

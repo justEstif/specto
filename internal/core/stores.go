@@ -48,6 +48,18 @@ type MediaItemStore interface {
 	// worker instance. Uses FOR UPDATE SKIP LOCKED.
 	ClaimPendingItems(ctx context.Context, limit int32, maxRetries int32) ([]EnrichmentItem, error)
 
+	// ResetEnrichment resets all enriched/failed items for a user back to
+	// pending with zero retries. Returns the number of items reset.
+	// Used for re-enrichment when tags or prompts change.
+	ResetEnrichment(ctx context.Context, userID uuid.UUID) (int64, error)
+
+	// ResetEnrichmentByID resets a single item's enrichment status to pending.
+	ResetEnrichmentByID(ctx context.Context, itemID, userID uuid.UUID) error
+
+	// EnrichmentStats returns counts of items in each enrichment status
+	// for a user.
+	EnrichmentStats(ctx context.Context, userID uuid.UUID) (*EnrichmentStatusCounts, error)
+
 	// DeleteByPlatform removes all media items for a user on a given platform.
 	// Returns the number of items deleted.
 	DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error)
@@ -258,6 +270,14 @@ type SyncLogEntry struct {
 	ErrorCode    *string
 	ErrorMessage *string
 	DurationMs   int32
+}
+
+// EnrichmentStatusCounts holds counts of items in each enrichment status.
+type EnrichmentStatusCounts struct {
+	Pending   int64
+	Enriching int64
+	Enriched  int64
+	Failed    int64
 }
 
 // EnrichmentItem wraps a MediaItem with its database ID and retry count,

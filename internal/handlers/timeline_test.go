@@ -73,6 +73,15 @@ func (m *mockMediaItemStore) ClaimPendingItems(_ context.Context, _ int32, _ int
 func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
 	return 0, nil
 }
+func (m *mockMediaItemStore) ResetEnrichment(_ context.Context, _ uuid.UUID) (int64, error) {
+	return 0, nil
+}
+func (m *mockMediaItemStore) ResetEnrichmentByID(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}
+func (m *mockMediaItemStore) EnrichmentStats(_ context.Context, _ uuid.UUID) (*core.EnrichmentStatusCounts, error) {
+	return &core.EnrichmentStatusCounts{}, nil
+}
 
 func TestTimeline(t *testing.T) {
 	duration := 3 * time.Minute

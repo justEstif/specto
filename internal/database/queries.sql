@@ -137,6 +137,30 @@ UPDATE media_items SET
     updated_at = now()
 WHERE id = $1;
 
+-- name: ResetEnrichmentByUser :execrows
+UPDATE media_items SET
+    enrichment_status = 'pending',
+    enrichment_retries = 0,
+    updated_at = now()
+WHERE user_id = $1
+    AND enrichment_status IN ('enriched', 'failed');
+
+-- name: ResetEnrichmentByID :exec
+UPDATE media_items SET
+    enrichment_status = 'pending',
+    enrichment_retries = 0,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2;
+
+-- name: EnrichmentStats :one
+SELECT
+    count(*) FILTER (WHERE enrichment_status = 'pending') AS pending,
+    count(*) FILTER (WHERE enrichment_status = 'enriching') AS enriching,
+    count(*) FILTER (WHERE enrichment_status = 'enriched') AS enriched,
+    count(*) FILTER (WHERE enrichment_status = 'failed') AS failed
+FROM media_items
+WHERE user_id = $1;
+
 -- name: GetOrCreateTag :one
 INSERT INTO tags (name, category)
 VALUES ($1, $2)

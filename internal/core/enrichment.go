@@ -102,6 +102,24 @@ type EnrichmentResult struct {
 	LLMTagResult *TagResult // non-nil if LLM enrichment produced tags
 }
 
+// ProviderStats holds per-provider metrics from a single enrichment run.
+type ProviderStats struct {
+	Name          string
+	ItemsReceived int
+	ItemsEnriched int
+	TagsAssigned  int
+	Failed        bool
+	Error         string
+}
+
+// BatchStats holds aggregate metrics for a single enrichment batch.
+type BatchStats struct {
+	Providers []ProviderStats
+	LLMItems  int // items sent to LLM
+	LLMTags   int // tags assigned by LLM
+	LLMErrors int // per-item LLM failures
+}
+
 // Run executes two-phase enrichment on a batch of items.
 //
 // Phase 1: All API providers run concurrently. Each provider receives only
@@ -110,34 +128,38 @@ type EnrichmentResult struct {
 // Phase 2: The LLM enricher runs on all items, using accumulated tags
 // from Phase 1 as context.
 //
-// Returns enrichment results with items and their LLM tag results (if any).
+// Returns enrichment results with items, their LLM tag results (if any),
+// and batch-level stats for observability.
 // Per-provider and per-item errors are logged but do not fail the batch.
-func (c *EnrichmentCoordinator) Run(ctx context.Context, items []MediaItem) ([]EnrichmentResult, error) {
+func (c *EnrichmentCoordinator) Run(ctx context.Context, items []MediaItem) ([]EnrichmentResult, *BatchStats, error) {
 	if len(items) == 0 {
-		return nil, nil
+		return nil, &BatchStats{}, nil
 	}
 
+	stats := &BatchStats{}
+
 	// Phase 1: API providers (concurrent)
-	items = c.runAPIProviders(ctx, items)
+	items = c.runAPIProviders(ctx, items, stats)
 
 	// Phase 2: LLM enricher (sequential, uses Phase 1 tags as context)
-	results := c.runLLMEnricher(ctx, items)
+	results := c.runLLMEnricher(ctx, items, stats)
 
-	return results, nil
+	return results, stats, nil
 }
 
 // runAPIProviders runs all API providers concurrently and merges their
-// tag results back onto items.
-func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []MediaItem) []MediaItem {
+// tag results back onto items. Provider-level metrics are recorded in stats.
+func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []MediaItem, stats *BatchStats) []MediaItem {
 	if len(c.providers) == 0 {
 		return items
 	}
 
 	// providerResult holds the output of a single provider run.
 	type providerResult struct {
-		name  string
-		items []MediaItem
-		err   error
+		name     string
+		items    []MediaItem
+		received int
+		err      error
 	}
 
 	var wg sync.WaitGroup
@@ -162,9 +184,10 @@ func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []Med
 			defer wg.Done()
 			enriched, err := provider.Enrich(ctx, batch)
 			results[idx] = providerResult{
-				name:  provider.Name(),
-				items: enriched,
-				err:   err,
+				name:     provider.Name(),
+				items:    enriched,
+				received: len(batch),
+				err:      err,
 			}
 		}(i, p, supported)
 	}
@@ -172,17 +195,25 @@ func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []Med
 	wg.Wait()
 
 	// Merge tags from all provider results back onto the original items.
-	// Build a lookup by ExternalID for efficient merging.
 	for _, pr := range results {
+		ps := ProviderStats{
+			Name:          pr.name,
+			ItemsReceived: pr.received,
+		}
+
 		if pr.err != nil {
 			c.logger.Warn("enrichment provider failed",
 				"provider", pr.name,
 				"error", pr.err,
 			)
+			ps.Failed = true
+			ps.Error = pr.err.Error()
+			stats.Providers = append(stats.Providers, ps)
 			continue
 		}
 
 		if len(pr.items) == 0 {
+			stats.Providers = append(stats.Providers, ps)
 			continue
 		}
 
@@ -192,12 +223,20 @@ func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []Med
 			enrichedTags[enrichedItem.ExternalID] = enrichedItem.Tags
 		}
 
-		// Merge tags into original items
+		// Merge tags into original items and count
 		for i := range items {
 			if tags, ok := enrichedTags[items[i].ExternalID]; ok {
+				oldLen := len(items[i].Tags)
 				items[i].Tags = mergeUniqueTags(items[i].Tags, tags)
+				newTags := len(items[i].Tags) - oldLen
+				ps.TagsAssigned += newTags
+				if newTags > 0 {
+					ps.ItemsEnriched++
+				}
 			}
 		}
+
+		stats.Providers = append(stats.Providers, ps)
 	}
 
 	return items
@@ -205,7 +244,7 @@ func (c *EnrichmentCoordinator) runAPIProviders(ctx context.Context, items []Med
 
 // runLLMEnricher runs the LLM enricher (Phase 2) on all items and
 // returns structured results with LLM tag data separated from items.
-func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []MediaItem) []EnrichmentResult {
+func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []MediaItem, stats *BatchStats) []EnrichmentResult {
 	results := make([]EnrichmentResult, len(items))
 	for i := range items {
 		results[i] = EnrichmentResult{Item: items[i]}
@@ -215,9 +254,12 @@ func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []Medi
 		return results
 	}
 
+	stats.LLMItems = len(items)
+
 	for i, item := range items {
 		tagResult, err := c.enricher.Enrich(ctx, item, item.Tags)
 		if err != nil {
+			stats.LLMErrors++
 			c.logger.Warn("LLM enrichment failed for item",
 				"title", item.Title,
 				"error", err,
@@ -240,6 +282,7 @@ func (c *EnrichmentCoordinator) runLLMEnricher(ctx context.Context, items []Medi
 		for _, ts := range validated.AllTags() {
 			llmTags = append(llmTags, ts.Tag)
 		}
+		stats.LLMTags += len(llmTags)
 		results[i].Item.Tags = mergeUniqueTags(results[i].Item.Tags, llmTags)
 		results[i].LLMTagResult = validated
 	}

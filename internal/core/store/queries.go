@@ -20,6 +20,9 @@ type Querier interface {
 	UpdateEnrichmentStatusWithRetries(ctx context.Context, arg database.UpdateEnrichmentStatusWithRetriesParams) error
 	ListPendingEnrichment(ctx context.Context, limit int32) ([]database.MediaItem, error)
 	ClaimPendingItems(ctx context.Context, arg database.ClaimPendingItemsParams) ([]database.MediaItem, error)
+	ResetEnrichmentByUser(ctx context.Context, userID pgtype.UUID) (int64, error)
+	ResetEnrichmentByID(ctx context.Context, arg database.ResetEnrichmentByIDParams) error
+	EnrichmentStats(ctx context.Context, userID pgtype.UUID) (database.EnrichmentStatsRow, error)
 	DeleteMediaItemsByPlatform(ctx context.Context, arg database.DeleteMediaItemsByPlatformParams) (int64, error)
 
 	// Plugin state

@@ -332,3 +332,15 @@ func (m *mockQuerier) GetPublicTopCreators(_ context.Context, _ database.GetPubl
 func (m *mockQuerier) GetPublicPlatformMix(_ context.Context, _ database.GetPublicPlatformMixParams) ([]database.GetPublicPlatformMixRow, error) {
 	return nil, fmt.Errorf("GetPublicPlatformMix not mocked")
 }
+
+func (m *mockQuerier) ResetEnrichmentByUser(_ context.Context, _ pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockQuerier) ResetEnrichmentByID(_ context.Context, _ database.ResetEnrichmentByIDParams) error {
+	return nil
+}
+
+func (m *mockQuerier) EnrichmentStats(_ context.Context, _ pgtype.UUID) (database.EnrichmentStatsRow, error) {
+	return database.EnrichmentStatsRow{}, nil
+}

@@ -149,7 +149,7 @@ var _ EnrichmentProvider = (*mockEnrichmentProvider)(nil)
 
 func TestCoordinator_EmptyItems(t *testing.T) {
 	c := NewEnrichmentCoordinator(nil, nil, discardLogger())
-	items, err := c.Run(context.Background(), nil)
+	items, _, err := c.Run(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestCoordinator_NoProviders(t *testing.T) {
 	items := []MediaItem{
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1"},
 	}
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestCoordinator_SingleProvider_AddsTags(t *testing.T) {
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1"},
 	}
 
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestCoordinator_ProviderSupportsFilter(t *testing.T) {
 		{Platform: "youtube", Type: MediaVideo, Title: "Video", ExternalID: "2"},
 	}
 
-	_, err := c.Run(context.Background(), items)
+	_, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestCoordinator_MultipleProviders_MergeTags(t *testing.T) {
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1"},
 	}
 
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestCoordinator_ProviderError_NonFatal(t *testing.T) {
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1"},
 	}
 
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("expected no error (failures are non-fatal), got: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestCoordinator_LLMPhase2_RunsAfterAPI(t *testing.T) {
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1"},
 	}
 
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestCoordinator_LLMPhase2_InvalidTagsFiltered(t *testing.T) {
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1"},
 	}
 
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestCoordinator_NilLLM_SkipsPhase2(t *testing.T) {
 		{Platform: "spotify", Type: MediaMusic, Title: "Song", ExternalID: "1", Tags: []string{"rock"}},
 	}
 
-	result, err := c.Run(context.Background(), items)
+	result, _, err := c.Run(context.Background(), items)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
