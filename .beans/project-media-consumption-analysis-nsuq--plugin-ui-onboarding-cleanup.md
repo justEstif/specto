@@ -5,8 +5,8 @@ status: todo
 type: feature
 priority: normal
 created_at: 2026-03-14T20:16:41Z
-updated_at: 2026-03-14T20:17:04Z
-parent: project-media-consumption-analysis-bja8
+updated_at: 2026-03-14T21:04:58Z
+parent: project-media-consumption-analysis-doqg
 blocked_by:
     - project-media-consumption-analysis-zhyz
 ---
