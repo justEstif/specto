@@ -86,12 +86,17 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 							<span class="status status-neutral" title="Not connected"></span>
 						}
 					</div>
-					<div class="text-xs text-base-content/50 mt-0.5">
-						{ authTypeLabel(p.AuthType) }
-						if p.LastSynced != "" {
-							{ " · Last synced " + p.LastSynced }
+				<div class="text-xs text-base-content/50 mt-0.5">
+					{ authTypeLabel(p.AuthType) }
+					if p.LastSynced != "" {
+						{ " · Last synced " + p.LastSynced }
+					}
+					if !p.Connected {
+						if desc := pluginDescription(p.Name); desc != "" {
+							{ " · " + desc }
 						}
-					</div>
+					}
+				</div>
 				</div>
 			</div>
 		</div>
@@ -188,7 +193,7 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 			</div>
 			<div>
 				<span class="font-semibold text-base-content">Import from file</span>
-				<div class="text-xs text-base-content/50 mt-0.5">Upload an export file from a supported platform</div>
+				<div class="text-xs text-base-content/50 mt-0.5">Your complete history — years of data, not just recent plays</div>
 			</div>
 		</div>
 		<form
@@ -235,14 +240,15 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 			if p.AuthType == core.AuthFileImport {
 				<div class="collapse collapse-arrow bg-base-100/50 border border-base-300 mt-4">
 					<input type="checkbox"/>
-					<div class="collapse-title text-sm font-medium text-base-content/60">
-						<div class="flex items-center gap-2">
-							<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-								@pluginLogo(p.Name)
-							</div>
-							{ p.DisplayName } — { fileFormatHint(p.Name) }
+				<div class="collapse-title text-sm font-medium text-base-content/60">
+					<div class="flex items-center gap-2">
+						<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+							@pluginLogo(p.Name)
 						</div>
+						<span>{ p.DisplayName } — How to export</span>
+						<span class="badge badge-xs badge-ghost text-base-content/40">{ pluginTimeEstimate(p.Name) }</span>
 					</div>
+				</div>
 					<div class="collapse-content text-sm text-base-content/80 space-y-3">
 						@importGuideSteps(p.Name)
 					</div>
@@ -300,19 +306,6 @@ func hasFileImportPlugins(plugins []PluginViewData) bool {
 		}
 	}
 	return false
-}
-
-// fileFormatHint returns accepted file type descriptions per plugin.
-func fileFormatHint(name string) string {
-	lower := strings.ToLower(name)
-	switch {
-	case strings.Contains(lower, "spotify"):
-		return "Spotify extended streaming history JSON (Account privacy → Request data)"
-	case strings.Contains(lower, "youtube"):
-		return "YouTube Takeout watch-history.json (Google Takeout → YouTube)"
-	default:
-		return "CSV, JSON, or TXT export file"
-	}
 }
 
 templ importGuideSteps(name string) {
@@ -425,3 +418,37 @@ func authTypeLabel(at core.AuthType) string {
 		return ""
 	}
 }
+
+// pluginDescription returns a short one-line description for unconnected plugins.
+func pluginDescription(name string) string {
+	lower := strings.ToLower(name)
+	switch {
+	case lower == "spotify-api":
+		return "Recent plays, auto-synced"
+	case lower == "spotify":
+		return "Full listening history via file export"
+	case lower == "youtube-api":
+		return "Recent watches, auto-synced"
+	case lower == "youtube":
+		return "Full watch history via Google Takeout"
+	default:
+		return ""
+	}
+}
+
+// pluginTimeEstimate returns a human-readable time estimate for connecting.
+func pluginTimeEstimate(name string) string {
+	lower := strings.ToLower(name)
+	switch {
+	case lower == "spotify-api" || lower == "youtube-api":
+		return "One click"
+	case strings.Contains(lower, "spotify"):
+		return "~5 min setup, data arrives in 1–30 days"
+	case strings.Contains(lower, "youtube"):
+		return "~5 min via Google Takeout"
+	default:
+		return "A few minutes"
+	}
+}
+
+

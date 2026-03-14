@@ -1,11 +1,11 @@
 ---
 # project-media-consumption-analysis-iq3r
 title: Onboarding & Plugins Page Redesign Plan
-status: todo
+status: in-progress
 type: epic
 priority: normal
 created_at: 2026-03-14T22:06:38Z
-updated_at: 2026-03-14T22:07:55Z
+updated_at: 2026-03-14T22:15:15Z
 ---
 
 UX research-backed plan for improving the new user onboarding experience and plugins connection page to motivate users to connect their services and import data.
@@ -186,3 +186,239 @@ A non-intrusive checklist widget (collapsible, lives on dashboard):
 - Single line of purposeful copy
 - One CTA button using `btn-primary`
 - Consistent but not monotonous — each empty state previews its specific content type
+
+
+---
+
+## Wireframes (aligned with ui-design.md conventions)
+
+### Welcome Flow — Step 1: "What Do You Track?"
+
+**Route:** `/welcome` (redirect here on first login, stored in user row `onboarded` bool)
+**Auth:** Required
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ navbar: [Specto]                                [▼ avatar]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                                                             │
+│  Welcome to Specto                   (text-display, 5xl)    │
+│  ─────────────────                                          │
+│  What do you consume most?           (text-base-content/60) │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   ♫          │  │   ▶          │  │   ◈          │      │
+│  │              │  │              │  │              │      │
+│  │   Music      │  │  Movies &    │  │   Anime &    │      │
+│  │              │  │  TV          │  │   Manga      │      │
+│  │  Spotify,    │  │  YouTube,    │  │  AniList,    │      │
+│  │  Last.fm     │  │  Netflix     │  │  Crunchyroll │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │                    Everything                       │     │
+│  │        I track across all media types               │     │
+│  └────────────────────────────────────────────────────┘     │
+│                                                             │
+│                          ~ or ~                             │
+│                                                             │
+│       I'll explore on my own →       (text-link, muted)     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Interaction:** Clicking a card sets preference + navigates to Step 2 with recommended plugin pre-selected. "I'll explore on my own" skips to dashboard, sets `onboarded=true`.
+
+### Welcome Flow — Step 2: "Connect Your First Source"
+
+**Route:** `/welcome/connect`
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ navbar: [Specto]                                [▼ avatar]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Step 2 of 3                         (text-base-content/40) │
+│                                                             │
+│  Connect your first source           (text-display, 3xl)    │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                                                     │    │
+│  │  Recommended for you:                               │    │
+│  │                                                     │    │
+│  │  ┌─────────────────────────────────────────────┐    │    │
+│  │  │ ♫ Spotify                                   │    │    │
+│  │  │                                             │    │    │
+│  │  │ What you'll get:                            │    │    │
+│  │  │ • Your full listening history               │    │    │
+│  │  │ • Genre patterns & top artists              │    │    │
+│  │  │ • Cross-platform insights                   │    │    │
+│  │  │                                             │    │    │
+│  │  │ ┌───────────────────────┐   Takes ~5 min    │    │    │
+│  │  │ │  Upload history file  │   (file import)   │    │    │
+│  │  │ └───────────────────────┘                   │    │    │
+│  │  │                                             │    │    │
+│  │  │ ── or ──                                    │    │    │
+│  │  │                                             │    │    │
+│  │  │ ┌───────────────────────┐   One click       │    │    │
+│  │  │ │  Connect with OAuth   │   (last 50 only)  │    │    │
+│  │  │ └───────────────────────┘                   │    │    │
+│  │  │                                             │    │    │
+│  │  │ 🔒 We only read your history. Never posts.  │    │    │
+│  │  └─────────────────────────────────────────────┘    │    │
+│  │                                                     │    │
+│  │  Other sources:                                     │    │
+│  │  YouTube · AniList · (show as text links)           │    │
+│  │                                                     │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+│       Skip for now →                 (text-link, muted)     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Welcome Flow — Step 3: "Your First Insights" (post-import)
+
+**Route:** `/welcome/complete` (after successful import/OAuth callback)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ navbar                                                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                                                             │
+│  You're all set.                     (text-display, 5xl)    │
+│                                                             │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐              │
+│  │ 3,247      │ │ 89         │ │ 14 hrs     │              │
+│  │ songs      │ │ artists    │ │ total time │              │
+│  │ imported   │ │ discovered │ │ tracked    │              │
+│  └────────────┘ └────────────┘ └────────────┘              │
+│  (stat counters animate up from 0)                          │
+│                                                             │
+│  Your top genre: Electronic          (text-primary)         │
+│  Spanning: Jan 2019 – Mar 2026                              │
+│                                                             │
+│  ┌────────────────────────────┐                             │
+│  │  Go to your dashboard →   │  (btn-primary, lg)           │
+│  └────────────────────────────┘                             │
+│                                                             │
+│  Connect another source →            (text-link)            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Empty State Pattern (Dashboard example)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Activity                                                   │
+│  ─────────                                                  │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                                                     │    │
+│  │  ▁▃▅▇▆▄▃▅▇█▆▅▃▂▁▃▅▆▇█▆▅▃▂▁▃▅▇▆▄  ← filter:      │    │
+│  │  M  T  W  T  F  S  S  M  T  W  T     blur(8px)    │    │
+│  │                                       opacity-40   │    │
+│  │  ┌──────────────────────────────────────────────┐   │    │
+│  │  │  Your listening patterns will appear here.   │   │    │
+│  │  │  ┌─────────────────────────┐                 │   │    │
+│  │  │  │  Connect a source →    │  (btn-primary)   │   │    │
+│  │  │  └─────────────────────────┘                 │   │    │
+│  │  └──────────────────────────────────────────────┘   │    │
+│  │                                                     │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+```
+
+**Implementation:** Render the actual chart component with hardcoded sample data, apply `filter: blur(8px) opacity: 0.4` via CSS, overlay the CTA using `absolute inset-0` positioning.
+
+### Plugins Page — Value-First Card Redesign
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Plugins                               (vt-heading)         │
+│                                                             │
+│  Your media profile              ████████████░░░░  62%      │
+│  ──────────────────              (progress bar)             │
+│  Connect more sources to unlock deeper insights.            │
+│                                                             │
+│  Connected (2)                                              │
+│  ─────────────                                              │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │ ♫ Spotify                          Connected ●     │     │
+│  │   1,880 items · Last synced 3m ago                 │     │
+│  │   ┌──────────┐  ┌────────────┐                     │     │
+│  │   │ Sync now │  │ Disconnect │                     │     │
+│  │   └──────────┘  └────────────┘                     │     │
+│  └────────────────────────────────────────────────────┘     │
+│                                                             │
+│  Available                                                  │
+│  ─────────                                                  │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │ ▶ YouTube                                          │     │
+│  │                                                    │     │
+│  │ What you'll unlock:                                │     │
+│  │ Watch history, video genres, creator patterns      │     │
+│  │                                                    │     │
+│  │ ┌───────────────────┐  ~5 min via Google Takeout   │     │
+│  │ │ Upload history    │                              │     │
+│  │ └───────────────────┘                              │     │
+│  │ ┌───────────────────┐  One click (recent only)     │     │
+│  │ │ Connect with OAuth│                              │     │
+│  │ └───────────────────┘                              │     │
+│  │                                                    │     │
+│  │ ▼ How to export your YouTube data                  │     │
+│  │   (collapsible guide with time estimates per step) │     │
+│  └────────────────────────────────────────────────────┘     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Getting-Started Checklist (Dashboard widget)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Getting started               ████████░░░░  40%    [×]     │
+│  ─────────────────                                          │
+│  ✓ Create your account                                      │
+│  ✓ Connect your first source                                │
+│  ○ Explore your dashboard                                   │
+│  ○ Share your profile                                       │
+│  ○ Connect a second source                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Position: Top of dashboard, above filters. Uses `collapse` component (collapsible). Dismissible via × button. State tracked in `localStorage` key `specto-onboarding-checklist`.
+
+---
+
+## HTMX Integration for Onboarding
+
+| Interaction                  | Method                                           | Notes                                    |
+| ---------------------------- | ------------------------------------------------ | ---------------------------------------- |
+| Welcome step navigation      | `hx-boost` links                                 | View Transition between steps            |
+| Media type selection          | `hx-post="/welcome/preference"` + redirect       | Sets preference, redirects to step 2     |
+| File upload in welcome        | `hx-post` with `multipart/form-data`             | Same as existing import endpoint         |
+| Import progress               | `hx-get` polling on `/partials/import-status`     | Every 2s until complete, shows counters  |
+| Skip/dismiss                  | `hx-get="/"` with `hx-push-url`                  | Marks onboarded, goes to dashboard       |
+| Checklist dismiss             | Client-side JS, `localStorage`                   | No server call needed                    |
+| Empty state CTA               | `hx-boost` link to `/plugins`                    | Standard navigation                      |
+
+## New Routes Required
+
+| Route                        | Method | Purpose                                      |
+| ---------------------------- | ------ | -------------------------------------------- |
+| `/welcome`                   | GET    | Welcome step 1 (media type selection)        |
+| `/welcome/connect`           | GET    | Welcome step 2 (guided first connection)     |
+| `/welcome/complete`          | GET    | Welcome step 3 (import summary)              |
+| `/welcome/preference`        | POST   | Store media type preference                  |
+| `/welcome/skip`              | POST   | Mark user as onboarded, redirect to `/`      |
+| `/partials/import-status`    | GET    | Polling endpoint for live import progress    |
+
+## DB Changes
+
+| Table   | Column       | Type    | Purpose                           |
+| ------- | ------------ | ------- | --------------------------------- |
+| `users` | `onboarded`  | `bool`  | Skip welcome flow on repeat login |
+| `users` | `media_pref` | `text`  | Preferred media type (optional)   |
