@@ -154,7 +154,7 @@ templ dashboardActivity(timeline []core.TimelineEntry) {
 templ ActivityChart(timeline []core.TimelineEntry) {
 	if len(timeline) == 0 {
 		<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
-			No activity data yet. Connect a plugin and sync to see your consumption chart.
+			No activity data yet. <a href="/plugins" class="link link-primary">Connect a plugin</a> and sync to see your consumption chart.
 		</div>
 	} else {
 		<div class="bg-neutral border border-base-300 rounded-box p-4 overflow-x-auto">
@@ -184,7 +184,7 @@ templ dashboardRecent(items []core.MediaItem, f DashboardFilters) {
 				if f.Platform != "" || f.Type != "" {
 					No items match your filters.
 				} else {
-					No items yet. Connect a plugin and sync your history.
+				No items yet. <a href="/plugins" class="link link-primary">Connect a plugin</a> and sync your history.
 				}
 			</div>
 		} else {

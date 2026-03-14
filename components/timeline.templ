@@ -94,7 +94,7 @@ templ TimelineItems(items []core.MediaItem, f TimelineFilters, hasMore bool) {
 			if f.Search != "" || f.Platform != "" || f.Type != "" {
 				No items match your filters.
 			} else {
-				No items yet. Connect a plugin and sync your history.
+			No items yet. <a href="/plugins" class="link link-primary">Connect a plugin</a> and sync your history.
 			}
 		</div>
 	} else {

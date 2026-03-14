@@ -124,9 +124,9 @@ templ attentionByTypeSection(entries []core.AttentionByTypeEntry) {
 	<div>
 		<h2 class="text-display text-xl font-semibold mb-4">By Type</h2>
 		if len(entries) == 0 {
-			<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
-				No consumption data yet.
-			</div>
+		<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
+			No consumption data yet. <a href="/plugins" class="link link-primary">Connect a plugin</a> to get started.
+		</div>
 		} else {
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 				for _, entry := range entries {
@@ -190,7 +190,7 @@ templ attentionPlatforms(entries []core.PlatformBreakdownEntry) {
 	<h2 class="text-display text-xl font-semibold mb-4">By Platform</h2>
 	if len(entries) == 0 {
 		<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
-			No platform data yet.
+			No platform data yet. <a href="/plugins" class="link link-primary">Connect a plugin</a> to get started.
 		</div>
 	} else {
 		<div class="bg-neutral border border-base-300 rounded-box p-4 space-y-3">
