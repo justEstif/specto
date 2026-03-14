@@ -24,6 +24,24 @@ BASE_URL = "http://127.0.0.1:3000"
 # GOOGLE_CLIENT_SECRET = ""
 # GITHUB_CLIENT_ID = ""
 # GITHUB_CLIENT_SECRET = ""
+# Enrichment API providers (optional — leave empty to skip provider registration)
+# LASTFM_API_KEY = ""
+# TMDB_API_KEY = ""
+# OMDB_API_KEY = ""
+# PODCAST_INDEX_API_KEY = ""
+# PODCAST_INDEX_API_SECRET = ""
+# IGDB_CLIENT_ID = ""
+# IGDB_CLIENT_SECRET = ""
+# LLM enricher (optional — leave empty to skip LLM enrichment)
+# LLM_PROVIDER = "googlegenai"         # googlegenai | ollama
+# LLM_MODEL = "gemini-2.0-flash"
+# LLM_API_KEY = ""
+# LLM_OLLAMA_BASE_URL = "http://localhost:11434"
+# Enrichment worker tuning
+ENRICHMENT_BATCH_SIZE = "50"
+ENRICHMENT_POLL_INTERVAL = "5s"
+ENRICHMENT_MAX_RETRIES = "3"
+ENRICHMENT_MIN_CONFIDENCE = "0.7"
 
 [tasks.dev]
 description = "Start development server with live reload"

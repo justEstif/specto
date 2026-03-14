@@ -11,6 +11,7 @@ These are independent. A user logs in with GitHub (app auth) but connects their
 Google account for YouTube (plugin auth).
 
 This doc distinguishes between:
+
 - **HTML/navigation routes** owned by the server (`/login`, OAuth callbacks, public share pages)
 - **canonical JSON API routes** under `/api/v1` used for the client/server boundary
 
@@ -22,15 +23,15 @@ See [api.md](./api.md) for the canonical API surface.
 
 Based on the project's Go web template:
 
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| Router | `go-chi/chi` | Route groups, middleware |
-| Sessions | `gorilla/sessions` + PostgreSQL store | Server-side sessions via HTTP-only cookies |
-| CSRF | `gorilla/csrf` | CSRF protection on all mutating requests |
-| OAuth | `golang.org/x/oauth2` | OAuth 2.0 flows for app login + plugin connections |
-| DB | `jackc/pgx/v5` | PostgreSQL driver |
-| Queries | `sqlc` | Type-safe SQL |
-| Encryption | `crypto/aes` (stdlib) | AES-256-GCM for plugin credential encryption |
+| Component  | Library                               | Purpose                                            |
+| ---------- | ------------------------------------- | -------------------------------------------------- |
+| Router     | `go-chi/chi`                          | Route groups, middleware                           |
+| Sessions   | `gorilla/sessions` + PostgreSQL store | Server-side sessions via HTTP-only cookies         |
+| CSRF       | `gorilla/csrf`                        | CSRF protection on all mutating requests           |
+| OAuth      | `golang.org/x/oauth2`                 | OAuth 2.0 flows for app login + plugin connections |
+| DB         | `jackc/pgx/v5`                        | PostgreSQL driver                                  |
+| Queries    | `sqlc`                                | Type-safe SQL                                      |
+| Encryption | `crypto/aes` (stdlib)                 | AES-256-GCM for plugin credential encryption       |
 
 ---
 
@@ -38,9 +39,9 @@ Based on the project's Go web template:
 
 ### Supported Providers
 
-| Provider | OAuth Endpoints | Scopes |
-|----------|----------------|--------|
-| **Google** | `accounts.google.com/o/oauth2/v2/auth` / `oauth2.googleapis.com/token` | `openid email profile` |
+| Provider   | OAuth Endpoints                                                            | Scopes                 |
+| ---------- | -------------------------------------------------------------------------- | ---------------------- |
+| **Google** | `accounts.google.com/o/oauth2/v2/auth` / `oauth2.googleapis.com/token`     | `openid email profile` |
 | **GitHub** | `github.com/login/oauth/authorize` / `github.com/login/oauth/access_token` | `read:user user:email` |
 
 ### Flow
@@ -309,6 +310,7 @@ The `plugin_credentials.encrypted_data` column stores an encrypted JSON blob:
 ```
 
 Decrypted only when:
+
 - Passing credentials to `plugin.Sync()` or `plugin.Enrich()`
 - Refreshing an expired OAuth token
 
@@ -366,12 +368,12 @@ DATABASE_URL=postgres://...
 
 ## Security Considerations
 
-| Concern | Mitigation |
-|---------|-----------|
-| CSRF | `gorilla/csrf` on all mutating routes. Token injected via templ components. |
-| Session fixation | Generate new session ID on login. |
-| Token theft | Plugin credentials encrypted at rest. Sessions are server-side (no JWTs with embedded secrets). |
-| OAuth state | Random state param validated on callback. Stored in session, not URL. |
-| Cookie security | HTTP-only, Secure (production), SameSite=Lax. |
-| SQL injection | sqlc generates parameterized queries. No raw string concatenation. |
-| XSS | Templ auto-escapes output. CSP headers recommended. |
+| Concern          | Mitigation                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| CSRF             | `gorilla/csrf` on all mutating routes. Token injected via templ components.                     |
+| Session fixation | Generate new session ID on login.                                                               |
+| Token theft      | Plugin credentials encrypted at rest. Sessions are server-side (no JWTs with embedded secrets). |
+| OAuth state      | Random state param validated on callback. Stored in session, not URL.                           |
+| Cookie security  | HTTP-only, Secure (production), SameSite=Lax.                                                   |
+| SQL injection    | sqlc generates parameterized queries. No raw string concatenation.                              |
+| XSS              | Templ auto-escapes output. CSP headers recommended.                                             |
