@@ -1,10 +1,11 @@
 ---
 # project-media-consumption-analysis-502i
 title: OAuth login providers (Google, GitHub)
-status: todo
+status: completed
 type: feature
+priority: normal
 created_at: 2026-03-12T21:39:14Z
-updated_at: 2026-03-12T21:39:14Z
+updated_at: 2026-03-14T03:49:00Z
 parent: project-media-consumption-analysis-bja8
 blocked_by:
     - project-media-consumption-analysis-eo0f

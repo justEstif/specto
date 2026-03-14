@@ -82,7 +82,7 @@ func main() {
 	if err := application.Registry.Register(spotify.NewAPI()); err != nil {
 		log.Fatalf("Failed to register spotify-api plugin: %v", err)
 	}
-	if err := application.Registry.Register(youtube.New()); err != nil {
+	if err := application.Registry.Register(youtube.NewWithEnrich()); err != nil {
 		log.Fatalf("Failed to register youtube plugin: %v", err)
 	}
 	if err := application.Registry.Register(youtube.NewAPI()); err != nil {
