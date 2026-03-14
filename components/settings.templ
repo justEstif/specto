@@ -5,7 +5,7 @@ import "github.com/justestif/specto/internal/core"
 // SettingsData holds data for the settings page.
 type SettingsData struct {
 	User         *core.UserInfo
-	ActiveTab    string // "account", "appearance", "sharing"
+	ActiveTab    string // "account", "sharing"
 	CSRFToken    string
 	Message      string // success or error message
 	ShareProfile *core.ShareProfile
@@ -19,10 +19,8 @@ templ SettingsPage(data SettingsData) {
 		@settingsTabs(data.ActiveTab)
 		<!-- Tab content -->
 		<div id="settings-content" class="mt-6">
-			switch data.ActiveTab {
-			case "appearance":
-				@SettingsAppearance(data)
-			case "sharing":
+		switch data.ActiveTab {
+		case "sharing":
 				@SettingsSharing(data)
 			default:
 				@SettingsAccount(data)
@@ -34,7 +32,7 @@ templ SettingsPage(data SettingsData) {
 templ settingsTabs(active string) {
 	<div role="tablist" class="tabs tabs-box bg-base-200">
 		@settingsTab("Account", "account", "/settings", active)
-		@settingsTab("Appearance", "appearance", "/settings/appearance", active)
+
 		@settingsTab("Sharing", "sharing", "/settings/sharing", active)
 	</div>
 }
@@ -189,35 +187,6 @@ templ connectedAccount(provider string, connected bool) {
 			</a>
 		}
 	</div>
-}
-
-// SettingsAppearance renders the Appearance tab content.
-templ SettingsAppearance(data SettingsData) {
-	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6">
-		<legend class="fieldset-legend text-base font-semibold">Theme</legend>
-		<p class="text-sm text-base-content/50 mb-4">Choose your preferred color scheme.</p>
-		<div class="flex gap-4">
-			<label class="flex items-center gap-2 cursor-pointer">
-				<input
-					type="radio"
-					name="theme"
-					value="specto-dark"
-					class="radio radio-primary theme-controller"
-					checked
-				/>
-				<span class="text-sm text-base-content/80">Dark</span>
-			</label>
-			<label class="flex items-center gap-2 cursor-pointer">
-				<input
-					type="radio"
-					name="theme"
-					value="specto-light"
-					class="radio radio-primary theme-controller"
-				/>
-				<span class="text-sm text-base-content/80">Light</span>
-			</label>
-		</div>
-	</fieldset>
 }
 
 // SettingsSharing renders the Sharing tab with public profile toggle,

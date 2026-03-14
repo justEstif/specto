@@ -74,66 +74,9 @@
   --noise: 0;
 }
 
-/* ── LIGHT THEME ──────────────────────────────────────────────
-   For users who prefer light mode.
-   Warm cream paper base, same jewel-tone accents shifted for contrast.
-   Feels like a high-end magazine/editorial layout.
-*/
-@plugin "../daisyui-theme.mjs" {
-  name: "specto-light";
-  color-scheme: light;
-
-  /* Base surfaces — warm cream/parchment tones */
-  --color-base-100: oklch(97% 0.008 80);
-  --color-base-200: oklch(94% 0.01 80);
-  --color-base-300: oklch(90% 0.014 80);
-  --color-base-content: oklch(18% 0.015 70);
-
-  /* Primary — deeper amber for legibility on light backgrounds */
-  --color-primary: oklch(52% 0.17 55);
-  --color-primary-content: oklch(97% 0.008 55);
-
-  /* Secondary — richer teal on light */
-  --color-secondary: oklch(45% 0.1 190);
-  --color-secondary-content: oklch(97% 0.008 190);
-
-  /* Accent — warm copper, deeper for contrast */
-  --color-accent: oklch(50% 0.14 25);
-  --color-accent-content: oklch(97% 0.008 25);
-
-  /* Neutral — warm medium gray */
-  --color-neutral: oklch(35% 0.015 70);
-  --color-neutral-content: oklch(95% 0.005 70);
-
-  /* Semantic — slightly more saturated for light backgrounds */
-  --color-info: oklch(50% 0.15 235);
-  --color-info-content: oklch(97% 0.01 235);
-  --color-success: oklch(50% 0.16 155);
-  --color-success-content: oklch(97% 0.01 155);
-  --color-warning: oklch(60% 0.16 65);
-  --color-warning-content: oklch(18% 0.02 65);
-  --color-error: oklch(52% 0.2 18);
-  --color-error-content: oklch(97% 0.01 18);
-
-  /* Same sharp shape language */
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
-}
-
 /* ──────────────────────────────────────────────────────────────
    Custom utilities & design tokens
    ────────────────────────────────────────────────────────────── */
-
-/* Tailwind v4 dark: variant mapped to specto-dark theme */
-@custom-variant dark (&:where([data-theme=specto-dark], [data-theme=specto-dark] *));
 
 /* ── Typography via Google Fonts ──────────────────────────────
    Display: "Outfit" — rounded geometric sans with soft terminals.
@@ -170,14 +113,7 @@
     }
   }
 
-  [data-theme="specto-light"] {
-    scrollbar-color: oklch(80% 0.01 70) transparent;
 
-    ::selection {
-      background: oklch(52% 0.17 55 / 0.25);
-      color: oklch(18% 0.015 70);
-    }
-  }
 }
 
 /* ── Utility classes specific to Specto ──────────────────────

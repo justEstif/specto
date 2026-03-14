@@ -14,9 +14,8 @@ import (
 
 // settingsTabPartials maps tab names to their partial templ components.
 var settingsTabPartials = map[string]func(components.SettingsData) templ.Component{
-	"account":    components.SettingsAccount,
-	"appearance": components.SettingsAppearance,
-	"sharing":    components.SettingsSharing,
+	"account": components.SettingsAccount,
+	"sharing": components.SettingsSharing,
 }
 
 // validSettingsTab returns the tab name if valid, or "account" as default.
