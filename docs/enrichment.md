@@ -2,15 +2,22 @@
 
 ## Overview
 
-Enrichment is split into two layers:
+Enrichment is handled by **EnrichmentProviders** — a separate plugin type from
+SourcePlugins. Source plugins import data (`Sync()`), enrichment providers add
+metadata (`Enrich()`). Multiple providers can enrich the same items.
 
-1. **Plugin enrichment** — Each plugin enriches its own items using platform-specific
-   sources (Spotify plugin calls Last.fm, Netflix plugin calls TMDB). Lives in the plugin.
-2. **Core enrichment** — Universal LLM-based classification that runs on ALL items
-   after plugin enrichment. Lives in core. Also handles tag validation and alias resolution.
+Providers are registered at startup and run automatically by a background worker.
+Each provider declares which media types and platforms it supports. If a provider's
+required API key is not configured, it is simply not registered.
 
-This keeps plugins self-contained (fetch + normalize + enrich) while core stays slim
-(just the LLM tagger and tag management).
+### Provider types
+
+- **API providers** — Call external platform APIs (Last.fm, TMDB, YouTube Data API,
+  Open Library, Podcast Index, AniList, IGDB). Add authoritative tags with
+  confidence `NULL` (meaning "certain").
+- **LLM provider** — Universal Genkit-based classification. Fills gaps (mood, topic).
+  Tags stored with confidence 0.0–1.0. Runs **after** API providers so it can use
+  their tags as context.
 
 ---
 
@@ -72,38 +79,40 @@ To add new tags post-MVP:
 
 ---
 
-## Two-Layer Enrichment
+## EnrichmentProvider Interface
 
-### Layer 1: Plugin Enrichment (platform-specific)
+```go
+type EnrichmentProvider interface {
+    Name() string
+    Supports(mediaType string, platform string) bool
+    Enrich(ctx context.Context, items []MediaItem) ([]MediaItem, error)
+}
+```
 
-Each plugin's `Enrich()` method calls external APIs specific to that content type.
-The plugin knows its domain best.
+- `Supports()` — Returns true if this provider can enrich items of the given type/platform.
+- `Enrich()` — Takes a batch of items, returns enriched items. Errors should be `*PluginError`
+  with appropriate codes (rate_limit, upstream, auth_expired, invalid_data).
+- Each provider batches internally according to its API's capabilities.
 
-| Plugin | Enrichment Sources | What It Adds |
-|--------|-------------------|-------------|
-| **Spotify** | Last.fm (track/artist tags), MusicBrainz (genres) | genre, format |
-| **YouTube** | YouTube Data API (categories, topic details) | genre, topic, format |
-| **Netflix** | TMDB (search by title → genres, keywords) | genre, format |
-| **Prime Video** | TMDB + OMDB (ratings → raw_metadata) | genre, format |
-| **Goodreads** | Open Library (subjects → genre/topic) | genre, topic, format |
-| **TikTok** | TikTok oEmbed (title, author) | minimal — relies on LLM |
-| **Podcasts** | Spotify API (show categories) | genre, topic |
+### Registered providers
 
-Plugin enrichment adds **authoritative tags with confidence `NULL`** (meaning "certain").
-
-### Layer 2: Core Enrichment (universal LLM)
-
-After plugin enrichment, core runs the LLM enricher on all items. It:
-- Fills gaps — adds mood and topic tags that platform APIs don't provide
-- Works with what plugin enrichment already added as context
-- Only assigns from the **fixed tag set**
-- Tags stored with a `confidence` score (0.0–1.0)
+| Provider | Supports | What It Adds |
+|----------|----------|-------------|
+| **Last.fm** | music (any platform) | genre tags (freeform → mapped to fixed set) |
+| **MusicBrainz** | music (any platform) | genre tags (curated), duration validation |
+| **YouTube Data API** | video (youtube) | genre, topic, format, duration, view counts |
+| **TMDB** | video (netflix, prime-video, etc.) | genre, format, runtime, ratings |
+| **Open Library** | book (any platform) | genre, topic, format |
+| **Podcast Index** | podcast (any platform) | genre, topic |
+| **AniList** | anime, manga (any platform) | genre, topic |
+| **IGDB** | game (any platform) | genre, topic |
+| **LLM (Genkit)** | all types, all platforms | mood, topic (fills gaps after API providers) |
 
 ---
 
-## Plugin Enrichment Sources
+## Enrichment Sources
 
-### Last.fm (used by Spotify plugin)
+### Last.fm (music)
 
 - **API**: `http://ws.audioscrobbler.com/2.0/`
 - **Auth**: API key (free, instant at [last.fm/api](https://www.last.fm/api/account/create))
@@ -117,7 +126,7 @@ After plugin enrichment, core runs the LLM enricher on all items. It:
   (e.g., "Hip Hop" → `hip-hop`, "electronic music" → `electronic`). Unmatched tags
   are discarded.
 
-### MusicBrainz (used by Spotify plugin)
+### MusicBrainz (music)
 
 - **API**: `https://musicbrainz.org/ws/2/`
 - **Auth**: None (just `User-Agent` header)
@@ -127,7 +136,7 @@ After plugin enrichment, core runs the LLM enricher on all items. It:
 - **Rate limit**: 1 request/second (strict)
 - **Note**: High-quality curated genres. Use as secondary to validate Last.fm tags.
 
-### TMDB (used by Netflix, Prime Video plugins)
+### TMDB (movies, TV shows)
 
 - **API**: `https://api.themoviedb.org/3/`
 - **Auth**: API key (free at [themoviedb.org](https://www.themoviedb.org/settings/api))
@@ -138,14 +147,14 @@ After plugin enrichment, core runs the LLM enricher on all items. It:
 - **Matching**: Search by title, filter by year if available. Store TMDB ID in
   `raw_metadata` for future lookups.
 
-### OMDB (used by Prime Video plugin, optional)
+### OMDB (movies, TV shows — supplementary)
 
 - **API**: `http://www.omdbapi.com/`
 - **Auth**: API key (free tier: 1,000 requests/day)
 - **Use case**: Ratings data (IMDb, RT, Metacritic) stored in `raw_metadata`.
   Not used for genre tagging.
 
-### Open Library (used by Goodreads plugin)
+### Open Library (books)
 
 - **API**: `https://openlibrary.org/`
 - **Auth**: None
@@ -154,7 +163,7 @@ After plugin enrichment, core runs the LLM enricher on all items. It:
   - `works/{id}.json` — subjects
 - **Tag mapping**: Subjects are freeform. Map to fixed genre/topic set via fuzzy matching.
 
-### YouTube Data API (used by YouTube plugin)
+### YouTube Data API (videos)
 
 - **API**: `https://www.googleapis.com/youtube/v3/`
 - **Auth**: OAuth (same token as sync)
@@ -162,12 +171,34 @@ After plugin enrichment, core runs the LLM enricher on all items. It:
 - **Quota**: 1 unit per call, 50 IDs per call, 10K units/day
 - **Output**: `categoryId`, `topicDetails.topicCategories` (Wikipedia URLs), `tags`
 
-### TikTok oEmbed (used by TikTok plugin)
+### Podcast Index (podcasts)
 
-- **API**: `https://www.tiktok.com/oembed?url=VIDEO_URL`
-- **Auth**: None
-- **Output**: Title, author name, thumbnail URL
-- **Note**: Very sparse. TikTok items rely heavily on LLM enrichment.
+- **API**: `https://api.podcastindex.org/api/1.0/`
+- **Auth**: API key + secret (free at [podcastindex.org](https://api.podcastindex.org/))
+- **Key endpoints**:
+  - `search/byterm?q=X` — search podcasts by title
+  - `podcasts/byitunesid?id=X` — lookup by Apple Podcasts ID
+  - `episodes/byfeedid?id=X` — episodes for a podcast
+- **Rate limit**: Undocumented (~few req/s)
+- **Output**: Categories (Apple/iTunes taxonomy, ~100 structured values), episode count, description
+
+### AniList (anime, manga)
+
+- **API**: `https://graphql.anilist.co` (GraphQL)
+- **Auth**: None required
+- **Key query**: `Media(search: "title", type: ANIME)` → genres, tags, episodes, duration, averageScore
+- **Rate limit**: 90 requests/minute
+- **Output**: 19 curated genres + hundreds of community-ranked tags with vote counts
+
+### IGDB (games)
+
+- **API**: `https://api.igdb.com/v4/`
+- **Auth**: Twitch client credentials (free at [dev.twitch.tv](https://dev.twitch.tv/console))
+- **Key endpoints**:
+  - `games` — search by name, returns genres, themes, game modes, platforms
+  - `genres`, `themes` — taxonomy lookups
+- **Rate limit**: 4 requests/second
+- **Output**: ~25 genres + ~20 themes (structured taxonomy)
 
 ---
 
@@ -273,25 +304,57 @@ enrichment:
 
 ## Enrichment Flow
 
-### Per-Item Flow
+### Architecture
+
+Enrichment is **async** — decoupled from the sync request:
+
+1. `SourcePlugin.Sync()` imports items → stored with `enrichment_status = 'pending'`
+2. Sync returns immediately to the user
+3. Background worker (goroutine with `time.Ticker`) polls for pending items
+4. Worker runs matching providers in two phases:
+   - **Phase 1**: API providers (concurrently) — Last.fm, TMDB, YouTube API, etc.
+   - **Phase 2**: LLM provider — uses Phase 1 tags as context
+5. Tags validated against fixed set, aliases resolved, status updated
 
 ```mermaid
 flowchart TD
-    A["Plugin.Sync()"] --> B["Plugin.Enrich(items)<br/>← platform-specific (Last.fm, TMDB, etc.)<br/>adds authoritative genre/format tags"]
-    B --> C["Core stores items (status: 'plugin-enriched')"]
-    C --> D["Core.LLMEnrich(items)<br/>← universal (Genkit + LLM)<br/>adds mood/topic tags, fills gaps"]
-    D --> E["Core validates tags against fixed set"]
-    E --> F["Core resolves aliases ('Hip Hop' → 'hip-hop')"]
-    F --> G["Core stores tags + updates status: 'enriched'"]
+    A["SourcePlugin.Sync()"] --> B["Store items (status: 'pending')"]
+    B --> C["Return to user immediately"]
+    C -.-> D["Background worker picks up pending items"]
+    D --> E["Phase 1: API providers (concurrent)<br/>Last.fm, TMDB, YouTube API, etc."]
+    E --> F["Phase 2: LLM provider<br/>uses Phase 1 tags as context"]
+    F --> G["Validate tags against fixed set"]
+    G --> H["Resolve aliases"]
+    H --> I["Store tags + update status: 'enriched'"]
+```
+
+### Worker Details
+
+- Polls every 5 seconds with `time.Ticker`
+- Pulls ~50 pending items per tick: `SELECT ... WHERE enrichment_status = 'pending' LIMIT 50 FOR UPDATE SKIP LOCKED`
+- Postgres row locking handles concurrency (safe for multiple instances)
+- No external queue or pub/sub needed
+
+### Status Transitions
+
+```
+pending → enriching → enriched
+                    → failed (after 3 retries)
 ```
 
 ### Error Handling
 
-- Plugin enrichment failure → items stored without plugin tags, LLM still runs
-- LLM failure → items keep plugin tags only, status set to `"plugin-enriched"`
-  (retry LLM later)
-- Both fail → status stays `"pending"` for full retry
-- Rate limit errors → backoff for that source only, don't block other items
+Providers return `*PluginError` with error codes. The worker responds per code:
+
+| Error Code | Worker Action |
+|------------|--------------|
+| `rate_limit` | Back off for `After` duration, skip provider this tick, retry next tick |
+| `auth_expired` | Skip provider until credentials refreshed |
+| `upstream` | Retry with exponential backoff (max 3 attempts) |
+| `invalid_data` | Log and skip — item can't be parsed by this provider |
+
+Per-item retry count (max 3). After 3 failures → `failed`. Re-enrichment resets
+status to `pending` (triggered via API endpoint or settings UI).
 
 ---
 
@@ -324,24 +387,31 @@ Before persisting, tag strings are resolved through the `tag_aliases` table:
 
 ## Configuration
 
-```yaml
-enrichment:
-  enabled: true
-  llm:
-    provider: "googlegenai"
-    model: "gemini-2.0-flash"
-    api_key: "${GENAI_API_KEY}"
-    batch_size: 10
-    max_concurrent: 3
-  # Tag confidence threshold for insights
-  min_confidence: 0.7
-  # Plugin-level enrichment API keys (used by respective plugins)
-  api_keys:
-    lastfm: "${LASTFM_API_KEY}"
-    tmdb: "${TMDB_API_KEY}"
-    omdb: "${OMDB_API_KEY}"
+All configuration via environment variables, consistent with the rest of the app.
+Providers are only registered if their required env vars are set.
+
+```bash
+# API enrichment providers (set to register, omit to skip)
+LASTFM_API_KEY=xxx
+TMDB_API_KEY=xxx
+OMDB_API_KEY=xxx                    # optional, supplements TMDB
+PODCAST_INDEX_API_KEY=xxx
+PODCAST_INDEX_API_SECRET=xxx
+IGDB_CLIENT_ID=xxx
+IGDB_CLIENT_SECRET=xxx
+
+# LLM enrichment provider
+LLM_PROVIDER=googlegenai            # googlegenai | ollama
+LLM_MODEL=gemini-2.0-flash
+LLM_API_KEY=xxx                     # not needed for ollama
+# LLM_OLLAMA_BASE_URL=http://localhost:11434  # only for ollama
+
+# Worker settings (optional, sensible defaults)
+ENRICHMENT_BATCH_SIZE=50            # items per worker tick
+ENRICHMENT_POLL_INTERVAL=5s         # how often worker checks for pending items
+ENRICHMENT_MAX_RETRIES=3            # per-item retry limit
+ENRICHMENT_MIN_CONFIDENCE=0.7       # tag confidence threshold for insights
 ```
 
-Note: Plugin enrichment sources (Last.fm, TMDB, etc.) are configured and called by
-their respective plugins, not by core. The API keys are passed to plugins via config.
-Core only configures the LLM enricher.
+Providers are wired in `main.go` — each constructor takes its config as parameters.
+No config file, no YAML.
