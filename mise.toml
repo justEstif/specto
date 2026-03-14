@@ -79,3 +79,12 @@ run = "go build -o bin/app cmd/web/main.go"
 description = "Run httpyac API tests against local server"
 run = "httpyac send *.http --all -e local"
 dir = "http"
+
+[tasks.pre-commit]
+description = "Pre-commit checks (vet, test, build)"
+run = """
+templ generate
+go vet ./...
+go test ./...
+go build -o /dev/null cmd/web/main.go
+"""
