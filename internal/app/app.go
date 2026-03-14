@@ -51,6 +51,7 @@ type App struct {
 	// Core stores (exposed for handlers that need direct store access)
 	Users         core.UserStore
 	MediaItems    core.MediaItemStore
+	Enrichment    core.EnrichmentStore
 	PluginStates  core.PluginStateStore
 	SyncLogs      core.SyncLogStore
 	Tags          core.TagStore
@@ -102,7 +103,7 @@ func New(db *database.Queries, cfg Config) *App {
 	coordinator := core.NewEnrichmentCoordinator(providers, cfg.LLMEnricher, log)
 	worker := core.NewEnrichmentWorker(
 		coordinator,
-		mediaItemStore,
+		mediaItemStore, // PgMediaItemStore implements both MediaItemStore and EnrichmentStore
 		tagStore,
 		log,
 		core.EnrichmentWorkerConfig{}, // use defaults
@@ -140,6 +141,7 @@ func New(db *database.Queries, cfg Config) *App {
 		Worker:        worker,
 		Users:         userStore,
 		MediaItems:    mediaItemStore,
+		Enrichment:    mediaItemStore, // PgMediaItemStore implements both interfaces
 		PluginStates:  pluginStateStore,
 		SyncLogs:      syncLogStore,
 		Tags:          tagStore,

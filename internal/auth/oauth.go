@@ -220,6 +220,154 @@ func (s *OAuthService) RefreshPluginToken(pluginName string, cfg *core.OAuthConf
 	}, nil
 }
 
+// --- Provider user info fetchers ---
+
+// ProviderUserInfo holds user info fetched from an OAuth provider's API.
+type ProviderUserInfo struct {
+	Subject     string  // Provider-specific user ID
+	Email       string  // User email
+	DisplayName string  // Display name
+	AvatarURL   *string // Optional avatar URL
+}
+
+// FetchGoogleUserInfo retrieves user info from Google's userinfo API.
+func FetchGoogleUserInfo(accessToken string) (*ProviderUserInfo, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("google userinfo returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		ID      string `json:"id"`
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decoding google userinfo: %w", err)
+	}
+
+	info := &ProviderUserInfo{
+		Subject:     raw.ID,
+		Email:       raw.Email,
+		DisplayName: raw.Name,
+	}
+	if raw.Picture != "" {
+		info.AvatarURL = &raw.Picture
+	}
+	return info, nil
+}
+
+// FetchGithubUserInfo retrieves user info from GitHub's user API.
+func FetchGithubUserInfo(accessToken string) (*ProviderUserInfo, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Fetch user profile
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/user", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("github user returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var raw struct {
+		ID        int    `json:"id"`
+		Login     string `json:"login"`
+		Name      string `json:"name"`
+		AvatarURL string `json:"avatar_url"`
+		Email     string `json:"email"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decoding github user: %w", err)
+	}
+
+	// If email is not public, fetch from /user/emails
+	email := raw.Email
+	if email == "" {
+		email, _ = fetchGithubPrimaryEmail(accessToken)
+	}
+
+	displayName := raw.Name
+	if displayName == "" {
+		displayName = raw.Login
+	}
+
+	info := &ProviderUserInfo{
+		Subject:     fmt.Sprintf("%d", raw.ID),
+		Email:       email,
+		DisplayName: displayName,
+	}
+	if raw.AvatarURL != "" {
+		info.AvatarURL = &raw.AvatarURL
+	}
+	return info, nil
+}
+
+func fetchGithubPrimaryEmail(accessToken string) (string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/user/emails", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("github emails returned %d", resp.StatusCode)
+	}
+
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
+		return "", err
+	}
+
+	for _, e := range emails {
+		if e.Primary && e.Verified {
+			return e.Email, nil
+		}
+	}
+	for _, e := range emails {
+		if e.Verified {
+			return e.Email, nil
+		}
+	}
+	return "", fmt.Errorf("no verified email found")
+}
+
 // postTokenRequest sends a POST to the token endpoint and parses the response.
 func (s *OAuthService) postTokenRequest(tokenURL string, data url.Values) (*TokenResponse, error) {
 	req, reqErr := http.NewRequest(http.MethodPost, tokenURL, strings.NewReader(data.Encode()))

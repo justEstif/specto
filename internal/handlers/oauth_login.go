@@ -1,11 +1,8 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"time"
 
 	"github.com/justestif/specto/internal/auth"
 )
@@ -28,7 +25,7 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch user info from Google
-	userInfo, err := fetchGoogleUserInfo(tokenResp.AccessToken)
+	userInfo, err := auth.FetchGoogleUserInfo(tokenResp.AccessToken)
 	if err != nil {
 		http.Redirect(w, r, "/login?error=failed+to+fetch+user+info", http.StatusFound)
 		return
@@ -55,7 +52,7 @@ func (h *Handler) GithubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch user info from GitHub
-	userInfo, err := fetchGithubUserInfo(tokenResp.AccessToken)
+	userInfo, err := auth.FetchGithubUserInfo(tokenResp.AccessToken)
 	if err != nil {
 		http.Redirect(w, r, "/login?error=failed+to+fetch+user+info", http.StatusFound)
 		return
@@ -65,14 +62,6 @@ func (h *Handler) GithubCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- Shared helpers ---
-
-// oauthProviderUserInfo holds user info fetched from an OAuth provider.
-type oauthProviderUserInfo struct {
-	Subject     string  // Provider-specific user ID
-	Email       string  // User email
-	DisplayName string  // Display name
-	AvatarURL   *string // Optional avatar URL
-}
 
 // oauthLogin initiates an OAuth login flow for the given provider.
 func (h *Handler) oauthLogin(w http.ResponseWriter, r *http.Request, provider string) {
@@ -138,7 +127,7 @@ func (h *Handler) oauthCallback(w http.ResponseWriter, r *http.Request, provider
 }
 
 // completeOAuthLogin upserts the user and creates a session.
-func (h *Handler) completeOAuthLogin(w http.ResponseWriter, r *http.Request, provider string, info *oauthProviderUserInfo) {
+func (h *Handler) completeOAuthLogin(w http.ResponseWriter, r *http.Request, provider string, info *auth.ProviderUserInfo) {
 	ctx := r.Context()
 
 	// Try to find existing user by auth provider + subject
@@ -159,142 +148,4 @@ func (h *Handler) completeOAuthLogin(w http.ResponseWriter, r *http.Request, pro
 	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-// --- Provider user info fetchers ---
-
-func fetchGoogleUserInfo(accessToken string) (*oauthProviderUserInfo, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, "https://www.googleapis.com/oauth2/v2/userinfo", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("google userinfo returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var raw struct {
-		ID      string `json:"id"`
-		Email   string `json:"email"`
-		Name    string `json:"name"`
-		Picture string `json:"picture"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("decoding google userinfo: %w", err)
-	}
-
-	info := &oauthProviderUserInfo{
-		Subject:     raw.ID,
-		Email:       raw.Email,
-		DisplayName: raw.Name,
-	}
-	if raw.Picture != "" {
-		info.AvatarURL = &raw.Picture
-	}
-	return info, nil
-}
-
-func fetchGithubUserInfo(accessToken string) (*oauthProviderUserInfo, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	// Fetch user profile
-	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/user", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("github user returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var raw struct {
-		ID        int    `json:"id"`
-		Login     string `json:"login"`
-		Name      string `json:"name"`
-		AvatarURL string `json:"avatar_url"`
-		Email     string `json:"email"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("decoding github user: %w", err)
-	}
-
-	// If email is not public, fetch from /user/emails
-	email := raw.Email
-	if email == "" {
-		email, _ = fetchGithubPrimaryEmail(accessToken)
-	}
-
-	displayName := raw.Name
-	if displayName == "" {
-		displayName = raw.Login
-	}
-
-	info := &oauthProviderUserInfo{
-		Subject:     fmt.Sprintf("%d", raw.ID),
-		Email:       email,
-		DisplayName: displayName,
-	}
-	if raw.AvatarURL != "" {
-		info.AvatarURL = &raw.AvatarURL
-	}
-	return info, nil
-}
-
-func fetchGithubPrimaryEmail(accessToken string) (string, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/user/emails", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("github emails returned %d", resp.StatusCode)
-	}
-
-	var emails []struct {
-		Email    string `json:"email"`
-		Primary  bool   `json:"primary"`
-		Verified bool   `json:"verified"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
-		return "", err
-	}
-
-	for _, e := range emails {
-		if e.Primary && e.Verified {
-			return e.Email, nil
-		}
-	}
-	for _, e := range emails {
-		if e.Verified {
-			return e.Email, nil
-		}
-	}
-	return "", fmt.Errorf("no verified email found")
 }

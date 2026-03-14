@@ -23,18 +23,13 @@ func NewInsightsService(store InsightsStore) *InsightsService {
 
 // GetSummary returns a high-level overview: total items, total duration,
 // top platform, and top media type for the given date range.
-func (s *InsightsService) GetSummary(ctx context.Context, userID uuid.UUID, from, to time.Time) (*Summary, error) {
-	return s.GetSummaryFiltered(ctx, userID, from, to, InsightsFilter{})
-}
-
-// GetSummaryFiltered returns a high-level overview with optional platform
-// and media type filters applied.
-func (s *InsightsService) GetSummaryFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) (*Summary, error) {
+// Pass InsightsFilter{} for unfiltered results.
+func (s *InsightsService) GetSummary(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) (*Summary, error) {
 	if err := validateDateRange(from, to); err != nil {
 		return nil, err
 	}
 
-	breakdown, err := s.store.PlatformBreakdownFiltered(ctx, userID, from, to, filter)
+	breakdown, err := s.store.PlatformBreakdown(ctx, userID, from, to, filter)
 	if err != nil {
 		return nil, fmt.Errorf("getting summary: %w", err)
 	}
@@ -59,13 +54,8 @@ func (s *InsightsService) GetSummaryFiltered(ctx context.Context, userID uuid.UU
 // GetTimeline returns time-bucketed consumption data. Each entry
 // represents one bucket (day/week/month) with the count and total
 // duration of items consumed in that bucket.
-func (s *InsightsService) GetTimeline(ctx context.Context, userID uuid.UUID, bucket TimeBucket, from, to time.Time) ([]TimelineEntry, error) {
-	return s.GetTimelineFiltered(ctx, userID, bucket, from, to, InsightsFilter{})
-}
-
-// GetTimelineFiltered returns time-bucketed consumption data with optional
-// platform and media type filters applied.
-func (s *InsightsService) GetTimelineFiltered(ctx context.Context, userID uuid.UUID, bucket TimeBucket, from, to time.Time, filter InsightsFilter) ([]TimelineEntry, error) {
+// Pass InsightsFilter{} for unfiltered results.
+func (s *InsightsService) GetTimeline(ctx context.Context, userID uuid.UUID, bucket TimeBucket, from, to time.Time, filter InsightsFilter) ([]TimelineEntry, error) {
 	if err := validateDateRange(from, to); err != nil {
 		return nil, err
 	}
@@ -76,17 +66,10 @@ func (s *InsightsService) GetTimelineFiltered(ctx context.Context, userID uuid.U
 	// Fetch all items in the range. We use a high limit and paginate
 	// through all results to build the timeline in-memory. For MVP scale
 	// this is fine — a single user won't have millions of items.
-	hasFilter := filter.Platform != nil || filter.MediaType != nil
 	const pageSize int32 = 500
 	var allItems []MediaItem
 	for offset := int32(0); ; offset += pageSize {
-		var page []MediaItem
-		var err error
-		if hasFilter {
-			page, err = s.store.ListMediaItemsFiltered(ctx, userID, from, to, pageSize, offset, filter)
-		} else {
-			page, err = s.store.ListMediaItems(ctx, userID, from, to, pageSize, offset)
-		}
+		page, err := s.store.ListMediaItems(ctx, userID, from, to, pageSize, offset, filter)
 		if err != nil {
 			return nil, fmt.Errorf("fetching items for timeline: %w", err)
 		}
@@ -118,18 +101,13 @@ func (s *InsightsService) GetTimelineFiltered(ctx context.Context, userID uuid.U
 }
 
 // GetPlatformBreakdown returns consumption stats grouped by platform
-// and media type.
-func (s *InsightsService) GetPlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]PlatformBreakdownEntry, error) {
-	return s.GetPlatformBreakdownFiltered(ctx, userID, from, to, InsightsFilter{})
-}
-
-// GetPlatformBreakdownFiltered returns consumption stats with optional filters.
-func (s *InsightsService) GetPlatformBreakdownFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]PlatformBreakdownEntry, error) {
+// and media type. Pass InsightsFilter{} for unfiltered results.
+func (s *InsightsService) GetPlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]PlatformBreakdownEntry, error) {
 	if err := validateDateRange(from, to); err != nil {
 		return nil, err
 	}
 
-	entries, err := s.store.PlatformBreakdownFiltered(ctx, userID, from, to, filter)
+	entries, err := s.store.PlatformBreakdown(ctx, userID, from, to, filter)
 	if err != nil {
 		return nil, fmt.Errorf("getting platform breakdown: %w", err)
 	}
@@ -140,13 +118,8 @@ func (s *InsightsService) GetPlatformBreakdownFiltered(ctx context.Context, user
 // GetTagDistribution returns tag usage counts within a date range.
 // Only tags with confidence >= the hardcoded threshold (0.7) or
 // authoritative (NULL confidence) tags are included. Results are
-// ordered by count descending.
-func (s *InsightsService) GetTagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32) ([]TagDistributionEntry, error) {
-	return s.GetTagDistributionFiltered(ctx, userID, from, to, limit, InsightsFilter{})
-}
-
-// GetTagDistributionFiltered returns tag distribution with optional filters.
-func (s *InsightsService) GetTagDistributionFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, filter InsightsFilter) ([]TagDistributionEntry, error) {
+// ordered by count descending. Pass InsightsFilter{} for unfiltered results.
+func (s *InsightsService) GetTagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, filter InsightsFilter) ([]TagDistributionEntry, error) {
 	if err := validateDateRange(from, to); err != nil {
 		return nil, err
 	}
@@ -154,7 +127,7 @@ func (s *InsightsService) GetTagDistributionFiltered(ctx context.Context, userID
 		limit = 50 // sensible default
 	}
 
-	entries, err := s.store.TagDistributionFiltered(ctx, userID, from, to, limit, filter)
+	entries, err := s.store.TagDistribution(ctx, userID, from, to, limit, filter)
 	if err != nil {
 		return nil, fmt.Errorf("getting tag distribution: %w", err)
 	}

@@ -67,7 +67,7 @@ func (h *Handler) renderAttention(w http.ResponseWriter, r *http.Request, user *
 	}
 
 	// Platform breakdown
-	platforms, err := h.App.Insights.GetPlatformBreakdownFiltered(ctx, user.ID, from, to, insightsFilter)
+	platforms, err := h.App.Insights.GetPlatformBreakdown(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
 		addContext(r, "attention_platforms_error", err.Error())
 	}

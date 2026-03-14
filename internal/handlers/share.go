@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -206,11 +207,33 @@ func (h *Handler) ToggleItemPrivate(w http.ResponseWriter, r *http.Request) {
 	}})
 }
 
-// --- Block rendering ---
+// --- Block data resolution ---
 
-// renderBlocks produces the preview/public data for each enabled block.
-func (h *Handler) renderBlocks(ctx context.Context, userID uuid.UUID, profile *core.ShareProfile) ([]previewBlockResponse, error) {
-	var blocks []previewBlockResponse
+// resolvedBlock holds the raw data fetched for a share block, before
+// conversion to a format-specific output type (JSON preview or HTML template).
+// This eliminates duplicate data-fetching logic between renderBlocks and
+// renderPublicBlocks.
+type resolvedBlock struct {
+	Type     string
+	Tags     []core.TagDistributionEntry // top_genres, mood_profile
+	Creators []core.TopCreatorEntry      // top_creators
+	Mix      []core.PlatformMixEntry     // platform_mix
+	Text     string                      // currently_into
+	Items    []resolvedFavorite          // recent_favorites
+	Stats    int64                       // listening_stats total
+}
+
+type resolvedFavorite struct {
+	Title    string
+	Creator  string
+	Platform string
+	Type     string
+}
+
+// resolveBlocks fetches the underlying data for each enabled block in the profile.
+// The caller converts resolvedBlock values to the appropriate output format.
+func (h *Handler) resolveBlocks(ctx context.Context, userID uuid.UUID, profile *core.ShareProfile) ([]resolvedBlock, error) {
+	var result []resolvedBlock
 
 	for _, block := range profile.Blocks {
 		if !block.Enabled {
@@ -227,13 +250,9 @@ func (h *Handler) renderBlocks(ctx context.Context, userID uuid.UUID, profile *c
 				strPtr("genre"),
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("top_genres: %w", err)
 			}
-			blocks = append(blocks, previewBlockResponse{
-				Type:  "top_genres",
-				Title: "Top Genres",
-				Items: toBarItems(entries),
-			})
+			result = append(result, resolvedBlock{Type: "top_genres", Tags: entries})
 
 		case "mood_profile":
 			entries, err := h.App.ShareProfiles.GetPublicTagDistribution(
@@ -242,13 +261,9 @@ func (h *Handler) renderBlocks(ctx context.Context, userID uuid.UUID, profile *c
 				strPtr("mood"),
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("mood_profile: %w", err)
 			}
-			blocks = append(blocks, previewBlockResponse{
-				Type:  "mood_profile",
-				Title: "Mood Profile",
-				Items: toBarItems(entries),
-			})
+			result = append(result, resolvedBlock{Type: "mood_profile", Tags: entries})
 
 		case "top_creators":
 			entries, err := h.App.ShareProfiles.GetPublicTopCreators(
@@ -256,10 +271,92 @@ func (h *Handler) renderBlocks(ctx context.Context, userID uuid.UUID, profile *c
 				profile.ExcludedPlatforms,
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("top_creators: %w", err)
 			}
-			items := make([]creatorItem, len(entries))
-			for i, e := range entries {
+			result = append(result, resolvedBlock{Type: "top_creators", Creators: entries})
+
+		case "platform_mix":
+			entries, err := h.App.ShareProfiles.GetPublicPlatformMix(
+				ctx, userID, from, to, profile.ExcludedPlatforms,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("platform_mix: %w", err)
+			}
+			result = append(result, resolvedBlock{Type: "platform_mix", Mix: entries})
+
+		case "currently_into":
+			result = append(result, resolvedBlock{Type: "currently_into", Text: block.Text})
+
+		case "recent_favorites":
+			if len(block.ItemIDs) == 0 {
+				continue
+			}
+			var items []resolvedFavorite
+			for _, idStr := range block.ItemIDs {
+				id, err := uuid.Parse(idStr)
+				if err != nil {
+					continue
+				}
+				item, err := h.App.MediaItems.Get(ctx, userID, id)
+				if err != nil || item == nil {
+					continue
+				}
+				items = append(items, resolvedFavorite{
+					Title:    item.Title,
+					Creator:  item.Creator,
+					Platform: item.Platform,
+					Type:     string(item.Type),
+				})
+			}
+			if len(items) > 0 {
+				result = append(result, resolvedBlock{Type: "recent_favorites", Items: items})
+			}
+
+		case "listening_stats":
+			entries, err := h.App.ShareProfiles.GetPublicPlatformMix(
+				ctx, userID, from, to, profile.ExcludedPlatforms,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("listening_stats: %w", err)
+			}
+			var total int64
+			for _, e := range entries {
+				total += e.Count
+			}
+			result = append(result, resolvedBlock{Type: "listening_stats", Stats: total})
+		}
+	}
+
+	return result, nil
+}
+
+// --- Block rendering (JSON preview) ---
+
+// renderBlocks produces the preview data for each enabled block.
+func (h *Handler) renderBlocks(ctx context.Context, userID uuid.UUID, profile *core.ShareProfile) ([]previewBlockResponse, error) {
+	resolved, err := h.resolveBlocks(ctx, userID, profile)
+	if err != nil {
+		return nil, err
+	}
+
+	var blocks []previewBlockResponse
+	for _, rb := range resolved {
+		switch rb.Type {
+		case "top_genres":
+			blocks = append(blocks, previewBlockResponse{
+				Type:  "top_genres",
+				Title: "Top Genres",
+				Items: toBarItems(rb.Tags),
+			})
+		case "mood_profile":
+			blocks = append(blocks, previewBlockResponse{
+				Type:  "mood_profile",
+				Title: "Mood Profile",
+				Items: toBarItems(rb.Tags),
+			})
+		case "top_creators":
+			items := make([]creatorItem, len(rb.Creators))
+			for i, e := range rb.Creators {
 				items[i] = creatorItem{
 					Rank:     i + 1,
 					Name:     e.Creator,
@@ -273,46 +370,43 @@ func (h *Handler) renderBlocks(ctx context.Context, userID uuid.UUID, profile *c
 				Title: "Top Creators",
 				Items: items,
 			})
-
 		case "platform_mix":
-			entries, err := h.App.ShareProfiles.GetPublicPlatformMix(
-				ctx, userID, from, to, profile.ExcludedPlatforms,
-			)
-			if err != nil {
-				return nil, err
-			}
-			var total int64
-			for _, e := range entries {
-				total += e.Count
-			}
-			items := make([]barItem, len(entries))
-			for i, e := range entries {
-				pct := 0
-				if total > 0 {
-					pct = int(e.Count * 100 / total)
-				}
-				items[i] = barItem{
-					Name:    e.Platform,
-					Count:   e.Count,
-					Percent: pct,
-				}
-			}
 			blocks = append(blocks, previewBlockResponse{
 				Type:  "platform_mix",
 				Title: "Platform Mix",
-				Items: items,
+				Items: toPlatformBarItems(rb.Mix),
 			})
-
 		case "currently_into":
 			blocks = append(blocks, previewBlockResponse{
 				Type:  "currently_into",
 				Title: "Currently Into",
-				Text:  block.Text,
+				Text:  rb.Text,
 			})
 		}
 	}
 
 	return blocks, nil
+}
+
+// toPlatformBarItems converts platform mix entries to bar items with percentages.
+func toPlatformBarItems(entries []core.PlatformMixEntry) []barItem {
+	var total int64
+	for _, e := range entries {
+		total += e.Count
+	}
+	items := make([]barItem, len(entries))
+	for i, e := range entries {
+		pct := 0
+		if total > 0 {
+			pct = int(e.Count * 100 / total)
+		}
+		items[i] = barItem{
+			Name:    e.Platform,
+			Count:   e.Count,
+			Percent: pct,
+		}
+	}
+	return items
 }
 
 // --- Helpers ---

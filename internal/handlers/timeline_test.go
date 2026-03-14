@@ -17,12 +17,10 @@ import (
 // --- mock media item store ---
 
 type mockMediaItemStore struct {
-	listFn                   func(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]core.MediaItem, error)
-	createFn                 func(ctx context.Context, userID uuid.UUID, item core.MediaItem) (uuid.UUID, error)
-	getFn                    func(ctx context.Context, userID, itemID uuid.UUID) (*core.MediaItem, error)
-	getByExternalIDFn        func(ctx context.Context, userID uuid.UUID, platform, externalID string) (*core.MediaItem, uuid.UUID, error)
-	updateEnrichmentStatusFn func(ctx context.Context, itemID uuid.UUID, status string) error
-	listPendingEnrichmentFn  func(ctx context.Context, limit int32) ([]core.MediaItem, error)
+	listFn            func(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]core.MediaItem, error)
+	createFn          func(ctx context.Context, userID uuid.UUID, item core.MediaItem) (uuid.UUID, error)
+	getFn             func(ctx context.Context, userID, itemID uuid.UUID) (*core.MediaItem, error)
+	getByExternalIDFn func(ctx context.Context, userID uuid.UUID, platform, externalID string) (*core.MediaItem, uuid.UUID, error)
 }
 
 func (m *mockMediaItemStore) List(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]core.MediaItem, error) {
@@ -49,38 +47,11 @@ func (m *mockMediaItemStore) GetByExternalID(ctx context.Context, userID uuid.UU
 	}
 	return nil, uuid.Nil, nil
 }
-func (m *mockMediaItemStore) UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error {
-	if m.updateEnrichmentStatusFn != nil {
-		return m.updateEnrichmentStatusFn(ctx, itemID, status)
-	}
-	return nil
-}
 func (m *mockMediaItemStore) ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]core.MediaItem, error) {
 	return m.List(ctx, userID, from, to, limit, offset)
 }
-func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit int32) ([]core.MediaItem, error) {
-	if m.listPendingEnrichmentFn != nil {
-		return m.listPendingEnrichmentFn(ctx, limit)
-	}
-	return nil, nil
-}
-func (m *mockMediaItemStore) UpdateEnrichmentStatusWithRetries(_ context.Context, _ uuid.UUID, _ string, _ int32) error {
-	return nil
-}
-func (m *mockMediaItemStore) ClaimPendingItems(_ context.Context, _ int32, _ int32) ([]core.EnrichmentItem, error) {
-	return nil, nil
-}
 func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
 	return 0, nil
-}
-func (m *mockMediaItemStore) ResetEnrichment(_ context.Context, _ uuid.UUID) (int64, error) {
-	return 0, nil
-}
-func (m *mockMediaItemStore) ResetEnrichmentByID(_ context.Context, _, _ uuid.UUID) error {
-	return nil
-}
-func (m *mockMediaItemStore) EnrichmentStats(_ context.Context, _ uuid.UUID) (*core.EnrichmentStatusCounts, error) {
-	return &core.EnrichmentStatusCounts{}, nil
 }
 func (m *mockMediaItemStore) OnThisDay(_ context.Context, _ uuid.UUID, _ int32) ([]core.OnThisDayItem, error) {
 	return nil, nil

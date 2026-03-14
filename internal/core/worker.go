@@ -20,7 +20,7 @@ const DefaultMaxRetries int32 = 3
 // SELECT ... FOR UPDATE SKIP LOCKED for safe concurrent processing.
 type EnrichmentWorker struct {
 	coordinator *EnrichmentCoordinator
-	media       MediaItemStore
+	enrichment  EnrichmentStore
 	tags        TagStore
 	batchSize   int32
 	maxRetries  int32
@@ -38,7 +38,7 @@ type EnrichmentWorkerConfig struct {
 // NewEnrichmentWorker creates a new background enrichment worker.
 func NewEnrichmentWorker(
 	coordinator *EnrichmentCoordinator,
-	media MediaItemStore,
+	enrichment EnrichmentStore,
 	tags TagStore,
 	logger *slog.Logger,
 	cfg EnrichmentWorkerConfig,
@@ -58,7 +58,7 @@ func NewEnrichmentWorker(
 
 	return &EnrichmentWorker{
 		coordinator: coordinator,
-		media:       media,
+		enrichment:  enrichment,
 		tags:        tags,
 		batchSize:   cfg.BatchSize,
 		maxRetries:  cfg.MaxRetries,
@@ -96,7 +96,7 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 	start := time.Now()
 
 	// Claim pending items with row-level locking
-	claimed, err := w.media.ClaimPendingItems(ctx, w.batchSize, w.maxRetries)
+	claimed, err := w.enrichment.ClaimPendingItems(ctx, w.batchSize, w.maxRetries)
 	if err != nil {
 		w.logger.Error("enrichment_tick",
 			"outcome", "claim_failed",
@@ -121,7 +121,7 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 
 	// Mark items as 'enriching'
 	for _, ei := range claimed {
-		if err := w.media.UpdateEnrichmentStatus(ctx, ei.ID, "enriching"); err != nil {
+		if err := w.enrichment.UpdateEnrichmentStatus(ctx, ei.ID, "enriching"); err != nil {
 			w.logger.Error("enrichment_tick",
 				"outcome", "status_update_failed",
 				"item_id", ei.ID,
@@ -179,7 +179,7 @@ func (w *EnrichmentWorker) tick(ctx context.Context) {
 		we["tags_persisted"] = we["tags_persisted"].(int) + tagCount
 		we["tag_errors"] = we["tag_errors"].(int) + tagErrors
 
-		if err := w.media.UpdateEnrichmentStatus(ctx, ei.ID, "enriched"); err != nil {
+		if err := w.enrichment.UpdateEnrichmentStatus(ctx, ei.ID, "enriched"); err != nil {
 			w.logger.Error("enrichment_tick",
 				"outcome", "status_update_failed",
 				"item_id", ei.ID,
@@ -246,7 +246,7 @@ func (w *EnrichmentWorker) markRetry(ctx context.Context, ei EnrichmentItem, we 
 		we["items_retried"] = we["items_retried"].(int) + 1
 	}
 
-	if err := w.media.UpdateEnrichmentStatusWithRetries(ctx, ei.ID, status, newRetries); err != nil {
+	if err := w.enrichment.UpdateEnrichmentStatusWithRetries(ctx, ei.ID, status, newRetries); err != nil {
 		w.logger.Error("enrichment_tick",
 			"outcome", "retry_update_failed",
 			"item_id", ei.ID,

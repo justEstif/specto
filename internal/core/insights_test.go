@@ -19,37 +19,25 @@ type mockInsightsStore struct {
 
 var _ InsightsStore = (*mockInsightsStore)(nil)
 
-func (m *mockInsightsStore) PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]PlatformBreakdownEntry, error) {
+func (m *mockInsightsStore) PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time, _ InsightsFilter) ([]PlatformBreakdownEntry, error) {
 	if m.platformBreakdownFn != nil {
 		return m.platformBreakdownFn(ctx, userID, from, to)
 	}
 	return nil, nil
 }
 
-func (m *mockInsightsStore) TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32) ([]TagDistributionEntry, error) {
+func (m *mockInsightsStore) TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, _ InsightsFilter) ([]TagDistributionEntry, error) {
 	if m.tagDistributionFn != nil {
 		return m.tagDistributionFn(ctx, userID, from, to, limit)
 	}
 	return nil, nil
 }
 
-func (m *mockInsightsStore) ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error) {
+func (m *mockInsightsStore) ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, _ InsightsFilter) ([]MediaItem, error) {
 	if m.listMediaItemsFn != nil {
 		return m.listMediaItemsFn(ctx, userID, from, to, limit, offset)
 	}
 	return nil, nil
-}
-
-func (m *mockInsightsStore) PlatformBreakdownFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, _ InsightsFilter) ([]PlatformBreakdownEntry, error) {
-	return m.PlatformBreakdown(ctx, userID, from, to)
-}
-
-func (m *mockInsightsStore) TagDistributionFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, _ InsightsFilter) ([]TagDistributionEntry, error) {
-	return m.TagDistribution(ctx, userID, from, to, limit)
-}
-
-func (m *mockInsightsStore) ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, _ InsightsFilter) ([]MediaItem, error) {
-	return m.ListMediaItems(ctx, userID, from, to, limit, offset)
 }
 
 func (m *mockInsightsStore) TagDistributionByCategory(_ context.Context, _ uuid.UUID, _, _ time.Time, _ int32, _ string, _ InsightsFilter) ([]TagDistributionEntry, error) {
@@ -87,7 +75,7 @@ func TestGetSummary_Basic(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	summary, err := svc.GetSummary(context.Background(), testUserID, testFrom, testTo)
+	summary, err := svc.GetSummary(context.Background(), testUserID, testFrom, testTo, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,7 +100,7 @@ func TestGetSummary_Empty(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	summary, err := svc.GetSummary(context.Background(), testUserID, testFrom, testTo)
+	summary, err := svc.GetSummary(context.Background(), testUserID, testFrom, testTo, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +119,7 @@ func TestGetSummary_StoreError(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	_, err := svc.GetSummary(context.Background(), testUserID, testFrom, testTo)
+	_, err := svc.GetSummary(context.Background(), testUserID, testFrom, testTo, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -141,19 +129,19 @@ func TestGetSummary_InvalidDateRange(t *testing.T) {
 	svc := NewInsightsService(&mockInsightsStore{})
 
 	// to before from
-	_, err := svc.GetSummary(context.Background(), testUserID, testTo, testFrom)
+	_, err := svc.GetSummary(context.Background(), testUserID, testTo, testFrom, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error for reversed date range")
 	}
 
 	// zero from
-	_, err = svc.GetSummary(context.Background(), testUserID, time.Time{}, testTo)
+	_, err = svc.GetSummary(context.Background(), testUserID, time.Time{}, testTo, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error for zero from")
 	}
 
 	// zero to
-	_, err = svc.GetSummary(context.Background(), testUserID, testFrom, time.Time{})
+	_, err = svc.GetSummary(context.Background(), testUserID, testFrom, time.Time{}, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error for zero to")
 	}
@@ -175,7 +163,7 @@ func TestGetTimeline_DailyBuckets(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, from, to)
+	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, from, to, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -221,7 +209,7 @@ func TestGetTimeline_WeeklyBuckets(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketWeek, from, to)
+	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketWeek, from, to, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -253,7 +241,7 @@ func TestGetTimeline_MonthlyBuckets(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketMonth, from, to)
+	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketMonth, from, to, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -280,7 +268,7 @@ func TestGetTimeline_Empty(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, testFrom, testTo)
+	timeline, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, testFrom, testTo, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -297,7 +285,7 @@ func TestGetTimeline_Empty(t *testing.T) {
 
 func TestGetTimeline_InvalidBucket(t *testing.T) {
 	svc := NewInsightsService(&mockInsightsStore{})
-	_, err := svc.GetTimeline(context.Background(), testUserID, "quarter", testFrom, testTo)
+	_, err := svc.GetTimeline(context.Background(), testUserID, "quarter", testFrom, testTo, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error for invalid bucket")
 	}
@@ -310,7 +298,7 @@ func TestGetTimeline_StoreError(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	_, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, testFrom, testTo)
+	_, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, testFrom, testTo, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -338,7 +326,7 @@ func TestGetTimeline_Pagination(t *testing.T) {
 
 	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 1, 1, 23, 59, 59, 0, time.UTC)
-	_, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, from, to)
+	_, err := svc.GetTimeline(context.Background(), testUserID, BucketDay, from, to, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,7 +348,7 @@ func TestGetPlatformBreakdown_Basic(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	result, err := svc.GetPlatformBreakdown(context.Background(), testUserID, testFrom, testTo)
+	result, err := svc.GetPlatformBreakdown(context.Background(), testUserID, testFrom, testTo, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -374,7 +362,7 @@ func TestGetPlatformBreakdown_Basic(t *testing.T) {
 
 func TestGetPlatformBreakdown_InvalidDateRange(t *testing.T) {
 	svc := NewInsightsService(&mockInsightsStore{})
-	_, err := svc.GetPlatformBreakdown(context.Background(), testUserID, testTo, testFrom)
+	_, err := svc.GetPlatformBreakdown(context.Background(), testUserID, testTo, testFrom, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error for reversed date range")
 	}
@@ -397,7 +385,7 @@ func TestGetTagDistribution_Basic(t *testing.T) {
 		},
 	}
 	svc := NewInsightsService(store)
-	result, err := svc.GetTagDistribution(context.Background(), testUserID, testFrom, testTo, 10)
+	result, err := svc.GetTagDistribution(context.Background(), testUserID, testFrom, testTo, 10, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -420,7 +408,7 @@ func TestGetTagDistribution_DefaultLimit(t *testing.T) {
 	svc := NewInsightsService(store)
 
 	// Passing 0 should default to 50
-	_, err := svc.GetTagDistribution(context.Background(), testUserID, testFrom, testTo, 0)
+	_, err := svc.GetTagDistribution(context.Background(), testUserID, testFrom, testTo, 0, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -439,7 +427,7 @@ func TestGetTagDistribution_NegativeLimit(t *testing.T) {
 	}
 	svc := NewInsightsService(store)
 
-	_, err := svc.GetTagDistribution(context.Background(), testUserID, testFrom, testTo, -5)
+	_, err := svc.GetTagDistribution(context.Background(), testUserID, testFrom, testTo, -5, InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -450,7 +438,7 @@ func TestGetTagDistribution_NegativeLimit(t *testing.T) {
 
 func TestGetTagDistribution_InvalidDateRange(t *testing.T) {
 	svc := NewInsightsService(&mockInsightsStore{})
-	_, err := svc.GetTagDistribution(context.Background(), testUserID, testTo, testFrom, 10)
+	_, err := svc.GetTagDistribution(context.Background(), testUserID, testTo, testFrom, 10, InsightsFilter{})
 	if err == nil {
 		t.Fatal("expected error for reversed date range")
 	}

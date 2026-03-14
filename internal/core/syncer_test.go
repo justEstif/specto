@@ -44,12 +44,10 @@ func (m *mockPlugin) Enrich(ctx context.Context, creds Credentials, items []Medi
 
 // mockMediaItemStore implements MediaItemStore for testing.
 type mockMediaItemStore struct {
-	createFn                 func(ctx context.Context, userID uuid.UUID, item MediaItem) (uuid.UUID, error)
-	getFn                    func(ctx context.Context, userID, itemID uuid.UUID) (*MediaItem, error)
-	getByExternalIDFn        func(ctx context.Context, userID uuid.UUID, platform, externalID string) (*MediaItem, uuid.UUID, error)
-	listFn                   func(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
-	updateEnrichmentStatusFn func(ctx context.Context, itemID uuid.UUID, status string) error
-	listPendingEnrichmentFn  func(ctx context.Context, limit int32) ([]MediaItem, error)
+	createFn          func(ctx context.Context, userID uuid.UUID, item MediaItem) (uuid.UUID, error)
+	getFn             func(ctx context.Context, userID, itemID uuid.UUID) (*MediaItem, error)
+	getByExternalIDFn func(ctx context.Context, userID uuid.UUID, platform, externalID string) (*MediaItem, uuid.UUID, error)
+	listFn            func(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
 }
 
 func (m *mockMediaItemStore) Create(ctx context.Context, userID uuid.UUID, item MediaItem) (uuid.UUID, error) {
@@ -76,41 +74,48 @@ func (m *mockMediaItemStore) List(ctx context.Context, userID uuid.UUID, from, t
 	}
 	return nil, nil
 }
-func (m *mockMediaItemStore) UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error {
+func (m *mockMediaItemStore) ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]MediaItem, error) {
+	return m.List(ctx, userID, from, to, limit, offset)
+}
+func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
+	return 0, nil
+}
+func (m *mockMediaItemStore) OnThisDay(_ context.Context, _ uuid.UUID, _ int32) ([]OnThisDayItem, error) {
+	return nil, nil
+}
+
+// mockEnrichmentStore implements EnrichmentStore for testing.
+type mockEnrichmentStore struct {
+	updateEnrichmentStatusFn func(ctx context.Context, itemID uuid.UUID, status string) error
+	listPendingEnrichmentFn  func(ctx context.Context, limit int32) ([]MediaItem, error)
+}
+
+func (m *mockEnrichmentStore) UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error {
 	if m.updateEnrichmentStatusFn != nil {
 		return m.updateEnrichmentStatusFn(ctx, itemID, status)
 	}
 	return nil
 }
-func (m *mockMediaItemStore) ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]MediaItem, error) {
-	return m.List(ctx, userID, from, to, limit, offset)
-}
-func (m *mockMediaItemStore) ListPendingEnrichment(ctx context.Context, limit int32) ([]MediaItem, error) {
+func (m *mockEnrichmentStore) ListPendingEnrichment(ctx context.Context, limit int32) ([]MediaItem, error) {
 	if m.listPendingEnrichmentFn != nil {
 		return m.listPendingEnrichmentFn(ctx, limit)
 	}
 	return nil, nil
 }
-func (m *mockMediaItemStore) UpdateEnrichmentStatusWithRetries(_ context.Context, _ uuid.UUID, _ string, _ int32) error {
+func (m *mockEnrichmentStore) UpdateEnrichmentStatusWithRetries(_ context.Context, _ uuid.UUID, _ string, _ int32) error {
 	return nil
 }
-func (m *mockMediaItemStore) ClaimPendingItems(_ context.Context, _ int32, _ int32) ([]EnrichmentItem, error) {
+func (m *mockEnrichmentStore) ClaimPendingItems(_ context.Context, _ int32, _ int32) ([]EnrichmentItem, error) {
 	return nil, nil
 }
-func (m *mockMediaItemStore) DeleteByPlatform(_ context.Context, _ uuid.UUID, _ string) (int64, error) {
+func (m *mockEnrichmentStore) ResetEnrichment(_ context.Context, _ uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (m *mockMediaItemStore) ResetEnrichment(_ context.Context, _ uuid.UUID) (int64, error) {
-	return 0, nil
-}
-func (m *mockMediaItemStore) ResetEnrichmentByID(_ context.Context, _, _ uuid.UUID) error {
+func (m *mockEnrichmentStore) ResetEnrichmentByID(_ context.Context, _, _ uuid.UUID) error {
 	return nil
 }
-func (m *mockMediaItemStore) EnrichmentStats(_ context.Context, _ uuid.UUID) (*EnrichmentStatusCounts, error) {
+func (m *mockEnrichmentStore) EnrichmentStats(_ context.Context, _ uuid.UUID) (*EnrichmentStatusCounts, error) {
 	return &EnrichmentStatusCounts{}, nil
-}
-func (m *mockMediaItemStore) OnThisDay(_ context.Context, _ uuid.UUID, _ int32) ([]OnThisDayItem, error) {
-	return nil, nil
 }
 
 // mockPluginStateStore implements PluginStateStore for testing.

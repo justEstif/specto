@@ -23,6 +23,7 @@ func NewMediaItemStore(q Querier) *PgMediaItemStore {
 }
 
 var _ core.MediaItemStore = (*PgMediaItemStore)(nil)
+var _ core.EnrichmentStore = (*PgMediaItemStore)(nil)
 
 func (s *PgMediaItemStore) Create(ctx context.Context, userID uuid.UUID, item core.MediaItem) (uuid.UUID, error) {
 	var rawMeta []byte

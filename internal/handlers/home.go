@@ -51,13 +51,13 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 	addContext(r, "handler", "dashboard")
 	addContext(r, "user_id", user.ID.String())
 
-	summary, err := h.App.Insights.GetSummaryFiltered(ctx, user.ID, from, to, insightsFilter)
+	summary, err := h.App.Insights.GetSummary(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
 		addContext(r, "dashboard_summary_error", err.Error())
 		summary = &core.Summary{}
 	}
 
-	timeline, err := h.App.Insights.GetTimelineFiltered(ctx, user.ID, core.BucketDay, from, to, insightsFilter)
+	timeline, err := h.App.Insights.GetTimeline(ctx, user.ID, core.BucketDay, from, to, insightsFilter)
 	if err != nil {
 		addContext(r, "dashboard_timeline_error", err.Error())
 	}
@@ -75,12 +75,12 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		addContext(r, "dashboard_items_error", err.Error())
 	}
 
-	tags, err := h.App.Insights.GetTagDistributionFiltered(ctx, user.ID, from, to, 5, insightsFilter)
+	tags, err := h.App.Insights.GetTagDistribution(ctx, user.ID, from, to, 5, insightsFilter)
 	if err != nil {
 		addContext(r, "dashboard_tags_error", err.Error())
 	}
 
-	platforms, err := h.App.Insights.GetPlatformBreakdownFiltered(ctx, user.ID, from, to, insightsFilter)
+	platforms, err := h.App.Insights.GetPlatformBreakdown(ctx, user.ID, from, to, insightsFilter)
 	if err != nil {
 		addContext(r, "dashboard_platforms_error", err.Error())
 	}
@@ -130,7 +130,7 @@ func (h *Handler) ActivityChartPartial(w http.ResponseWriter, r *http.Request) {
 	}
 	from, to := rangeToTime(rangeStr)
 
-	timeline, err := h.App.Insights.GetTimeline(r.Context(), user.ID, core.BucketDay, from, to)
+	timeline, err := h.App.Insights.GetTimeline(r.Context(), user.ID, core.BucketDay, from, to, core.InsightsFilter{})
 	if err != nil {
 		addContext(r, "activity_chart_error", err.Error())
 	}

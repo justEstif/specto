@@ -16,7 +16,7 @@ func TestWorker_TickProcessesPendingItems(t *testing.T) {
 	var statusUpdates []string
 	var tagsPersisted []string
 
-	media := &mockMediaItemStore{
+	enrichment := &mockEnrichmentStore{
 		listPendingEnrichmentFn: func(_ context.Context, limit int32) ([]MediaItem, error) {
 			claimedLimit = limit
 			return nil, nil
@@ -40,12 +40,11 @@ func TestWorker_TickProcessesPendingItems(t *testing.T) {
 			},
 		}, nil
 	}
-	media.createFn = nil
 
 	// Build a custom mock that tracks status updates
-	mockMedia := &workerTestMediaStore{
-		mockMediaItemStore: media,
-		claimFn:            claimFn,
+	mockEnrich := &workerTestEnrichmentStore{
+		mockEnrichmentStore: enrichment,
+		claimFn:             claimFn,
 		updateStatusFn: func(_ context.Context, id uuid.UUID, status string) error {
 			statusUpdates = append(statusUpdates, status)
 			return nil
@@ -75,7 +74,7 @@ func TestWorker_TickProcessesPendingItems(t *testing.T) {
 	}
 	coordinator := NewEnrichmentCoordinator([]EnrichmentProvider{provider}, nil, discardLogger())
 
-	worker := NewEnrichmentWorker(coordinator, mockMedia, tags, discardLogger(), EnrichmentWorkerConfig{
+	worker := NewEnrichmentWorker(coordinator, mockEnrich, tags, discardLogger(), EnrichmentWorkerConfig{
 		BatchSize:    10,
 		MaxRetries:   3,
 		PollInterval: time.Millisecond,
@@ -108,15 +107,15 @@ func TestWorker_TickProcessesPendingItems(t *testing.T) {
 }
 
 func TestWorker_EmptyBatch_NoOp(t *testing.T) {
-	mockMedia := &workerTestMediaStore{
-		mockMediaItemStore: &mockMediaItemStore{},
+	mockEnrich := &workerTestEnrichmentStore{
+		mockEnrichmentStore: &mockEnrichmentStore{},
 		claimFn: func(_ context.Context, _ int32, _ int32) ([]EnrichmentItem, error) {
 			return nil, nil
 		},
 	}
 
 	coordinator := NewEnrichmentCoordinator(nil, nil, discardLogger())
-	worker := NewEnrichmentWorker(coordinator, mockMedia, &mockTagStore{}, discardLogger(), EnrichmentWorkerConfig{
+	worker := NewEnrichmentWorker(coordinator, mockEnrich, &mockTagStore{}, discardLogger(), EnrichmentWorkerConfig{
 		PollInterval: time.Millisecond,
 	})
 
@@ -125,15 +124,15 @@ func TestWorker_EmptyBatch_NoOp(t *testing.T) {
 }
 
 func TestWorker_GracefulShutdown(t *testing.T) {
-	mockMedia := &workerTestMediaStore{
-		mockMediaItemStore: &mockMediaItemStore{},
+	mockEnrich := &workerTestEnrichmentStore{
+		mockEnrichmentStore: &mockEnrichmentStore{},
 		claimFn: func(_ context.Context, _ int32, _ int32) ([]EnrichmentItem, error) {
 			return nil, nil
 		},
 	}
 
 	coordinator := NewEnrichmentCoordinator(nil, nil, discardLogger())
-	worker := NewEnrichmentWorker(coordinator, mockMedia, &mockTagStore{}, discardLogger(), EnrichmentWorkerConfig{
+	worker := NewEnrichmentWorker(coordinator, mockEnrich, &mockTagStore{}, discardLogger(), EnrichmentWorkerConfig{
 		PollInterval: 10 * time.Millisecond,
 	})
 
@@ -159,7 +158,7 @@ func TestWorker_GracefulShutdown(t *testing.T) {
 
 func TestWorkerConfig_Defaults(t *testing.T) {
 	coordinator := NewEnrichmentCoordinator(nil, nil, nil)
-	worker := NewEnrichmentWorker(coordinator, &mockMediaItemStore{}, &mockTagStore{}, nil, EnrichmentWorkerConfig{})
+	worker := NewEnrichmentWorker(coordinator, &mockEnrichmentStore{}, &mockTagStore{}, nil, EnrichmentWorkerConfig{})
 
 	if worker.batchSize != DefaultBatchSize {
 		t.Errorf("expected batch size %d, got %d", DefaultBatchSize, worker.batchSize)
@@ -172,30 +171,30 @@ func TestWorkerConfig_Defaults(t *testing.T) {
 	}
 }
 
-// workerTestMediaStore wraps mockMediaItemStore but overrides claim/update
+// workerTestEnrichmentStore wraps mockEnrichmentStore but overrides claim/update
 // methods needed by the worker.
-type workerTestMediaStore struct {
-	*mockMediaItemStore
+type workerTestEnrichmentStore struct {
+	*mockEnrichmentStore
 	claimFn               func(ctx context.Context, limit int32, maxRetries int32) ([]EnrichmentItem, error)
 	updateStatusFn        func(ctx context.Context, itemID uuid.UUID, status string) error
 	updateStatusRetriesFn func(ctx context.Context, itemID uuid.UUID, status string, retries int32) error
 }
 
-func (m *workerTestMediaStore) ClaimPendingItems(ctx context.Context, limit int32, maxRetries int32) ([]EnrichmentItem, error) {
+func (m *workerTestEnrichmentStore) ClaimPendingItems(ctx context.Context, limit int32, maxRetries int32) ([]EnrichmentItem, error) {
 	if m.claimFn != nil {
 		return m.claimFn(ctx, limit, maxRetries)
 	}
 	return nil, nil
 }
 
-func (m *workerTestMediaStore) UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error {
+func (m *workerTestEnrichmentStore) UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error {
 	if m.updateStatusFn != nil {
 		return m.updateStatusFn(ctx, itemID, status)
 	}
 	return nil
 }
 
-func (m *workerTestMediaStore) UpdateEnrichmentStatusWithRetries(ctx context.Context, itemID uuid.UUID, status string, retries int32) error {
+func (m *workerTestEnrichmentStore) UpdateEnrichmentStatusWithRetries(ctx context.Context, itemID uuid.UUID, status string, retries int32) error {
 	if m.updateStatusRetriesFn != nil {
 		return m.updateStatusRetriesFn(ctx, itemID, status, retries)
 	}

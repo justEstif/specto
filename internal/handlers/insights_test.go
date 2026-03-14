@@ -22,32 +22,23 @@ type mockInsightsStore struct {
 	listMediaItemsFn    func(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]core.MediaItem, error)
 }
 
-func (m *mockInsightsStore) PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]core.PlatformBreakdownEntry, error) {
+func (m *mockInsightsStore) PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time, _ core.InsightsFilter) ([]core.PlatformBreakdownEntry, error) {
 	if m.platformBreakdownFn != nil {
 		return m.platformBreakdownFn(ctx, userID, from, to)
 	}
 	return nil, nil
 }
-func (m *mockInsightsStore) TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32) ([]core.TagDistributionEntry, error) {
+func (m *mockInsightsStore) TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, _ core.InsightsFilter) ([]core.TagDistributionEntry, error) {
 	if m.tagDistributionFn != nil {
 		return m.tagDistributionFn(ctx, userID, from, to, limit)
 	}
 	return nil, nil
 }
-func (m *mockInsightsStore) ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]core.MediaItem, error) {
+func (m *mockInsightsStore) ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, _ core.InsightsFilter) ([]core.MediaItem, error) {
 	if m.listMediaItemsFn != nil {
 		return m.listMediaItemsFn(ctx, userID, from, to, limit, offset)
 	}
 	return nil, nil
-}
-func (m *mockInsightsStore) PlatformBreakdownFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, _ core.InsightsFilter) ([]core.PlatformBreakdownEntry, error) {
-	return m.PlatformBreakdown(ctx, userID, from, to)
-}
-func (m *mockInsightsStore) TagDistributionFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, _ core.InsightsFilter) ([]core.TagDistributionEntry, error) {
-	return m.TagDistribution(ctx, userID, from, to, limit)
-}
-func (m *mockInsightsStore) ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, _ core.InsightsFilter) ([]core.MediaItem, error) {
-	return m.ListMediaItems(ctx, userID, from, to, limit, offset)
 }
 func (m *mockInsightsStore) TagDistributionByCategory(_ context.Context, _ uuid.UUID, _, _ time.Time, _ int32, _ string, _ core.InsightsFilter) ([]core.TagDistributionEntry, error) {
 	return nil, nil
@@ -55,7 +46,6 @@ func (m *mockInsightsStore) TagDistributionByCategory(_ context.Context, _ uuid.
 func (m *mockInsightsStore) AttentionByType(_ context.Context, _ uuid.UUID, _, _ time.Time, _ *string) ([]core.AttentionByTypeEntry, error) {
 	return nil, nil
 }
-
 func (m *mockInsightsStore) ConsumptionHeatmap(_ context.Context, _ uuid.UUID, _, _ time.Time, _ core.InsightsFilter) ([]core.HeatmapCell, error) {
 	return nil, nil
 }

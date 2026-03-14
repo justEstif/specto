@@ -23,7 +23,7 @@ func (h *Handler) InsightsSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	summary, err := h.App.Insights.GetSummary(r.Context(), user.ID, from, to)
+	summary, err := h.App.Insights.GetSummary(r.Context(), user.ID, from, to, core.InsightsFilter{})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load summary")
 		return
@@ -52,7 +52,7 @@ func (h *Handler) InsightsPlatformBreakdown(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	entries, err := h.App.Insights.GetPlatformBreakdown(r.Context(), user.ID, from, to)
+	entries, err := h.App.Insights.GetPlatformBreakdown(r.Context(), user.ID, from, to, core.InsightsFilter{})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load platform breakdown")
 		return
@@ -89,7 +89,7 @@ func (h *Handler) InsightsTags(w http.ResponseWriter, r *http.Request) {
 
 	limit := parseIntParam(q.Get("limit"), 20, 1, 200)
 
-	entries, err := h.App.Insights.GetTagDistribution(r.Context(), user.ID, from, to, int32(limit))
+	entries, err := h.App.Insights.GetTagDistribution(r.Context(), user.ID, from, to, int32(limit), core.InsightsFilter{})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "Failed to load tag distribution")
 		return
@@ -129,7 +129,7 @@ func (h *Handler) InsightsTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	bucket := core.TimeBucket(bucketStr)
 
-	timeline, err := h.App.Insights.GetTimeline(r.Context(), user.ID, bucket, from, to)
+	timeline, err := h.App.Insights.GetTimeline(r.Context(), user.ID, bucket, from, to, core.InsightsFilter{})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "validation_error", err.Error())
 		return

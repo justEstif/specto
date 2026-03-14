@@ -15,6 +15,7 @@ type mockQuerier struct {
 	getMediaItemByIDFn          func(ctx context.Context, arg database.GetMediaItemByIDParams) (database.MediaItem, error)
 	getMediaItemByExternalIDFn  func(ctx context.Context, arg database.GetMediaItemByExternalIDParams) (database.MediaItem, error)
 	listMediaItemsFn            func(ctx context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error)
+	listMediaItemsFilteredFn    func(ctx context.Context, arg database.ListMediaItemsFilteredParams) ([]database.MediaItem, error)
 	updateEnrichmentStatusFn    func(ctx context.Context, arg database.UpdateEnrichmentStatusParams) error
 	listPendingEnrichmentFn     func(ctx context.Context, limit int32) ([]database.MediaItem, error)
 	getPluginStateFn            func(ctx context.Context, arg database.GetPluginStateParams) (database.PluginState, error)
@@ -41,7 +42,9 @@ type mockQuerier struct {
 	addMediaItemTagFn           func(ctx context.Context, arg database.AddMediaItemTagParams) error
 	listMediaItemTagsFn         func(ctx context.Context, mediaItemID pgtype.UUID) ([]database.ListMediaItemTagsRow, error)
 	platformBreakdownFn         func(ctx context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error)
+	platformBreakdownFilteredFn func(ctx context.Context, arg database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error)
 	tagDistributionFn           func(ctx context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error)
+	tagDistributionFilteredFn   func(ctx context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error)
 	onThisDayFn                 func(ctx context.Context, arg database.OnThisDayParams) ([]database.MediaItem, error)
 	tagDistributionByCategoryFn func(ctx context.Context, arg database.TagDistributionByCategoryParams) ([]database.TagDistributionByCategoryRow, error)
 	attentionByTypeFn           func(ctx context.Context, arg database.AttentionByTypeParams) ([]database.AttentionByTypeRow, error)
@@ -78,6 +81,9 @@ func (m *mockQuerier) ListMediaItems(ctx context.Context, arg database.ListMedia
 }
 
 func (m *mockQuerier) ListMediaItemsFiltered(ctx context.Context, arg database.ListMediaItemsFilteredParams) ([]database.MediaItem, error) {
+	if m.listMediaItemsFilteredFn != nil {
+		return m.listMediaItemsFilteredFn(ctx, arg)
+	}
 	// Delegate to ListMediaItems for test compatibility
 	if m.listMediaItemsFn != nil {
 		return m.listMediaItemsFn(ctx, database.ListMediaItemsParams{
@@ -300,11 +306,17 @@ func (m *mockQuerier) DeleteSyncLogsByPlugin(_ context.Context, _ database.Delet
 	return nil
 }
 
-func (m *mockQuerier) PlatformBreakdownFiltered(_ context.Context, _ database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error) {
+func (m *mockQuerier) PlatformBreakdownFiltered(ctx context.Context, arg database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error) {
+	if m.platformBreakdownFilteredFn != nil {
+		return m.platformBreakdownFilteredFn(ctx, arg)
+	}
 	return nil, nil
 }
 
-func (m *mockQuerier) TagDistributionFiltered(_ context.Context, _ database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error) {
+func (m *mockQuerier) TagDistributionFiltered(ctx context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error) {
+	if m.tagDistributionFilteredFn != nil {
+		return m.tagDistributionFilteredFn(ctx, arg)
+	}
 	return nil, nil
 }
 

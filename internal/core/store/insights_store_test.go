@@ -7,12 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/database"
 )
 
 func TestPgInsightsStore_PlatformBreakdown(t *testing.T) {
 	mq := &mockQuerier{
-		platformBreakdownFn: func(_ context.Context, arg database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error) {
+		platformBreakdownFilteredFn: func(_ context.Context, arg database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error) {
 			// Verify params are converted correctly
 			if !arg.UserID.Valid {
 				t.Error("expected valid UserID")
@@ -20,7 +21,7 @@ func TestPgInsightsStore_PlatformBreakdown(t *testing.T) {
 			if !arg.ConsumedAt.Valid {
 				t.Error("expected valid ConsumedAt (from)")
 			}
-			return []database.PlatformBreakdownRow{
+			return []database.PlatformBreakdownFilteredRow{
 				{Platform: "spotify", Type: "music", Count: 100, TotalDurationSec: 36000},
 				{Platform: "youtube", Type: "video", Count: 50, TotalDurationSec: 18000},
 			}, nil
@@ -32,7 +33,7 @@ func TestPgInsightsStore_PlatformBreakdown(t *testing.T) {
 	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
 
-	entries, err := store.PlatformBreakdown(context.Background(), userID, from, to)
+	entries, err := store.PlatformBreakdown(context.Background(), userID, from, to, core.InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,13 +56,13 @@ func TestPgInsightsStore_PlatformBreakdown(t *testing.T) {
 
 func TestPgInsightsStore_PlatformBreakdown_Empty(t *testing.T) {
 	mq := &mockQuerier{
-		platformBreakdownFn: func(_ context.Context, _ database.PlatformBreakdownParams) ([]database.PlatformBreakdownRow, error) {
-			return []database.PlatformBreakdownRow{}, nil
+		platformBreakdownFilteredFn: func(_ context.Context, _ database.PlatformBreakdownFilteredParams) ([]database.PlatformBreakdownFilteredRow, error) {
+			return []database.PlatformBreakdownFilteredRow{}, nil
 		},
 	}
 
 	store := NewInsightsStore(mq)
-	entries, err := store.PlatformBreakdown(context.Background(), uuid.New(), time.Now(), time.Now())
+	entries, err := store.PlatformBreakdown(context.Background(), uuid.New(), time.Now(), time.Now(), core.InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,11 +73,11 @@ func TestPgInsightsStore_PlatformBreakdown_Empty(t *testing.T) {
 
 func TestPgInsightsStore_TagDistribution(t *testing.T) {
 	mq := &mockQuerier{
-		tagDistributionFn: func(_ context.Context, arg database.TagDistributionParams) ([]database.TagDistributionRow, error) {
+		tagDistributionFilteredFn: func(_ context.Context, arg database.TagDistributionFilteredParams) ([]database.TagDistributionFilteredRow, error) {
 			if arg.Limit != 20 {
 				t.Errorf("limit = %d, want 20", arg.Limit)
 			}
-			return []database.TagDistributionRow{
+			return []database.TagDistributionFilteredRow{
 				{Name: "rock", Category: pgtype.Text{String: "genre", Valid: true}, Count: 45},
 				{Name: "electronic", Category: pgtype.Text{String: "genre", Valid: true}, Count: 30},
 				{Name: "unknown", Category: pgtype.Text{}, Count: 10}, // NULL category
@@ -85,7 +86,7 @@ func TestPgInsightsStore_TagDistribution(t *testing.T) {
 	}
 
 	store := NewInsightsStore(mq)
-	entries, err := store.TagDistribution(context.Background(), uuid.New(), time.Now(), time.Now(), 20)
+	entries, err := store.TagDistribution(context.Background(), uuid.New(), time.Now(), time.Now(), 20, core.InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +103,7 @@ func TestPgInsightsStore_TagDistribution(t *testing.T) {
 
 func TestPgInsightsStore_ListMediaItems(t *testing.T) {
 	mq := &mockQuerier{
-		listMediaItemsFn: func(_ context.Context, arg database.ListMediaItemsParams) ([]database.MediaItem, error) {
+		listMediaItemsFilteredFn: func(_ context.Context, arg database.ListMediaItemsFilteredParams) ([]database.MediaItem, error) {
 			if arg.Limit != 100 {
 				t.Errorf("limit = %d, want 100", arg.Limit)
 			}
@@ -125,7 +126,7 @@ func TestPgInsightsStore_ListMediaItems(t *testing.T) {
 	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
 
-	items, err := store.ListMediaItems(context.Background(), uuid.New(), from, to, 100, 0)
+	items, err := store.ListMediaItems(context.Background(), uuid.New(), from, to, 100, 0, core.InsightsFilter{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

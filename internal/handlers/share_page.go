@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 
 	"github.com/justestif/specto/components"
 	"github.com/justestif/specto/internal/auth"
@@ -85,66 +83,42 @@ func (h *Handler) ShareProfilePage(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderPublicBlocks converts domain block data into template-ready ShareBlocks.
+// Uses the shared resolveBlocks for data fetching, then maps to template types.
 func (h *Handler) renderPublicBlocks(r *http.Request, pub *core.PublicShareProfile) ([]components.ShareBlock, error) {
 	profile := &pub.Profile
+	resolved, err := h.resolveBlocks(r.Context(), profile.UserID, profile)
+	if err != nil {
+		return nil, err
+	}
+
 	var result []components.ShareBlock
-
-	for _, block := range profile.Blocks {
-		if !block.Enabled {
-			continue
-		}
-
-		from, to := timeRangeBounds(block.TimeRange)
-
-		switch block.Type {
+	for _, rb := range resolved {
+		switch rb.Type {
 		case "top_genres":
-			entries, err := h.App.ShareProfiles.GetPublicTagDistribution(
-				r.Context(), profile.UserID, from, to, limit(block.Count, 10),
-				profile.ExcludedPlatforms, profile.ExcludedTags,
-				strPtr("genre"),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("top_genres: %w", err)
-			}
 			result = append(result, components.ShareBlock{
 				Type:    "top_genres",
 				Enabled: true,
-				Bars:    toBars(entries),
+				Bars:    toBars(rb.Tags),
 			})
 
 		case "mood_profile":
-			entries, err := h.App.ShareProfiles.GetPublicTagDistribution(
-				r.Context(), profile.UserID, from, to, limit(block.Count, 10),
-				profile.ExcludedPlatforms, profile.ExcludedTags,
-				strPtr("mood"),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("mood_profile: %w", err)
-			}
 			summary := ""
-			if len(entries) > 0 {
-				summary = "mostly " + entries[0].Name
-				if len(entries) > 1 {
-					summary += " and " + entries[1].Name
+			if len(rb.Tags) > 0 {
+				summary = "mostly " + rb.Tags[0].Name
+				if len(rb.Tags) > 1 {
+					summary += " and " + rb.Tags[1].Name
 				}
 			}
 			result = append(result, components.ShareBlock{
 				Type:    "mood_profile",
 				Enabled: true,
 				Summary: summary,
-				Bars:    toBars(entries),
+				Bars:    toBars(rb.Tags),
 			})
 
 		case "top_creators":
-			entries, err := h.App.ShareProfiles.GetPublicTopCreators(
-				r.Context(), profile.UserID, from, to, limit(block.Count, 10),
-				profile.ExcludedPlatforms,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("top_creators: %w", err)
-			}
-			shareEntries := make([]components.ShareEntry, len(entries))
-			for i, e := range entries {
+			shareEntries := make([]components.ShareEntry, len(rb.Creators))
+			for i, e := range rb.Creators {
 				shareEntries[i] = components.ShareEntry{
 					Rank:     i + 1,
 					Name:     e.Creator,
@@ -159,19 +133,12 @@ func (h *Handler) renderPublicBlocks(r *http.Request, pub *core.PublicShareProfi
 			})
 
 		case "platform_mix":
-			entries, err := h.App.ShareProfiles.GetPublicPlatformMix(
-				r.Context(), profile.UserID, from, to,
-				profile.ExcludedPlatforms,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("platform_mix: %w", err)
-			}
 			var total int64
-			for _, e := range entries {
+			for _, e := range rb.Mix {
 				total += e.Count
 			}
-			bars := make([]components.ShareBar, len(entries))
-			for i, e := range entries {
+			bars := make([]components.ShareBar, len(rb.Mix))
+			for i, e := range rb.Mix {
 				pct := 0
 				if total > 0 {
 					pct = int(e.Count * 100 / total)
@@ -188,55 +155,31 @@ func (h *Handler) renderPublicBlocks(r *http.Request, pub *core.PublicShareProfi
 			result = append(result, components.ShareBlock{
 				Type:    "currently_into",
 				Enabled: true,
-				Text:    block.Text,
+				Text:    rb.Text,
 			})
 
 		case "recent_favorites":
-			if len(block.ItemIDs) == 0 {
-				continue
-			}
-			var items []components.ShareFavorite
-			for _, idStr := range block.ItemIDs {
-				id, err := uuid.Parse(idStr)
-				if err != nil {
-					continue
+			items := make([]components.ShareFavorite, len(rb.Items))
+			for i, f := range rb.Items {
+				items[i] = components.ShareFavorite{
+					Title:    f.Title,
+					Creator:  f.Creator,
+					Platform: f.Platform,
+					Type:     f.Type,
+					Icon:     mediaTypeIcon(f.Type),
 				}
-				item, err := h.App.MediaItems.Get(r.Context(), profile.UserID, id)
-				if err != nil || item == nil {
-					continue
-				}
-				items = append(items, components.ShareFavorite{
-					Title:    item.Title,
-					Creator:  item.Creator,
-					Platform: item.Platform,
-					Type:     string(item.Type),
-					Icon:     mediaTypeIcon(string(item.Type)),
-				})
 			}
-			if len(items) > 0 {
-				result = append(result, components.ShareBlock{
-					Type:      "recent_favorites",
-					Enabled:   true,
-					Favorites: items,
-				})
-			}
+			result = append(result, components.ShareBlock{
+				Type:      "recent_favorites",
+				Enabled:   true,
+				Favorites: items,
+			})
 
 		case "listening_stats":
-			entries, err := h.App.ShareProfiles.GetPublicPlatformMix(
-				r.Context(), profile.UserID, from, to,
-				profile.ExcludedPlatforms,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("listening_stats: %w", err)
-			}
-			var totalItems int64
-			for _, e := range entries {
-				totalItems += e.Count
-			}
 			result = append(result, components.ShareBlock{
 				Type:       "listening_stats",
 				Enabled:    true,
-				TotalItems: totalItems,
+				TotalItems: rb.Stats,
 			})
 		}
 	}

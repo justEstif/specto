@@ -13,7 +13,7 @@ import (
 // imports core for domain types, and the syncer (also in core) depends
 // on these interfaces without importing the store package.
 
-// MediaItemStore manages media item persistence.
+// MediaItemStore manages media item persistence (CRUD operations).
 type MediaItemStore interface {
 	// Create inserts a media item, performing an upsert on
 	// (user_id, platform, external_id) to handle deduplication.
@@ -33,6 +33,19 @@ type MediaItemStore interface {
 	// Pass nil for any filter to skip it.
 	ListFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, platform, mediaType, search *string) ([]MediaItem, error)
 
+	// DeleteByPlatform removes all media items for a user on a given platform.
+	// Returns the number of items deleted.
+	DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error)
+
+	// OnThisDay returns media items consumed on this day (month+day) in
+	// previous years. Items are ordered by consumed_at descending.
+	OnThisDay(ctx context.Context, userID uuid.UUID, limit int32) ([]OnThisDayItem, error)
+}
+
+// EnrichmentStore manages enrichment lifecycle for media items.
+// Separated from MediaItemStore so that enrichment consumers (e.g. EnrichmentWorker)
+// depend only on the methods they need.
+type EnrichmentStore interface {
 	// UpdateEnrichmentStatus sets the enrichment status on a media item.
 	UpdateEnrichmentStatus(ctx context.Context, itemID uuid.UUID, status string) error
 
@@ -59,14 +72,6 @@ type MediaItemStore interface {
 	// EnrichmentStats returns counts of items in each enrichment status
 	// for a user.
 	EnrichmentStats(ctx context.Context, userID uuid.UUID) (*EnrichmentStatusCounts, error)
-
-	// DeleteByPlatform removes all media items for a user on a given platform.
-	// Returns the number of items deleted.
-	DeleteByPlatform(ctx context.Context, userID uuid.UUID, platform string) (int64, error)
-
-	// OnThisDay returns media items consumed on this day (month+day) in
-	// previous years. Items are ordered by consumed_at descending.
-	OnThisDay(ctx context.Context, userID uuid.UUID, limit int32) ([]OnThisDayItem, error)
 }
 
 // OnThisDayItem wraps a MediaItem with the year it was consumed.
@@ -174,31 +179,20 @@ type InsightsFilter struct {
 }
 
 // InsightsStore provides pre-aggregated analytics data.
+// All query methods accept InsightsFilter; pass InsightsFilter{} for unfiltered results.
 type InsightsStore interface {
 	// PlatformBreakdown returns item counts and total duration grouped by
 	// platform and media type for the given date range.
-	PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]PlatformBreakdownEntry, error)
-
-	// PlatformBreakdownFiltered returns platform breakdown with optional
-	// platform and media type filters applied.
-	PlatformBreakdownFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]PlatformBreakdownEntry, error)
+	PlatformBreakdown(ctx context.Context, userID uuid.UUID, from, to time.Time, filter InsightsFilter) ([]PlatformBreakdownEntry, error)
 
 	// TagDistribution returns tag usage counts for the given date range,
 	// limited to tags with confidence >= minConfidence (or authoritative tags
 	// where confidence is NULL). Results are ordered by count descending.
-	TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32) ([]TagDistributionEntry, error)
-
-	// TagDistributionFiltered returns tag distribution with optional
-	// platform and media type filters applied.
-	TagDistributionFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, filter InsightsFilter) ([]TagDistributionEntry, error)
+	TagDistribution(ctx context.Context, userID uuid.UUID, from, to time.Time, limit int32, filter InsightsFilter) ([]TagDistributionEntry, error)
 
 	// ListMediaItems returns media items for a user within a date range
 	// (used internally by InsightsService for timeline aggregation).
-	ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32) ([]MediaItem, error)
-
-	// ListMediaItemsFiltered returns media items with optional filters
-	// (used internally by InsightsService for filtered timeline aggregation).
-	ListMediaItemsFiltered(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, filter InsightsFilter) ([]MediaItem, error)
+	ListMediaItems(ctx context.Context, userID uuid.UUID, from, to time.Time, limit, offset int32, filter InsightsFilter) ([]MediaItem, error)
 
 	// TagDistributionByCategory returns tag distribution filtered to a
 	// specific category (genre/topic/mood/format).
