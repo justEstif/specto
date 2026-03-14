@@ -67,6 +67,7 @@ func (h *Handler) buildInsightsPageData(r *http.Request, user *core.UserInfo, ta
 		User:      user,
 		ActiveTab: tab,
 		Filters:   filters,
+		Platforms: h.App.Registry.Platforms(),
 	}
 
 	switch tab {

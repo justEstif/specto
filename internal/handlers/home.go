@@ -106,6 +106,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, user *
 		ActiveRange:       filters.Range,
 		Filters:           filters,
 		OnThisDay:         onThisDayGroups,
+		Platforms:         h.App.Registry.Platforms(),
 	}
 
 	if partial {

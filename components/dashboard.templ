@@ -26,6 +26,7 @@ type DashboardData struct {
 	Timeline          []core.TimelineEntry
 	Filters           DashboardFilters
 	OnThisDay         []OnThisDayGroup
+	Platforms         []string // available platform names from the plugin registry
 }
 
 // Dashboard renders the authenticated dashboard page.
@@ -33,7 +34,7 @@ templ Dashboard(data DashboardData) {
 	@Layout("Dashboard — Specto", data.User) {
 		<h1 class="vt-heading text-display text-3xl sm:text-4xl font-bold tracking-tight mb-6">Dashboard</h1>
 		<!-- Filters -->
-		@dashboardFilterBar(data.Filters)
+		@dashboardFilterBar(data.Filters, data.Platforms)
 		<!-- Filterable content area -->
 		<div id="dashboard-content">
 			@DashboardContent(data)
@@ -64,7 +65,7 @@ templ DashboardContent(data DashboardData) {
 }
 
 // dashboardFilterBar renders the filter controls.
-templ dashboardFilterBar(f DashboardFilters) {
+templ dashboardFilterBar(f DashboardFilters, platforms []string) {
 	<div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
 		<select
 			name="platform"
@@ -77,9 +78,9 @@ templ dashboardFilterBar(f DashboardFilters) {
 			hx-include="[name='type'], [name='range']"
 		>
 			<option value="" selected?={ f.Platform == "" }>All platforms</option>
-			<option value="spotify" selected?={ f.Platform == "spotify" }>Spotify</option>
-			<option value="youtube" selected?={ f.Platform == "youtube" }>YouTube</option>
-			<option value="netflix" selected?={ f.Platform == "netflix" }>Netflix</option>
+			for _, p := range platforms {
+				<option value={ p } selected?={ f.Platform == p }>{ platformLabel(p) }</option>
+			}
 		</select>
 		<select
 			name="type"

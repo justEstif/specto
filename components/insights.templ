@@ -16,6 +16,7 @@ type InsightsPageData struct {
 	User      *core.UserInfo
 	ActiveTab InsightsTab
 	Filters   AttentionFilters
+	Platforms []string // available platform names from the plugin registry
 	// Tab-specific data — only the active tab's data is populated.
 	Attention  *AttentionData
 	Crossover  *CrossoverData
@@ -52,47 +53,37 @@ templ InsightsTabContent(data InsightsPageData) {
 		switch data.ActiveTab {
 			case InsightsTabCrossover:
 				if data.Crossover != nil {
-					@insightsFilterBar(data.Filters, data.ActiveTab)
+					@insightsFilterBar(data.Filters, data.ActiveTab, data.Platforms)
 					@CrossoverContent(*data.Crossover)
 				}
 			case InsightsTabObsessions:
 				if data.Obsessions != nil {
-					@insightsFilterBar(data.Filters, data.ActiveTab)
+					@insightsFilterBar(data.Filters, data.ActiveTab, data.Platforms)
 					@ObsessionsContent(*data.Obsessions)
 				}
 			default:
 				if data.Attention != nil {
-					@insightsFilterBar(data.Filters, data.ActiveTab)
+					@insightsFilterBar(data.Filters, data.ActiveTab, data.Platforms)
 					@AttentionContent(*data.Attention)
 				}
 		}
 	</div>
 }
 
-templ insightsTabs(active InsightsTab) {
-	<div role="tablist" class="tabs tabs-box bg-base-200">
-		@insightsTabLink("Attention", InsightsTabAttention, "/insights", active)
-		@insightsTabLink("Crossover", InsightsTabCrossover, "/insights/crossover", active)
-		@insightsTabLink("Obsessions", InsightsTabObsessions, "/insights/obsessions", active)
-	</div>
+func insightsTabDefs() []Tab {
+	return []Tab{
+		{Label: "Attention", Value: string(InsightsTabAttention), Href: "/insights", PartialURL: "/partials/insights/attention"},
+		{Label: "Crossover", Value: string(InsightsTabCrossover), Href: "/insights/crossover", PartialURL: "/partials/insights/crossover"},
+		{Label: "Obsessions", Value: string(InsightsTabObsessions), Href: "/insights/obsessions", PartialURL: "/partials/insights/obsessions"},
+	}
 }
 
-templ insightsTabLink(label string, value InsightsTab, href string, active InsightsTab) {
-	<a
-		role="tab"
-		href={ templ.SafeURL(href) }
-		class={ "tab", templ.KV("tab-active", value == active) }
-		hx-get={ "/partials/insights/" + string(value) }
-		hx-target="#insights-content"
-		hx-swap="innerHTML"
-		hx-push-url={ href }
-	>
-		{ label }
-	</a>
+templ insightsTabs(active InsightsTab) {
+	@TabBar(insightsTabDefs(), string(active), "#insights-content")
 }
 
 // insightsFilterBar renders the shared filter bar, targeting the correct partial.
-templ insightsFilterBar(f AttentionFilters, tab InsightsTab) {
+templ insightsFilterBar(f AttentionFilters, tab InsightsTab, platforms []string) {
 	<div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
 		<select
 			name="platform"
@@ -105,9 +96,9 @@ templ insightsFilterBar(f AttentionFilters, tab InsightsTab) {
 			hx-include="[name='type'], [name='range']"
 		>
 			<option value="" selected?={ f.Platform == "" }>All platforms</option>
-			<option value="spotify" selected?={ f.Platform == "spotify" }>Spotify</option>
-			<option value="youtube" selected?={ f.Platform == "youtube" }>YouTube</option>
-			<option value="netflix" selected?={ f.Platform == "netflix" }>Netflix</option>
+			for _, p := range platforms {
+				<option value={ p } selected?={ f.Platform == p }>{ platformLabel(p) }</option>
+			}
 		</select>
 		<select
 			name="type"
