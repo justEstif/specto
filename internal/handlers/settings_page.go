@@ -10,6 +10,7 @@ import (
 
 	"github.com/justestif/specto/components"
 	"github.com/justestif/specto/internal/auth"
+	"github.com/justestif/specto/internal/core"
 )
 
 // settingsTabPartials maps tab names to their partial templ components.
@@ -42,6 +43,12 @@ func (h *Handler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		ActiveTab: tab,
 		CSRFToken: csrf.Token(r),
 	}
+
+	// Load share profile for the sharing tab.
+	if tab == "sharing" {
+		data.ShareProfile = h.loadShareProfile(r, user)
+	}
+
 	components.SettingsPage(data).Render(r.Context(), w)
 }
 
@@ -60,7 +67,22 @@ func (h *Handler) SettingsPartial(w http.ResponseWriter, r *http.Request) {
 		ActiveTab: tab,
 		CSRFToken: csrf.Token(r),
 	}
+
+	// Load share profile for the sharing tab.
+	if tab == "sharing" {
+		data.ShareProfile = h.loadShareProfile(r, user)
+	}
+
 	settingsTabPartials[tab](data).Render(r.Context(), w)
+}
+
+// loadShareProfile fetches the share profile for a user, returning nil if none exists.
+func (h *Handler) loadShareProfile(r *http.Request, user *core.UserInfo) *core.ShareProfile {
+	profile, err := h.App.ShareProfiles.Get(r.Context(), user.ID)
+	if err != nil {
+		return nil // No profile yet — will use defaults in template.
+	}
+	return profile
 }
 
 // SettingsAccountUpdate handles PUT /settings/account — saves profile changes.

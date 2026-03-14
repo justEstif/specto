@@ -4,10 +4,11 @@ import "github.com/justestif/specto/internal/core"
 
 // SettingsData holds data for the settings page.
 type SettingsData struct {
-	User      *core.UserInfo
-	ActiveTab string // "account", "appearance", "sharing"
-	CSRFToken string
-	Message   string // success or error message
+	User         *core.UserInfo
+	ActiveTab    string // "account", "appearance", "sharing"
+	CSRFToken    string
+	Message      string // success or error message
+	ShareProfile *core.ShareProfile
 }
 
 // SettingsPage renders the full settings page with tab navigation.
@@ -222,83 +223,147 @@ templ SettingsAppearance(data SettingsData) {
 // SettingsSharing renders the Sharing tab with public profile toggle,
 // block configuration, and exclusion settings.
 templ SettingsSharing(data SettingsData) {
-	<!-- Public profile toggle -->
-	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
-		<legend class="fieldset-legend text-base font-semibold">Public profile</legend>
-		<p class="text-sm text-base-content/50 mb-4">Make your media profile visible to anyone with the link.</p>
-		<label class="flex items-center gap-3 cursor-pointer">
-			<input type="checkbox" class="toggle toggle-primary" name="profile_enabled"/>
-			<span class="text-sm font-medium text-base-content/80">Enable public profile</span>
-		</label>
-		if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
-			<div class="flex items-center gap-3 mt-4 px-3 py-2.5 bg-base-200/60 rounded-box">
-				<span class="font-mono text-sm text-base-content/60 truncate">/share/{ *data.User.ProfileSlug }</span>
-				<button
-					type="button"
-					class="btn btn-ghost btn-xs text-primary shrink-0"
-					onclick="navigator.clipboard.writeText(window.location.origin + '/share/' + this.previousElementSibling.textContent.trim().replace('/share/', ''))"
-				>
-					Copy link
-				</button>
-			</div>
-		} else {
-			<div class="flex items-center gap-2 mt-4 px-3 py-2.5 bg-base-200/40 rounded-box">
-				<span class="status status-warning status-xs"></span>
-				<p class="text-xs text-base-content/50">Set a profile slug in the Account tab first.</p>
-			</div>
-		}
-	</fieldset>
-	<!-- Blocks -->
-	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
-		<legend class="fieldset-legend text-base font-semibold">Blocks</legend>
-		<p class="text-sm text-base-content/50 mb-4">Toggle and reorder the sections on your public profile.</p>
-		<div class="border border-base-300 rounded-box divide-y divide-base-300 overflow-hidden">
-			@shareBlockRow("top_genres", "Top Genres", true, "30d", "")
-			@shareBlockRow("mood_profile", "Mood Profile", true, "30d", "")
-			@shareBlockRow("top_creators", "Top Creators", true, "30d", "")
-			@shareBlockRow("platform_mix", "Platform Mix", false, "30d", "")
-			@shareBlockRow("currently_into", "Currently Into", true, "", "")
-		</div>
-	</fieldset>
-	<!-- Exclusions -->
-	<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
-		<legend class="fieldset-legend text-base font-semibold">Exclusions</legend>
-		<p class="text-sm text-base-content/50 mb-4">Content matching these filters is excluded from all share calculations.</p>
-		<div class="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-6 gap-y-5 items-start">
-			<label class="label text-base-content/70 text-sm sm:pt-2.5" for="excluded_platforms">Platforms</label>
-			<div class="max-w-md">
+	<div
+		id="sharing-form"
+		hx-ext="json-enc"
+	>
+		<!-- Public profile toggle -->
+		<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+			<legend class="fieldset-legend text-base font-semibold">Public profile</legend>
+			<p class="text-sm text-base-content/50 mb-4">Make your media profile visible to anyone with the link.</p>
+			<label class="flex items-center gap-3 cursor-pointer">
 				<input
-					id="excluded_platforms"
-					type="text"
-					name="excluded_platforms"
-					placeholder="e.g. netflix, tiktok"
-					class="input w-full bg-base-100 border-base-300 min-h-[44px]"
+					type="checkbox"
+					class="toggle toggle-primary"
+					name="profile_enabled"
+					checked?={ data.ShareProfile != nil && data.ShareProfile.Published }
 				/>
-				<p class="text-xs text-base-content/40 mt-1.5">Comma-separated platform names</p>
+				<span class="text-sm font-medium text-base-content/80">Enable public profile</span>
+			</label>
+			if data.User.ProfileSlug != nil && *data.User.ProfileSlug != "" {
+				<div class="flex items-center gap-3 mt-4 px-3 py-2.5 bg-base-200/60 rounded-box">
+					<span class="font-mono text-sm text-base-content/60 truncate">/share/{ *data.User.ProfileSlug }</span>
+					<button
+						type="button"
+						class="btn btn-ghost btn-xs text-primary shrink-0"
+						onclick="navigator.clipboard.writeText(window.location.origin + '/share/' + this.previousElementSibling.textContent.trim().replace('/share/', ''))"
+					>
+						Copy link
+					</button>
+				</div>
+			} else {
+				<div class="flex items-center gap-2 mt-4 px-3 py-2.5 bg-base-200/40 rounded-box">
+					<span class="status status-warning status-xs"></span>
+					<p class="text-xs text-base-content/50">Set a profile slug in the Account tab first.</p>
+				</div>
+			}
+		</fieldset>
+		<!-- Blocks -->
+		<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+			<legend class="fieldset-legend text-base font-semibold">Blocks</legend>
+			<p class="text-sm text-base-content/50 mb-4">Toggle and reorder the sections on your public profile.</p>
+			<div class="border border-base-300 rounded-box divide-y divide-base-300 overflow-hidden">
+				for _, block := range shareBlocksWithDefaults(data.ShareProfile) {
+					@shareBlockRow(block.Type, shareBlockLabel(block.Type), block.Enabled, block.TimeRange, "")
+				}
 			</div>
-			<label class="label text-base-content/70 text-sm sm:pt-2.5" for="excluded_tags">Tags</label>
-			<div class="max-w-md">
-				<input
-					id="excluded_tags"
-					type="text"
-					name="excluded_tags"
-					placeholder="e.g. romance, reality-tv"
-					class="input w-full bg-base-100 border-base-300 min-h-[44px]"
-				/>
-				<p class="text-xs text-base-content/40 mt-1.5">Comma-separated tag names</p>
+		</fieldset>
+		<!-- Exclusions -->
+		<fieldset class="fieldset bg-neutral border border-base-300 rounded-box p-6 mb-6">
+			<legend class="fieldset-legend text-base font-semibold">Exclusions</legend>
+			<p class="text-sm text-base-content/50 mb-4">Content matching these filters is excluded from all share calculations.</p>
+			<div class="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-6 gap-y-5 items-start">
+				<label class="label text-base-content/70 text-sm sm:pt-2.5" for="excluded_platforms">Platforms</label>
+				<div class="max-w-md">
+					<input
+						id="excluded_platforms"
+						type="text"
+						name="excluded_platforms"
+						placeholder="e.g. netflix, tiktok"
+						value={ joinStrings(shareExcludedPlatforms(data.ShareProfile)) }
+						class="input w-full bg-base-100 border-base-300 min-h-[44px]"
+					/>
+					<p class="text-xs text-base-content/40 mt-1.5">Comma-separated platform names</p>
+				</div>
+				<label class="label text-base-content/70 text-sm sm:pt-2.5" for="excluded_tags">Tags</label>
+				<div class="max-w-md">
+					<input
+						id="excluded_tags"
+						type="text"
+						name="excluded_tags"
+						placeholder="e.g. romance, reality-tv"
+						value={ joinStrings(shareExcludedTags(data.ShareProfile)) }
+						class="input w-full bg-base-100 border-base-300 min-h-[44px]"
+					/>
+					<p class="text-xs text-base-content/40 mt-1.5">Comma-separated tag names</p>
+				</div>
 			</div>
+		</fieldset>
+		<!-- Actions -->
+		<div class="flex items-center gap-3">
+			<button
+				type="button"
+				class="btn btn-primary btn-sm min-h-[44px]"
+				hx-put="/api/v1/share-profile"
+				hx-target="#sharing-save-status"
+				hx-swap="innerHTML"
+				hx-indicator=".htmx-indicator"
+				onclick="submitShareProfile(this)"
+			>
+				Save &amp; publish
+			</button>
+			<a href={ templ.SafeURL(sharePreviewURL(data.User)) } class="btn btn-ghost btn-sm border-base-300 min-h-[44px]">
+				Preview profile
+			</a>
 		</div>
-	</fieldset>
-	<!-- Actions -->
-	<div class="flex items-center gap-3">
-		<button class="btn btn-primary btn-sm min-h-[44px]" disabled>
-			Save &amp; publish
-		</button>
-		<a href={ templ.SafeURL(sharePreviewURL(data.User)) } class="btn btn-ghost btn-sm border-base-300 min-h-[44px]">
-			Preview profile
-		</a>
+		<div id="sharing-save-status" class="mt-2">
+			if data.Message != "" {
+				<p class="text-xs text-success">{ data.Message }</p>
+			}
+		</div>
+		<script>
+			function submitShareProfile(btn) {
+				const form = document.getElementById('sharing-form');
+				const blocks = [];
+				const blockTypes = ['top_genres', 'mood_profile', 'top_creators', 'platform_mix', 'currently_into'];
+				blockTypes.forEach(type => {
+					const toggle = form.querySelector(`[name="block_${type}_enabled"]`);
+					const rangeSelect = form.querySelector(`[name="block_${type}_range"]`);
+					blocks.push({
+						type: type,
+						enabled: toggle ? toggle.checked : false,
+						time_range: rangeSelect ? rangeSelect.value : ''
+					});
+				});
+				const published = form.querySelector('[name="profile_enabled"]')?.checked || false;
+				const excludedPlatforms = (form.querySelector('#excluded_platforms')?.value || '')
+					.split(',').map(s => s.trim()).filter(Boolean);
+				const excludedTags = (form.querySelector('#excluded_tags')?.value || '')
+					.split(',').map(s => s.trim()).filter(Boolean);
+				const body = JSON.stringify({
+					published: published,
+					excluded_platforms: excludedPlatforms,
+					excluded_tags: excludedTags,
+					blocks: blocks
+				});
+				fetch('/api/v1/share-profile', {
+					method: 'PUT',
+					headers: {'Content-Type': 'application/json'},
+					body: body
+				}).then(r => r.json()).then(data => {
+					const status = document.getElementById('sharing-save-status');
+					if (data.error) {
+						status.innerHTML = '<p class="text-xs text-error">' + data.error.message + '</p>';
+					} else {
+						status.innerHTML = '<p class="text-xs text-success">Share profile saved!</p>';
+					}
+				}).catch(() => {
+					document.getElementById('sharing-save-status').innerHTML =
+						'<p class="text-xs text-error">Failed to save. Please try again.</p>';
+				});
+			}
+		</script>
 	</div>
-	<p class="text-xs text-base-content/40 mt-2">Share profile API not yet implemented. UI is ready for wiring.</p>
 }
 
 // shareBlockRow renders a single block configuration row.
@@ -356,4 +421,61 @@ func toLower(s string) string {
 		result[i] = c
 	}
 	return string(result)
+}
+
+// shareBlocksWithDefaults returns the profile's blocks or default blocks if nil.
+func shareBlocksWithDefaults(profile *core.ShareProfile) []core.ShareBlock {
+	if profile != nil && len(profile.Blocks) > 0 {
+		return profile.Blocks
+	}
+	return []core.ShareBlock{
+		{Type: "top_genres", Enabled: true, TimeRange: "30d"},
+		{Type: "mood_profile", Enabled: true, TimeRange: "30d"},
+		{Type: "top_creators", Enabled: true, TimeRange: "30d", Count: 10},
+		{Type: "platform_mix", Enabled: false, TimeRange: "30d"},
+		{Type: "currently_into", Enabled: true},
+	}
+}
+
+// shareBlockLabel returns a human-readable label for a block type.
+func shareBlockLabel(blockType string) string {
+	switch blockType {
+	case "top_genres":
+		return "Top Genres"
+	case "mood_profile":
+		return "Mood Profile"
+	case "top_creators":
+		return "Top Creators"
+	case "platform_mix":
+		return "Platform Mix"
+	case "currently_into":
+		return "Currently Into"
+	default:
+		return blockType
+	}
+}
+
+func shareExcludedPlatforms(profile *core.ShareProfile) []string {
+	if profile != nil {
+		return profile.ExcludedPlatforms
+	}
+	return nil
+}
+
+func shareExcludedTags(profile *core.ShareProfile) []string {
+	if profile != nil {
+		return profile.ExcludedTags
+	}
+	return nil
+}
+
+func joinStrings(ss []string) string {
+	if len(ss) == 0 {
+		return ""
+	}
+	result := ss[0]
+	for _, s := range ss[1:] {
+		result += ", " + s
+	}
+	return result
 }
