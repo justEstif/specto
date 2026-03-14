@@ -44,6 +44,7 @@ templ timelineFilters(f TimelineFilters, platforms []string) {
 	<div class="flex flex-col sm:flex-row gap-3 mb-6">
 		<select
 			name="platform"
+			aria-label="Filter by platform"
 			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-40"
 			hx-get="/partials/timeline-page"
 			hx-target="#timeline-items"
@@ -58,6 +59,7 @@ templ timelineFilters(f TimelineFilters, platforms []string) {
 		</select>
 		<select
 			name="type"
+			aria-label="Filter by type"
 			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-36"
 			hx-get="/partials/timeline-page"
 			hx-target="#timeline-items"
@@ -105,7 +107,7 @@ templ TimelineItems(items []core.MediaItem, f TimelineFilters, hasMore bool) {
 		if hasMore {
 			<div id="load-more-container" class="mt-4 text-center">
 				<button
-					class="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content"
+					class="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content min-h-[44px]"
 					hx-get={ timelineLoadMoreURL(f) }
 					hx-target="#timeline-list"
 					hx-swap="beforeend"

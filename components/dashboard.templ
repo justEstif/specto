@@ -61,6 +61,7 @@ templ dashboardFilterBar(f DashboardFilters) {
 	<div class="flex flex-col sm:flex-row gap-3 mb-6 items-start sm:items-center">
 		<select
 			name="platform"
+			aria-label="Filter by platform"
 			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-40"
 			hx-get="/partials/dashboard"
 			hx-target="#dashboard-content"
@@ -75,6 +76,7 @@ templ dashboardFilterBar(f DashboardFilters) {
 		</select>
 		<select
 			name="type"
+			aria-label="Filter by type"
 			class="select bg-base-100 border-base-300 min-h-[44px] sm:w-36"
 			hx-get="/partials/dashboard"
 			hx-target="#dashboard-content"
@@ -126,7 +128,7 @@ templ dashboardStats(summary *core.Summary) {
 templ statCard(label, value, desc string) {
 	<div class="stat bg-neutral border border-base-300 rounded-box p-4">
 		<div class="stat-title text-base-content/50 text-xs uppercase tracking-wider">{ label }</div>
-		<div class="stat-value text-2xl font-bold text-base-content font-mono">{ value }</div>
+		<div class="stat-value text-2xl font-bold text-base-content tabular-nums">{ value }</div>
 		if desc != "" {
 			<div class="stat-desc text-base-content/40">{ desc }</div>
 		}
@@ -187,7 +189,7 @@ templ dashboardRecent(items []core.MediaItem, f DashboardFilters) {
 			if len(items) >= 5 {
 				<div class="mt-3 text-center">
 					<button
-						class="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content"
+						class="btn btn-ghost btn-sm text-base-content/50 hover:text-base-content min-h-[44px]"
 						hx-get={ "/partials/timeline?offset=5&limit=5" + showMoreFilterQuery(f) }
 						hx-target="#recent-items"
 						hx-swap="beforeend"

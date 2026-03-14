@@ -182,7 +182,7 @@ templ connectedAccount(provider string, connected bool) {
 		if !connected {
 			<a
 				href={ templ.SafeURL("/auth/" + toLower(provider) + "/login") }
-				class="btn btn-ghost btn-xs text-primary"
+				class="btn btn-ghost btn-sm text-primary min-h-[44px]"
 			>
 				Link account
 			</a>
@@ -305,7 +305,7 @@ templ SettingsSharing(data SettingsData) {
 templ shareBlockRow(blockType, label string, enabled bool, timeRange, platform string) {
 	<div class={ "flex items-center gap-4 px-4 py-3 transition-colors", templ.KV("bg-base-200/30", enabled), templ.KV("opacity-50", !enabled) }>
 		<!-- Drag handle -->
-		<span class="text-base-content/25 cursor-grab select-none text-lg leading-none" title="Drag to reorder">⠿</span>
+		<span class="text-base-content/25 select-none text-lg leading-none" title="Reorder coming soon">⠿</span>
 		<!-- Enable toggle -->
 		<input
 			type="checkbox"

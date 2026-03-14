@@ -230,38 +230,23 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 				Upload
 			</button>
 		</form>
-		<!-- Accepted formats info -->
-		<div class="collapse collapse-arrow bg-base-100/50 border border-base-300 mt-4">
-			<input type="checkbox"/>
-			<div class="collapse-title text-sm font-medium text-base-content/60">
-				Accepted file formats
-			</div>
-			<div class="collapse-content text-xs text-base-content/50 space-y-2">
-				for _, p := range available {
-					if p.AuthType == core.AuthFileImport {
-						<div class="flex items-start gap-2">
+		<!-- Accepted formats & export guides (inline) -->
+		for _, p := range available {
+			if p.AuthType == core.AuthFileImport {
+				<div class="collapse collapse-arrow bg-base-100/50 border border-base-300 mt-4">
+					<input type="checkbox"/>
+					<div class="collapse-title text-sm font-medium text-base-content/60">
+						<div class="flex items-center gap-2">
 							<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
 								@pluginLogo(p.Name)
 							</div>
-							<div>
-								<span class="font-medium text-base-content/70">{ p.DisplayName }:</span>
-								{ " " + fileFormatHint(p.Name) }
-								<button
-									class="link link-primary ml-1"
-									onclick={ showGuideModal(p.Name) }
-								>
-									How to get this file
-								</button>
-							</div>
+							{ p.DisplayName } — { fileFormatHint(p.Name) }
 						</div>
-					}
-				}
-			</div>
-		</div>
-		<!-- Import guide modals -->
-		for _, p := range available {
-			if p.AuthType == core.AuthFileImport {
-				@importGuideModal(p.Name, p.DisplayName)
+					</div>
+					<div class="collapse-content text-sm text-base-content/80 space-y-3">
+						@importGuideSteps(p.Name)
+					</div>
+				</div>
 			}
 		}
 		<!-- Script to update form action based on selected plugin -->
@@ -328,34 +313,6 @@ func fileFormatHint(name string) string {
 	default:
 		return "CSV, JSON, or TXT export file"
 	}
-}
-
-// showGuideModal returns a script expression to open a platform's import guide modal.
-script showGuideModal(pluginName string) {
-	document.getElementById('guide-modal-' + pluginName).showModal()
-}
-
-// importGuideModal renders a modal with step-by-step instructions for obtaining export data.
-templ importGuideModal(name string, displayName string) {
-	<dialog id={ "guide-modal-" + name } class="modal">
-		<div class="modal-box max-w-lg">
-			<form method="dialog">
-				<button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-			</form>
-			<h3 class="text-lg font-bold mb-4">How to export your { displayName } data</h3>
-			<div class="text-sm text-base-content/80 space-y-3">
-				@importGuideSteps(name)
-			</div>
-			<div class="modal-action">
-				<form method="dialog">
-					<button class="btn btn-sm">Close</button>
-				</form>
-			</div>
-		</div>
-		<form method="dialog" class="modal-backdrop">
-			<button>close</button>
-		</form>
-	</dialog>
 }
 
 templ importGuideSteps(name string) {

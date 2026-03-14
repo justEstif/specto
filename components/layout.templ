@@ -16,6 +16,8 @@ templ Layout(title string, user *core.UserInfo) {
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<title>{ title }</title>
+		<meta name="description" content="Track and analyze your media consumption across Spotify, YouTube, Netflix, and more."/>
+		<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"/>
 		<!-- Fonts: Playfair Display (display), DM Sans (body), JetBrains Mono (data) -->
 		<link rel="preconnect" href="https://fonts.googleapis.com"/>
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -24,7 +26,7 @@ templ Layout(title string, user *core.UserInfo) {
 			rel="stylesheet"
 		/>
 		<link rel="stylesheet" href="/static/css/tailwind.css"/>
-		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
 		<!-- Enable View Transitions API globally for all htmx swaps -->
 		<meta name="htmx-config" content='{"globalViewTransitions": true, "defaultSwapStyle": "innerHTML", "defaultSettleDelay": 20}'/>
 	</head>
