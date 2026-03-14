@@ -13,7 +13,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/justestif/specto/internal/app"
+	"github.com/justestif/specto/internal/core"
 	"github.com/justestif/specto/internal/database"
+	"github.com/justestif/specto/internal/enrichment"
 	"github.com/justestif/specto/internal/handlers"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
 	"github.com/justestif/specto/internal/plugins/spotify"
@@ -75,6 +77,20 @@ func main() {
 	lastfmAPIKey := os.Getenv("LASTFM_API_KEY")
 	tmdbAPIKey := os.Getenv("TMDB_API_KEY")
 
+	// Initialize optional LLM enricher (Genkit)
+	var llmEnricher core.Enricher
+	if llmProvider := os.Getenv("LLM_PROVIDER"); llmProvider != "" {
+		enricher, err := enrichment.New(context.Background(), enrichment.Config{
+			Provider: llmProvider,
+			Model:    os.Getenv("LLM_MODEL"),
+			APIKey:   os.Getenv("LLM_API_KEY"),
+		}, nil)
+		if err != nil {
+			log.Fatalf("Failed to initialize LLM enricher: %v", err)
+		}
+		llmEnricher = enricher
+	}
+
 	// Initialize core application layer
 	application := app.New(database.DB, app.Config{
 		EncryptionKey: encKey,
@@ -83,6 +99,7 @@ func main() {
 		OAuthClients:  oauthClients,
 		LastfmAPIKey:  lastfmAPIKey,
 		TMDBAPIKey:    tmdbAPIKey,
+		LLMEnricher:   llmEnricher,
 	})
 
 	// Register plugins

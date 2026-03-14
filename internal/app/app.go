@@ -27,6 +27,7 @@ type Config struct {
 	OAuthClients  map[string]OAuthClientConfig // keyed by plugin name
 	LastfmAPIKey  string                       // Last.fm API key for music enrichment (optional)
 	TMDBAPIKey    string                       // TMDB API key for movie/TV enrichment (optional)
+	LLMEnricher   core.Enricher                // LLM enricher (nil to skip Phase 2)
 }
 
 // App holds all core dependencies. It is created once at startup and
@@ -78,7 +79,7 @@ func New(db *database.Queries, cfg Config) *App {
 	// Build enrichment infrastructure
 	// Build provider list. API-key-gated providers are conditional;
 	// providers with no auth (like AniList) are always registered.
-	// LLM enricher is nil for now — the Genkit LLM enricher bean will set it.
+	// LLM enricher (cfg.LLMEnricher) runs in Phase 2 after API providers.
 	var providers []core.EnrichmentProvider
 	providers = append(providers, anilist.New())
 	if cfg.LastfmAPIKey != "" {
@@ -87,7 +88,7 @@ func New(db *database.Queries, cfg Config) *App {
 	if cfg.TMDBAPIKey != "" {
 		providers = append(providers, tmdb.New(cfg.TMDBAPIKey))
 	}
-	coordinator := core.NewEnrichmentCoordinator(providers, nil, nil)
+	coordinator := core.NewEnrichmentCoordinator(providers, cfg.LLMEnricher, nil)
 	worker := core.NewEnrichmentWorker(
 		coordinator,
 		mediaItemStore,
