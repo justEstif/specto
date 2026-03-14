@@ -136,15 +136,15 @@
 @custom-variant dark (&:where([data-theme=specto-dark], [data-theme=specto-dark] *));
 
 /* ── Typography via Google Fonts ──────────────────────────────
-   Display: "Playfair Display" — high-contrast serif for headings.
-             Cinematic, editorial, striking at large sizes.
+   Display: "Outfit" — rounded geometric sans with soft terminals.
+              Contemporary, approachable, clean at all sizes.
    Body:    "DM Sans" — geometric sans with warmth.
-             Clean but not clinical, excellent x-height.
+              Clean but not clinical, excellent x-height.
    Mono:    "JetBrains Mono" — for code/data readability.
 */
 
 @theme {
-  --font-display: "Playfair Display", "Georgia", serif;
+  --font-display: "Outfit", system-ui, sans-serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
