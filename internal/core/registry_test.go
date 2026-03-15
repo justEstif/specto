@@ -146,10 +146,10 @@ func TestRegisterOAuthEmptyScopes(t *testing.T) {
 	r := core.NewPluginRegistry()
 	cfg := validOAuthConfig()
 	cfg.Scopes = nil
-	p := &fakePlugin{name: "bad-oauth", authType: core.AuthOAuth, authConfig: cfg}
+	p := &fakePlugin{name: "no-scopes-oauth", authType: core.AuthOAuth, authConfig: cfg}
 
-	if err := r.Register(p); err == nil {
-		t.Fatal("Register() should fail for OAuth plugin with empty Scopes")
+	if err := r.Register(p); err != nil {
+		t.Fatalf("Register() should succeed for OAuth plugin with nil Scopes: %v", err)
 	}
 }
 

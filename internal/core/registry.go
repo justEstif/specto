@@ -103,8 +103,6 @@ func validateOAuth(p SourcePlugin) error {
 	if cfg.TokenURL == "" {
 		return fmt.Errorf("OAuthConfig.TokenURL must not be empty")
 	}
-	if len(cfg.Scopes) == 0 {
-		return fmt.Errorf("OAuthConfig.Scopes must not be empty")
-	}
+
 	return nil
 }

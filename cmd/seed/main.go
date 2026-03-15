@@ -68,7 +68,7 @@ func main() {
 	_ = db.MarkUserOnboarded(ctx, user.ID)
 
 	// --- 2. Create plugin states (simulate connected platforms) ---
-	for _, plugin := range []string{"spotify", "youtube", "lastfm"} {
+	for _, plugin := range []string{"spotify", "youtube", "lastfm", "netflix", "tiktok", "goodreads", "anilist"} {
 		_, err := db.UpsertPluginState(ctx, database.UpsertPluginStateParams{
 			UserID:  user.ID,
 			Plugin:  plugin,
@@ -79,7 +79,7 @@ func main() {
 			log.Fatalf("plugin state %s: %v", plugin, err)
 		}
 	}
-	fmt.Println("Created plugin states: spotify, youtube, lastfm")
+	fmt.Println("Created plugin states: spotify, youtube, lastfm, netflix, tiktok, goodreads, anilist")
 
 	// --- 3. Seed media items ---
 	now := time.Now()
@@ -154,7 +154,7 @@ func main() {
 	fmt.Printf("Created %d tags, attached %d tag assignments\n", len(tagMap), tagCount)
 
 	// --- 5. Seed sync logs ---
-	for _, plugin := range []string{"spotify", "youtube", "lastfm"} {
+	for _, plugin := range []string{"spotify", "youtube", "lastfm", "netflix", "tiktok", "goodreads", "anilist"} {
 		sl, _ := db.CreateSyncLog(ctx, database.CreateSyncLogParams{
 			UserID: user.ID,
 			Plugin: plugin,
@@ -473,6 +473,95 @@ func buildMediaItems(now time.Time) []seedItem {
 		{platform: "youtube", mediaType: "podcast", title: "Huberman Lab: How to Focus", creator: "Andrew Huberman", consumedAt: ago(130, 3), duration: d(110), timeSpent: d(90), url: "https://youtube.com/watch?v=p023", externalID: "yt-081", rawMetadata: map[string]any{"channel_id": "UC2D2CMWXMOVWx7giW1n3LIg"}},
 		{platform: "youtube", mediaType: "podcast", title: "Hardcore History: The Celtic Holocaust", creator: "Dan Carlin", consumedAt: ago(90, 11), duration: d(360), timeSpent: d(200), url: "https://youtube.com/watch?v=p024", externalID: "yt-082", rawMetadata: map[string]any{}},
 		{platform: "youtube", mediaType: "podcast", title: "Philosophize This! Foucault on Power", creator: "Stephen West", consumedAt: ago(55, 0), duration: d(45), timeSpent: d(45), url: "https://youtube.com/watch?v=p025", externalID: "yt-083", rawMetadata: map[string]any{}},
+
+		// ============================================================
+		// NETFLIX: Movies & TV Shows (~20 items, type "video")
+		// Spread across the full 2-year range (days ~730-0)
+		// ============================================================
+		{platform: "netflix", mediaType: "video", title: "Breaking Bad - S1E1: Pilot", creator: "Vince Gilligan", consumedAt: ago(722, 20), duration: d(58), timeSpent: d(58), url: "https://www.netflix.com/title/70143836", externalID: "nf-001", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Breaking Bad - S1E2: Cat's in the Bag...", creator: "Vince Gilligan", consumedAt: ago(721, 21), duration: d(48), timeSpent: d(48), url: "https://www.netflix.com/title/70143836", externalID: "nf-002", rawMetadata: map[string]any{"season": 1, "episode": 2, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Stranger Things - S1E1: The Vanishing of Will Byers", creator: "The Duffer Brothers", consumedAt: ago(690, 18), duration: d(49), timeSpent: d(49), url: "https://www.netflix.com/title/80057281", externalID: "nf-003", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-14"}},
+		{platform: "netflix", mediaType: "video", title: "Stranger Things - S1E2: The Weirdo on Maple Street", creator: "The Duffer Brothers", consumedAt: ago(689, 22), duration: d(56), timeSpent: d(56), url: "https://www.netflix.com/title/80057281", externalID: "nf-004", rawMetadata: map[string]any{"season": 1, "episode": 2, "rating": "TV-14"}},
+		{platform: "netflix", mediaType: "video", title: "The Crown - S1E1: Wolferton Splash", creator: "Peter Morgan", consumedAt: ago(635, 10), duration: d(57), timeSpent: d(57), url: "https://www.netflix.com/title/80025678", externalID: "nf-005", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Black Mirror - S1E1: The National Anthem", creator: "Charlie Brooker", consumedAt: ago(580, 14), duration: d(44), timeSpent: d(44), url: "https://www.netflix.com/title/70264888", externalID: "nf-006", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Black Mirror - S3E4: San Junipero", creator: "Charlie Brooker", consumedAt: ago(578, 20), duration: d(62), timeSpent: d(62), url: "https://www.netflix.com/title/70264888", externalID: "nf-007", rawMetadata: map[string]any{"season": 3, "episode": 4, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "The Queen's Gambit - E1: Openings", creator: "Scott Frank", consumedAt: ago(520, 9), duration: d(56), timeSpent: d(56), url: "https://www.netflix.com/title/80234304", externalID: "nf-008", rawMetadata: map[string]any{"episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Dark - S1E1: Secrets", creator: "Baran bo Odar", consumedAt: ago(470, 3), duration: d(52), timeSpent: d(52), url: "https://www.netflix.com/title/80100172", externalID: "nf-009", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Mindhunter - S1E1: Episode 1", creator: "David Fincher", consumedAt: ago(432, 16), duration: d(50), timeSpent: d(50), url: "https://www.netflix.com/title/80114855", externalID: "nf-010", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Narcos - S1E1: Descenso", creator: "Chris Brancato", consumedAt: ago(388, 7), duration: d(49), timeSpent: d(49), url: "https://www.netflix.com/title/80025172", externalID: "nf-011", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "The Social Dilemma", creator: "Jeff Orlowski", consumedAt: ago(345, 12), duration: d(94), timeSpent: d(94), url: "https://www.netflix.com/title/81254224", externalID: "nf-012", rawMetadata: map[string]any{"rating": "PG-13", "type": "documentary"}},
+		{platform: "netflix", mediaType: "video", title: "Don't Look Up", creator: "Adam McKay", consumedAt: ago(310, 21), duration: d(138), timeSpent: d(138), url: "https://www.netflix.com/title/81252357", externalID: "nf-013", rawMetadata: map[string]any{"rating": "R", "type": "film"}},
+		{platform: "netflix", mediaType: "video", title: "Squid Game - S1E1: Red Light, Green Light", creator: "Hwang Dong-hyuk", consumedAt: ago(265, 4), duration: d(60), timeSpent: d(60), url: "https://www.netflix.com/title/81040344", externalID: "nf-014", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Ozark - S1E1: Sugarwood", creator: "Bill Dubuque", consumedAt: ago(218, 15), duration: d(60), timeSpent: d(60), url: "https://www.netflix.com/title/80117552", externalID: "nf-015", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Glass Onion: A Knives Out Mystery", creator: "Rian Johnson", consumedAt: ago(175, 19), duration: d(139), timeSpent: d(139), url: "https://www.netflix.com/title/81458416", externalID: "nf-016", rawMetadata: map[string]any{"rating": "PG-13", "type": "film"}},
+		{platform: "netflix", mediaType: "video", title: "Beef - S1E1: The Birds Don't Sing, They Screech in Pain", creator: "Lee Sung Jin", consumedAt: ago(130, 8), duration: d(36), timeSpent: d(36), url: "https://www.netflix.com/title/81447461", externalID: "nf-017", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "The Watcher - S1E1: Welcome, Friends", creator: "Ryan Murphy", consumedAt: ago(82, 2), duration: d(48), timeSpent: d(48), url: "https://www.netflix.com/title/81008806", externalID: "nf-018", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-MA"}},
+		{platform: "netflix", mediaType: "video", title: "Wednesday - S1E1: Wednesday's Child Is Full of Woe", creator: "Tim Burton", consumedAt: ago(42, 11), duration: d(50), timeSpent: d(50), url: "https://www.netflix.com/title/81231974", externalID: "nf-019", rawMetadata: map[string]any{"season": 1, "episode": 1, "rating": "TV-14"}},
+		{platform: "netflix", mediaType: "video", title: "All Quiet on the Western Front", creator: "Edward Berger", consumedAt: ago(8, 17), duration: d(148), timeSpent: d(148), url: "https://www.netflix.com/title/81260280", externalID: "nf-020", rawMetadata: map[string]any{"rating": "R", "type": "film"}},
+
+		// ============================================================
+		// TIKTOK: Short Videos (~15 items, type "video")
+		// Durations 1-3 minutes. Spread across the 2-year range.
+		// ============================================================
+		{platform: "tiktok", mediaType: "video", title: "POV: When the beat drops", creator: "@musicvibes", consumedAt: ago(715, 8), duration: d(1), timeSpent: d(1), url: "https://tiktok.com/@musicvibes/video/7001", externalID: "tt-001", rawMetadata: map[string]any{"likes": 450000, "shares": 12000}},
+		{platform: "tiktok", mediaType: "video", title: "3 coding tricks you didn't know", creator: "@devtips", consumedAt: ago(665, 13), duration: d(2), timeSpent: d(2), url: "https://tiktok.com/@devtips/video/7002", externalID: "tt-002", rawMetadata: map[string]any{"likes": 320000, "shares": 8500}},
+		{platform: "tiktok", mediaType: "video", title: "This philosophy will change your life", creator: "@deepthoughts", consumedAt: ago(620, 5), duration: d(3), timeSpent: d(3), url: "https://tiktok.com/@deepthoughts/video/7003", externalID: "tt-003", rawMetadata: map[string]any{"likes": 890000, "shares": 45000}},
+		{platform: "tiktok", mediaType: "video", title: "Making ramen from scratch", creator: "@chefkai", consumedAt: ago(585, 19), duration: d(2), timeSpent: d(2), url: "https://tiktok.com/@chefkai/video/7004", externalID: "tt-004", rawMetadata: map[string]any{"likes": 1200000, "shares": 67000}},
+		{platform: "tiktok", mediaType: "video", title: "The math behind music explained", creator: "@sciencefacts", consumedAt: ago(540, 0), duration: d(3), timeSpent: d(3), url: "https://tiktok.com/@sciencefacts/video/7005", externalID: "tt-005", rawMetadata: map[string]any{"likes": 560000, "shares": 23000}},
+		{platform: "tiktok", mediaType: "video", title: "Interior design tips for small spaces", creator: "@homestyle", consumedAt: ago(495, 16), duration: d(1), timeSpent: d(1), url: "https://tiktok.com/@homestyle/video/7006", externalID: "tt-006", rawMetadata: map[string]any{"likes": 780000, "shares": 34000}},
+		{platform: "tiktok", mediaType: "video", title: "Day in the life of a software engineer", creator: "@techlife", consumedAt: ago(450, 10), duration: d(3), timeSpent: d(3), url: "https://tiktok.com/@techlife/video/7007", externalID: "tt-007", rawMetadata: map[string]any{"likes": 920000, "shares": 41000}},
+		{platform: "tiktok", mediaType: "video", title: "Why this song is a masterpiece", creator: "@musicbreakdown", consumedAt: ago(398, 22), duration: d(2), timeSpent: d(2), url: "https://tiktok.com/@musicbreakdown/video/7008", externalID: "tt-008", rawMetadata: map[string]any{"likes": 670000, "shares": 28000}},
+		{platform: "tiktok", mediaType: "video", title: "Historical facts they don't teach you", creator: "@historynerd", consumedAt: ago(350, 6), duration: d(2), timeSpent: d(2), url: "https://tiktok.com/@historynerd/video/7009", externalID: "tt-009", rawMetadata: map[string]any{"likes": 1500000, "shares": 89000}},
+		{platform: "tiktok", mediaType: "video", title: "Sunset timelapse in Iceland", creator: "@travelgram", consumedAt: ago(295, 14), duration: d(1), timeSpent: d(1), url: "https://tiktok.com/@travelgram/video/7010", externalID: "tt-010", rawMetadata: map[string]any{"likes": 2100000, "shares": 120000}},
+		{platform: "tiktok", mediaType: "video", title: "How to learn any language in 6 months", creator: "@polyglotlife", consumedAt: ago(248, 3), duration: d(3), timeSpent: d(3), url: "https://tiktok.com/@polyglotlife/video/7011", externalID: "tt-011", rawMetadata: map[string]any{"likes": 430000, "shares": 19000}},
+		{platform: "tiktok", mediaType: "video", title: "AI art is getting insane", creator: "@futuretech", consumedAt: ago(195, 17), duration: d(1), timeSpent: d(1), url: "https://tiktok.com/@futuretech/video/7012", externalID: "tt-012", rawMetadata: map[string]any{"likes": 1800000, "shares": 95000}},
+		{platform: "tiktok", mediaType: "video", title: "Workout routine that actually works", creator: "@fitcoach", consumedAt: ago(140, 9), duration: d(2), timeSpent: d(2), url: "https://tiktok.com/@fitcoach/video/7013", externalID: "tt-013", rawMetadata: map[string]any{"likes": 340000, "shares": 15000}},
+		{platform: "tiktok", mediaType: "video", title: "The psychology of color in film", creator: "@filmanalysis", consumedAt: ago(78, 20), duration: d(3), timeSpent: d(3), url: "https://tiktok.com/@filmanalysis/video/7014", externalID: "tt-014", rawMetadata: map[string]any{"likes": 710000, "shares": 32000}},
+		{platform: "tiktok", mediaType: "video", title: "Making espresso the Italian way", creator: "@coffeeculture", consumedAt: ago(20, 12), duration: d(2), timeSpent: d(2), url: "https://tiktok.com/@coffeeculture/video/7015", externalID: "tt-015", rawMetadata: map[string]any{"likes": 520000, "shares": 21000}},
+
+		// ============================================================
+		// GOODREADS: Books (~15 items, type "book")
+		// Spread across the 2-year range.
+		// ============================================================
+		{platform: "goodreads", mediaType: "book", title: "Dune", creator: "Frank Herbert", consumedAt: ago(720, 11), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/44767458", externalID: "gr-001", rawMetadata: map[string]any{"isbn": "9780441172719", "pages": 688, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Project Hail Mary", creator: "Andy Weir", consumedAt: ago(680, 6), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/54493401", externalID: "gr-002", rawMetadata: map[string]any{"isbn": "9780593135204", "pages": 476, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "The Stranger", creator: "Albert Camus", consumedAt: ago(645, 17), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/49552", externalID: "gr-003", rawMetadata: map[string]any{"isbn": "9780679720201", "pages": 123, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Sapiens: A Brief History of Humankind", creator: "Yuval Noah Harari", consumedAt: ago(605, 2), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/23692271", externalID: "gr-004", rawMetadata: map[string]any{"isbn": "9780062316097", "pages": 443, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Neuromancer", creator: "William Gibson", consumedAt: ago(562, 21), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/6088007", externalID: "gr-005", rawMetadata: map[string]any{"isbn": "9780441569595", "pages": 271, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Man's Search for Meaning", creator: "Viktor E. Frankl", consumedAt: ago(525, 8), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/4069", externalID: "gr-006", rawMetadata: map[string]any{"isbn": "9780807014295", "pages": 184, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "The Left Hand of Darkness", creator: "Ursula K. Le Guin", consumedAt: ago(488, 15), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/18423", externalID: "gr-007", rawMetadata: map[string]any{"isbn": "9780441478125", "pages": 304, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Thinking, Fast and Slow", creator: "Daniel Kahneman", consumedAt: ago(440, 4), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/11468377", externalID: "gr-008", rawMetadata: map[string]any{"isbn": "9780374533557", "pages": 499, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "The Brothers Karamazov", creator: "Fyodor Dostoevsky", consumedAt: ago(392, 19), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/4934", externalID: "gr-009", rawMetadata: map[string]any{"isbn": "9780374528379", "pages": 796, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "A Philosophy of Software Design", creator: "John Ousterhout", consumedAt: ago(348, 7), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/39996759", externalID: "gr-010", rawMetadata: map[string]any{"isbn": "9781732102200", "pages": 190, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "The Myth of Sisyphus", creator: "Albert Camus", consumedAt: ago(298, 13), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/91950", externalID: "gr-011", rawMetadata: map[string]any{"isbn": "9780525564454", "pages": 212, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Designing Data-Intensive Applications", creator: "Martin Kleppmann", consumedAt: ago(245, 0), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/23463279", externalID: "gr-012", rawMetadata: map[string]any{"isbn": "9781449373320", "pages": 616, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Norwegian Wood", creator: "Haruki Murakami", consumedAt: ago(188, 16), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/11297", externalID: "gr-013", rawMetadata: map[string]any{"isbn": "9780375704024", "pages": 296, "shelf": "read"}},
+		{platform: "goodreads", mediaType: "book", title: "Meditations", creator: "Marcus Aurelius", consumedAt: ago(115, 5), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/30659", externalID: "gr-014", rawMetadata: map[string]any{"isbn": "9780140449334", "pages": 254, "shelf": "currently-reading"}},
+		{platform: "goodreads", mediaType: "book", title: "Kafka on the Shore", creator: "Haruki Murakami", consumedAt: ago(28, 22), duration: nil, timeSpent: nil, url: "https://www.goodreads.com/book/show/4929", externalID: "gr-015", rawMetadata: map[string]any{"isbn": "9781400079278", "pages": 467, "shelf": "currently-reading"}},
+
+		// ============================================================
+		// ANILIST: Anime (~10 items, type "video") & Manga (~5 items, type "book")
+		// Spread across the 2-year range.
+		// ============================================================
+
+		// --- AniList: Anime (video) ---
+		{platform: "anilist", mediaType: "video", title: "Steins;Gate - Episode 1: Turning Point", creator: "White Fox", consumedAt: ago(710, 7), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/9253", externalID: "al-001", rawMetadata: map[string]any{"mal_id": 9253, "format": "TV", "episodes": 24}},
+		{platform: "anilist", mediaType: "video", title: "Attack on Titan - S1E1: To You, in 2000 Years", creator: "Wit Studio", consumedAt: ago(668, 18), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/16498", externalID: "al-002", rawMetadata: map[string]any{"mal_id": 16498, "format": "TV", "episodes": 25}},
+		{platform: "anilist", mediaType: "video", title: "Neon Genesis Evangelion - Episode 1: Angel Attack", creator: "Gainax", consumedAt: ago(625, 4), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/30", externalID: "al-003", rawMetadata: map[string]any{"mal_id": 30, "format": "TV", "episodes": 26}},
+		{platform: "anilist", mediaType: "video", title: "Spirited Away", creator: "Studio Ghibli", consumedAt: ago(572, 12), duration: d(125), timeSpent: d(125), url: "https://anilist.co/anime/199", externalID: "al-004", rawMetadata: map[string]any{"mal_id": 199, "format": "MOVIE"}},
+		{platform: "anilist", mediaType: "video", title: "Cowboy Bebop - Session 1: Asteroid Blues", creator: "Sunrise", consumedAt: ago(518, 23), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/1", externalID: "al-005", rawMetadata: map[string]any{"mal_id": 1, "format": "TV", "episodes": 26}},
+		{platform: "anilist", mediaType: "video", title: "Mob Psycho 100 - Episode 1: Self-Proclaimed Psychic", creator: "Bones", consumedAt: ago(462, 6), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/21507", externalID: "al-006", rawMetadata: map[string]any{"mal_id": 21507, "format": "TV", "episodes": 12}},
+		{platform: "anilist", mediaType: "video", title: "Your Name", creator: "CoMix Wave Films", consumedAt: ago(408, 15), duration: d(106), timeSpent: d(106), url: "https://anilist.co/anime/21519", externalID: "al-007", rawMetadata: map[string]any{"mal_id": 21519, "format": "MOVIE"}},
+		{platform: "anilist", mediaType: "video", title: "Vinland Saga - Episode 1: Somewhere Not Here", creator: "Wit Studio", consumedAt: ago(335, 1), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/101348", externalID: "al-008", rawMetadata: map[string]any{"mal_id": 37521, "format": "TV", "episodes": 24}},
+		{platform: "anilist", mediaType: "video", title: "Perfect Blue", creator: "Madhouse", consumedAt: ago(228, 20), duration: d(81), timeSpent: d(81), url: "https://anilist.co/anime/437", externalID: "al-009", rawMetadata: map[string]any{"mal_id": 437, "format": "MOVIE"}},
+		{platform: "anilist", mediaType: "video", title: "Monster - Episode 1: Herr Dr. Tenma", creator: "Madhouse", consumedAt: ago(155, 9), duration: d(24), timeSpent: d(24), url: "https://anilist.co/anime/19", externalID: "al-010", rawMetadata: map[string]any{"mal_id": 19, "format": "TV", "episodes": 74}},
+
+		// --- AniList: Manga (book) ---
+		{platform: "anilist", mediaType: "book", title: "Berserk - Chapter 1: The Black Swordsman", creator: "Kentaro Miura", consumedAt: ago(700, 3), duration: nil, timeSpent: nil, url: "https://anilist.co/manga/30002", externalID: "al-011", rawMetadata: map[string]any{"mal_id": 2, "format": "MANGA", "chapters": 364}},
+		{platform: "anilist", mediaType: "book", title: "Vagabond - Chapter 1: Shinmen Takezo", creator: "Takehiko Inoue", consumedAt: ago(558, 11), duration: nil, timeSpent: nil, url: "https://anilist.co/manga/30656", externalID: "al-012", rawMetadata: map[string]any{"mal_id": 656, "format": "MANGA", "chapters": 327}},
+		{platform: "anilist", mediaType: "book", title: "Chainsaw Man - Chapter 1: Dog & Chainsaw", creator: "Tatsuki Fujimoto", consumedAt: ago(415, 14), duration: nil, timeSpent: nil, url: "https://anilist.co/manga/105778", externalID: "al-013", rawMetadata: map[string]any{"mal_id": 116778, "format": "MANGA", "chapters": 97}},
+		{platform: "anilist", mediaType: "book", title: "Oyasumi Punpun - Chapter 1", creator: "Inio Asano", consumedAt: ago(280, 2), duration: nil, timeSpent: nil, url: "https://anilist.co/manga/34632", externalID: "al-014", rawMetadata: map[string]any{"mal_id": 4632, "format": "MANGA", "chapters": 147}},
+		{platform: "anilist", mediaType: "book", title: "Pluto - Chapter 1: Act 01", creator: "Naoki Urasawa", consumedAt: ago(105, 18), duration: nil, timeSpent: nil, url: "https://anilist.co/manga/30745", externalID: "al-015", rawMetadata: map[string]any{"mal_id": 745, "format": "MANGA", "chapters": 65}},
 	}
 }
 
@@ -715,6 +804,87 @@ func buildTagAssignments() map[string][]seedTag {
 		"yt-081": {llm("health", "topic", 0.92), llm("science", "topic", 0.88), llm("psychology", "topic", 0.80), llm("serious", "mood", 0.82), llm("podcast-episode", "format", 0.95)},
 		"yt-082": {llm("history", "topic", 0.95), llm("philosophy", "topic", 0.75), llm("serious", "mood", 0.90), llm("intense", "mood", 0.85), llm("podcast-episode", "format", 0.95)},
 		"yt-083": {llm("philosophy", "topic", 0.95), llm("psychology", "topic", 0.82), llm("contemplative", "mood", 0.88), llm("serious", "mood", 0.80), llm("podcast-episode", "format", 0.95)},
+
+		// ============================================================
+		// NETFLIX (nf-001 to nf-020)
+		// ============================================================
+		"nf-001": {llm("drama", "genre", 0.95), llm("crime", "genre", 0.92), llm("thriller", "genre", 0.85), llm("intense", "mood", 0.90), llm("series", "format", 0.95)},
+		"nf-002": {llm("drama", "genre", 0.95), llm("crime", "genre", 0.90), llm("dark", "mood", 0.88), llm("intense", "mood", 0.85), llm("series", "format", 0.95)},
+		"nf-003": {llm("sci-fi", "genre", 0.93), llm("horror", "genre", 0.80), llm("mystery", "genre", 0.85), llm("eerie", "mood", 0.88), llm("series", "format", 0.95)},
+		"nf-004": {llm("sci-fi", "genre", 0.92), llm("mystery", "genre", 0.88), llm("eerie", "mood", 0.85), llm("nostalgic", "mood", 0.80), llm("series", "format", 0.95)},
+		"nf-005": {llm("drama", "genre", 0.95), llm("documentary", "genre", 0.78), llm("serious", "mood", 0.90), llm("contemplative", "mood", 0.82), llm("series", "format", 0.95)},
+		"nf-006": {llm("sci-fi", "genre", 0.88), llm("thriller", "genre", 0.90), llm("dark", "mood", 0.92), llm("eerie", "mood", 0.85), llm("series", "format", 0.95)},
+		"nf-007": {llm("sci-fi", "genre", 0.90), llm("romance", "genre", 0.85), llm("nostalgic", "mood", 0.90), llm("romantic", "mood", 0.88), llm("series", "format", 0.95)},
+		"nf-008": {llm("drama", "genre", 0.93), llm("intense", "mood", 0.88), llm("contemplative", "mood", 0.82), llm("inspirational", "mood", 0.78), llm("mini-series", "format", 0.92)},
+		"nf-009": {llm("sci-fi", "genre", 0.92), llm("mystery", "genre", 0.90), llm("thriller", "genre", 0.85), llm("dark", "mood", 0.92), llm("series", "format", 0.95)},
+		"nf-010": {llm("crime", "genre", 0.95), llm("thriller", "genre", 0.90), llm("dark", "mood", 0.90), llm("intense", "mood", 0.88), llm("series", "format", 0.95)},
+		"nf-011": {llm("crime", "genre", 0.95), llm("drama", "genre", 0.90), llm("intense", "mood", 0.88), llm("dark", "mood", 0.82), llm("series", "format", 0.95)},
+		"nf-012": {llm("documentary", "genre", 0.95), llm("serious", "mood", 0.90), llm("dark", "mood", 0.82), llm("contemplative", "mood", 0.78), llm("film", "format", 0.92)},
+		"nf-013": {llm("comedy", "genre", 0.85), llm("sci-fi", "genre", 0.80), llm("drama", "genre", 0.78), llm("funny", "mood", 0.82), llm("film", "format", 0.95)},
+		"nf-014": {llm("thriller", "genre", 0.93), llm("drama", "genre", 0.88), llm("intense", "mood", 0.92), llm("dark", "mood", 0.88), llm("series", "format", 0.95)},
+		"nf-015": {llm("crime", "genre", 0.93), llm("thriller", "genre", 0.90), llm("drama", "genre", 0.85), llm("dark", "mood", 0.90), llm("series", "format", 0.95)},
+		"nf-016": {llm("mystery", "genre", 0.95), llm("comedy", "genre", 0.82), llm("playful", "mood", 0.85), llm("funny", "mood", 0.80), llm("film", "format", 0.95)},
+		"nf-017": {llm("comedy", "genre", 0.88), llm("drama", "genre", 0.92), llm("dark", "mood", 0.85), llm("intense", "mood", 0.80), llm("series", "format", 0.95)},
+		"nf-018": {llm("thriller", "genre", 0.90), llm("mystery", "genre", 0.88), llm("horror", "genre", 0.78), llm("eerie", "mood", 0.90), llm("series", "format", 0.95)},
+		"nf-019": {llm("comedy", "genre", 0.85), llm("mystery", "genre", 0.82), llm("fantasy", "genre", 0.78), llm("playful", "mood", 0.85), llm("series", "format", 0.95)},
+		"nf-020": {llm("drama", "genre", 0.95), llm("action", "genre", 0.88), llm("dark", "mood", 0.92), llm("intense", "mood", 0.90), llm("film", "format", 0.95)},
+
+		// ============================================================
+		// TIKTOK (tt-001 to tt-015)
+		// ============================================================
+		"tt-001": {llm("pop", "genre", 0.82), llm("electronic", "genre", 0.78), llm("energetic", "mood", 0.92), llm("playful", "mood", 0.85), llm("clip", "format", 0.95)},
+		"tt-002": {llm("comedy", "genre", 0.75), llm("energetic", "mood", 0.82), llm("inspirational", "mood", 0.78), llm("playful", "mood", 0.80), llm("clip", "format", 0.95)},
+		"tt-003": {llm("drama", "genre", 0.72), llm("contemplative", "mood", 0.88), llm("inspirational", "mood", 0.85), llm("serious", "mood", 0.78), llm("clip", "format", 0.95)},
+		"tt-004": {llm("comedy", "genre", 0.70), llm("chill", "mood", 0.82), llm("peaceful", "mood", 0.78), llm("playful", "mood", 0.85), llm("clip", "format", 0.95)},
+		"tt-005": {llm("documentary", "genre", 0.78), llm("contemplative", "mood", 0.82), llm("playful", "mood", 0.78), llm("inspirational", "mood", 0.75), llm("clip", "format", 0.95)},
+		"tt-006": {llm("comedy", "genre", 0.72), llm("chill", "mood", 0.85), llm("inspirational", "mood", 0.80), llm("playful", "mood", 0.78), llm("clip", "format", 0.95)},
+		"tt-007": {llm("comedy", "genre", 0.75), llm("chill", "mood", 0.82), llm("inspirational", "mood", 0.78), llm("playful", "mood", 0.80), llm("clip", "format", 0.95)},
+		"tt-008": {llm("documentary", "genre", 0.75), llm("contemplative", "mood", 0.85), llm("inspirational", "mood", 0.82), llm("nostalgic", "mood", 0.78), llm("clip", "format", 0.95)},
+		"tt-009": {llm("documentary", "genre", 0.80), llm("serious", "mood", 0.82), llm("playful", "mood", 0.78), llm("nostalgic", "mood", 0.80), llm("clip", "format", 0.95)},
+		"tt-010": {llm("documentary", "genre", 0.78), llm("peaceful", "mood", 0.92), llm("dreamy", "mood", 0.88), llm("contemplative", "mood", 0.80), llm("clip", "format", 0.95)},
+		"tt-011": {llm("documentary", "genre", 0.75), llm("inspirational", "mood", 0.85), llm("energetic", "mood", 0.80), llm("playful", "mood", 0.78), llm("clip", "format", 0.95)},
+		"tt-012": {llm("sci-fi", "genre", 0.78), llm("energetic", "mood", 0.85), llm("playful", "mood", 0.82), llm("dreamy", "mood", 0.78), llm("clip", "format", 0.95)},
+		"tt-013": {llm("documentary", "genre", 0.72), llm("energetic", "mood", 0.90), llm("inspirational", "mood", 0.85), llm("uplifting", "mood", 0.82), llm("clip", "format", 0.95)},
+		"tt-014": {llm("documentary", "genre", 0.82), llm("contemplative", "mood", 0.88), llm("serious", "mood", 0.82), llm("dreamy", "mood", 0.78), llm("clip", "format", 0.95)},
+		"tt-015": {llm("comedy", "genre", 0.72), llm("chill", "mood", 0.85), llm("peaceful", "mood", 0.82), llm("nostalgic", "mood", 0.78), llm("clip", "format", 0.95)},
+
+		// ============================================================
+		// GOODREADS (gr-001 to gr-015)
+		// ============================================================
+		"gr-001": {llm("sci-fi", "genre", 0.95), llm("adventure", "genre", 0.85), llm("contemplative", "mood", 0.82), llm("intense", "mood", 0.78), llm("novel", "format", 0.95)},
+		"gr-002": {llm("sci-fi", "genre", 0.93), llm("adventure", "genre", 0.88), llm("science", "topic", 0.82), llm("uplifting", "mood", 0.85), llm("novel", "format", 0.95)},
+		"gr-003": {llm("literary-fiction", "genre", 0.95), llm("philosophy", "topic", 0.90), llm("contemplative", "mood", 0.92), llm("melancholic", "mood", 0.85), llm("novel", "format", 0.95)},
+		"gr-004": {llm("non-fiction", "genre", 0.95), llm("history", "topic", 0.92), llm("science", "topic", 0.82), llm("contemplative", "mood", 0.85), llm("novel", "format", 0.90)},
+		"gr-005": {llm("sci-fi", "genre", 0.95), llm("technology", "topic", 0.88), llm("dark", "mood", 0.85), llm("eerie", "mood", 0.78), llm("novel", "format", 0.95)},
+		"gr-006": {llm("memoir", "genre", 0.90), llm("non-fiction", "genre", 0.88), llm("philosophy", "topic", 0.92), llm("contemplative", "mood", 0.90), llm("novel", "format", 0.85)},
+		"gr-007": {llm("sci-fi", "genre", 0.93), llm("literary-fiction", "genre", 0.82), llm("philosophy", "topic", 0.78), llm("contemplative", "mood", 0.88), llm("novel", "format", 0.95)},
+		"gr-008": {llm("non-fiction", "genre", 0.95), llm("psychology", "topic", 0.95), llm("science", "topic", 0.85), llm("serious", "mood", 0.82), llm("novel", "format", 0.85)},
+		"gr-009": {llm("literary-fiction", "genre", 0.95), llm("philosophy", "topic", 0.92), llm("contemplative", "mood", 0.92), llm("dark", "mood", 0.82), llm("novel", "format", 0.95)},
+		"gr-010": {llm("non-fiction", "genre", 0.92), llm("programming", "topic", 0.95), llm("design", "topic", 0.88), llm("serious", "mood", 0.82), llm("novel", "format", 0.78)},
+		"gr-011": {llm("non-fiction", "genre", 0.90), llm("philosophy", "topic", 0.95), llm("contemplative", "mood", 0.92), llm("melancholic", "mood", 0.82), llm("essay", "format", 0.90)},
+		"gr-012": {llm("non-fiction", "genre", 0.95), llm("programming", "topic", 0.92), llm("technology", "topic", 0.90), llm("serious", "mood", 0.85), llm("novel", "format", 0.78)},
+		"gr-013": {llm("literary-fiction", "genre", 0.95), llm("romance", "genre", 0.82), llm("melancholic", "mood", 0.92), llm("nostalgic", "mood", 0.88), llm("novel", "format", 0.95)},
+		"gr-014": {llm("non-fiction", "genre", 0.88), llm("philosophy", "topic", 0.95), llm("contemplative", "mood", 0.92), llm("peaceful", "mood", 0.85), llm("novel", "format", 0.80)},
+		"gr-015": {llm("literary-fiction", "genre", 0.93), llm("fantasy", "genre", 0.78), llm("dreamy", "mood", 0.90), llm("contemplative", "mood", 0.85), llm("novel", "format", 0.95)},
+
+		// ============================================================
+		// ANILIST: Anime (al-001 to al-010) & Manga (al-011 to al-015)
+		// ============================================================
+		"al-001": {llm("sci-fi", "genre", 0.95), llm("thriller", "genre", 0.90), llm("intense", "mood", 0.88), llm("contemplative", "mood", 0.82), llm("series", "format", 0.95)},
+		"al-002": {llm("action", "genre", 0.95), llm("fantasy", "genre", 0.85), llm("intense", "mood", 0.92), llm("dark", "mood", 0.85), llm("series", "format", 0.95)},
+		"al-003": {llm("sci-fi", "genre", 0.92), llm("drama", "genre", 0.88), llm("dark", "mood", 0.90), llm("contemplative", "mood", 0.88), llm("series", "format", 0.95)},
+		"al-004": {llm("fantasy", "genre", 0.95), llm("adventure", "genre", 0.90), llm("animation", "genre", 0.88), llm("dreamy", "mood", 0.92), llm("film", "format", 0.95)},
+		"al-005": {llm("sci-fi", "genre", 0.90), llm("action", "genre", 0.88), llm("chill", "mood", 0.82), llm("nostalgic", "mood", 0.85), llm("series", "format", 0.95)},
+		"al-006": {llm("action", "genre", 0.88), llm("comedy", "genre", 0.85), llm("playful", "mood", 0.85), llm("uplifting", "mood", 0.80), llm("series", "format", 0.95)},
+		"al-007": {llm("romance", "genre", 0.92), llm("fantasy", "genre", 0.85), llm("animation", "genre", 0.88), llm("romantic", "mood", 0.90), llm("film", "format", 0.95)},
+		"al-008": {llm("action", "genre", 0.90), llm("adventure", "genre", 0.92), llm("drama", "genre", 0.85), llm("intense", "mood", 0.88), llm("series", "format", 0.95)},
+		"al-009": {llm("thriller", "genre", 0.93), llm("horror", "genre", 0.82), llm("dark", "mood", 0.92), llm("eerie", "mood", 0.88), llm("film", "format", 0.95)},
+		"al-010": {llm("thriller", "genre", 0.92), llm("mystery", "genre", 0.90), llm("drama", "genre", 0.85), llm("dark", "mood", 0.90), llm("series", "format", 0.95)},
+		"al-011": {llm("fantasy", "genre", 0.92), llm("action", "genre", 0.90), llm("dark", "mood", 0.92), llm("intense", "mood", 0.90), llm("graphic-novel", "format", 0.90)},
+		"al-012": {llm("action", "genre", 0.90), llm("drama", "genre", 0.88), llm("contemplative", "mood", 0.85), llm("intense", "mood", 0.82), llm("graphic-novel", "format", 0.90)},
+		"al-013": {llm("action", "genre", 0.93), llm("horror", "genre", 0.82), llm("dark", "mood", 0.85), llm("energetic", "mood", 0.82), llm("graphic-novel", "format", 0.90)},
+		"al-014": {llm("drama", "genre", 0.95), llm("melancholic", "mood", 0.92), llm("dark", "mood", 0.88), llm("contemplative", "mood", 0.85), llm("graphic-novel", "format", 0.90)},
+		"al-015": {llm("sci-fi", "genre", 0.90), llm("mystery", "genre", 0.88), llm("contemplative", "mood", 0.85), llm("serious", "mood", 0.82), llm("graphic-novel", "format", 0.90)},
 	}
 }
 
