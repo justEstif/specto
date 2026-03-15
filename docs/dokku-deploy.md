@@ -8,6 +8,18 @@ for initial server setup if needed.
 
 ---
 
+## How It Works
+
+Dokku uses the **Heroku Go buildpack** to build and deploy:
+
+- `bin/go-pre-compile` — installs templ + sqlc and runs code generation before the Go build
+- `bin/go-post-compile` — installs the migrate CLI into the release slug
+- `Procfile` — defines the web process and runs migrations automatically on each deploy
+
+No Dockerfile needed. Dokku detects `go.mod` and uses the Go buildpack.
+
+---
+
 ## 1. Create the App
 
 On the Dokku server:
@@ -85,24 +97,17 @@ git remote add dokku dokku@192.168.0.29:specto
 git push dokku main
 ```
 
-Dokku will detect the `Dockerfile` and build automatically.
+Dokku will:
+1. Detect `go.mod` and use the Go buildpack
+2. Run `bin/go-pre-compile` (templ + sqlc generation)
+3. Build `cmd/web/` → `bin/web`
+4. Run `bin/go-post-compile` (install migrate CLI)
+5. Run the `release` phase from `Procfile` (database migrations)
+6. Start the `web` process
 
-## 5. Run Migrations
+Migrations run automatically on every deploy — no manual step needed.
 
-```bash
-# SSH into the server and run migrations inside the container
-ssh dokku-server
-dokku run specto /app/specto migrate -path /app/migrations -database "\$DATABASE_URL" up
-```
-
-Or install the migrate CLI on the server and run against the linked database:
-
-```bash
-DATABASE_URL=$(dokku config:get specto DATABASE_URL)
-migrate -path migrations -database "$DATABASE_URL" up
-```
-
-## 6. Verify
+## 5. Verify
 
 Visit `https://specto.estifanos.cc` — you should see the login page.
 

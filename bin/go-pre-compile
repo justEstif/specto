@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -e
+
+GOBIN="/tmp/gobin"
+mkdir -p "$GOBIN"
+
+echo "-----> Installing templ"
+GOBIN="$GOBIN" go install github.com/a-h/templ/cmd/templ@latest
+
+echo "-----> Installing sqlc"
+GOBIN="$GOBIN" go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+echo "-----> Generating templ files"
+"$GOBIN/templ" generate
+
+echo "-----> Generating sqlc files"
+"$GOBIN/sqlc" generate
