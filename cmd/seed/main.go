@@ -174,7 +174,7 @@ func main() {
 	// --- 6. Seed share profile ---
 	_, _ = db.UpsertShareProfile(ctx, database.UpsertShareProfileParams{
 		UserID:            user.ID,
-		Blocks:            []byte(`[{"type":"top_tags","title":"My Genres","config":{"category":"genre","limit":10}},{"type":"recent","title":"Recently Consumed","config":{"limit":8}}]`),
+		Blocks:            []byte(`[{"type":"top_genres","enabled":true,"time_range":"all"},{"type":"mood_profile","enabled":true,"time_range":"all"},{"type":"top_creators","enabled":true,"time_range":"all","count":10},{"type":"platform_mix","enabled":true,"time_range":"all"},{"type":"currently_into","enabled":true,"text":"Frank Ocean, philosophy videos, and existentialist podcasts"},{"type":"listening_stats","enabled":true,"time_range":"all"}]`),
 		ExcludedPlatforms: []string{},
 		ExcludedTags:      []string{},
 		Published:         true,
