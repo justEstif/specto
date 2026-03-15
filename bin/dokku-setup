@@ -27,6 +27,9 @@ dokku_cmd postgres:create "$DB_NAME" || echo "    (database already exists)"
 echo "==> Linking database to app"
 dokku_cmd postgres:link "$DB_NAME" "$APP_NAME" || echo "    (already linked)"
 
+echo "==> Configuring Docker log rotation"
+dokku_cmd docker-options:add "$APP_NAME" deploy,run "--log-opt max-size=50m --log-opt max-file=10"
+
 echo "==> Setting required environment variables"
 dokku_cmd config:set --no-restart "$APP_NAME" \
   ENCRYPTION_KEY="$(openssl rand -hex 32)" \
