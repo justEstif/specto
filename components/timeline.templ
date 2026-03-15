@@ -14,6 +14,7 @@ type TimelineTab string
 const (
 	TimelineTabOverview  TimelineTab = "overview"
 	TimelineTabActivity  TimelineTab = "activity"
+	TimelineTabEras      TimelineTab = "eras"
 )
 
 // TimelinePageData holds the data for the full timeline page.
@@ -27,6 +28,15 @@ type TimelinePageData struct {
 	Platforms []string
 	// Overview tab data
 	Scorecard *ScorecardData
+	// Eras tab data
+	Eras      *ErasData
+}
+
+// ErasData holds era detection results for the eras tab.
+type ErasData struct {
+	MusicEras []core.Era
+	VideoEras []core.Era
+	CSRFToken string
 }
 
 // ScorecardData holds the aggregated consumption summary for the overview tab.
@@ -54,6 +64,7 @@ func timelineTabDefs() []Tab {
 	return []Tab{
 		{Label: "Overview", Value: string(TimelineTabOverview), Href: "/timeline", PartialURL: "/partials/timeline/overview"},
 		{Label: "Activity", Value: string(TimelineTabActivity), Href: "/timeline/activity", PartialURL: "/partials/timeline/activity"},
+		{Label: "Eras", Value: string(TimelineTabEras), Href: "/timeline/eras", PartialURL: "/partials/timeline/eras"},
 	}
 }
 
@@ -78,6 +89,12 @@ templ TimelineTabContent(data TimelinePageData) {
 				<div id="timeline-items">
 					@TimelineItems(data.Items, data.Filters, data.HasMore)
 				</div>
+			case TimelineTabEras:
+				if data.Eras != nil {
+					@erasContent(*data.Eras)
+				} else {
+					@erasEmpty()
+				}
 			default:
 				if data.Scorecard != nil {
 					@timelineScorecard(*data.Scorecard)
@@ -464,4 +481,246 @@ func timelineLoadMoreURL(f TimelineFilters) string {
 		url += "&search=" + f.Search
 	}
 	return url
+}
+
+// --- Eras tab components ---
+
+// erasContent renders the full eras tab with per-media-type era lanes.
+templ erasContent(data ErasData) {
+	<div class="space-y-12">
+		if len(data.MusicEras) == 0 && len(data.VideoEras) == 0 {
+			@erasEmpty()
+		} else {
+			if len(data.MusicEras) > 0 {
+				@erasLane("Music", data.MusicEras, data.CSRFToken)
+			}
+			if len(data.VideoEras) > 0 {
+				@erasLane("Video", data.VideoEras, data.CSRFToken)
+			}
+		}
+	</div>
+}
+
+// erasLane renders a horizontal sequence of eras for a single media type.
+// Each era is a segment in a continuous timeline, connected by thin lines.
+templ erasLane(label string, eras []core.Era, csrfToken string) {
+	<div class="animate-fade-in-up">
+		<h3 class="text-xs text-base-content/40 uppercase tracking-wider mb-4">{ label } eras</h3>
+		<!-- Horizontal era lane — a connected sequence of variable-width segments -->
+		<div class="relative">
+			<!-- The connecting spine -->
+			<div class="absolute top-5 left-0 right-0 h-px bg-base-300"></div>
+			<!-- Era segments -->
+			<div class="relative flex gap-0">
+				for i, era := range eras {
+					@eraSegment(era, i, len(eras), csrfToken)
+				}
+			</div>
+		</div>
+	</div>
+}
+
+// eraSegment renders a single era as a vertical card along the timeline.
+templ eraSegment(era core.Era, index int, total int, csrfToken string) {
+	<div
+		id={ fmt.Sprintf("era-%s", era.ID.String()) }
+		class="flex-1 min-w-0 group relative"
+		style={ fmt.Sprintf("animation-delay: %dms", index*60) }
+	>
+		<!-- Timeline node -->
+		<div class="flex items-center gap-2 mb-3">
+			<div class={ "w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-base-100", eraNodeColor(era, index) }></div>
+			<span class="text-xs text-base-content/30 font-mono tabular-nums truncate">
+				{ eraDateRange(era) }
+			</span>
+		</div>
+		<!-- Era card -->
+		<div class={ "border rounded-box p-4 transition-colors", eraCardStyle(era) }>
+			<!-- Title area -->
+			<div class="mb-3">
+				if era.Title != nil {
+					<p class="text-display text-sm font-semibold text-base-content tracking-tight">
+						{ *era.Title }
+					</p>
+				} else if era.SuggestedTitle != nil {
+					<p class="text-display text-sm font-semibold text-base-content/70 tracking-tight italic">
+						{ *era.SuggestedTitle }
+					</p>
+				} else {
+					<p class="text-sm text-base-content/30">Untitled era</p>
+				}
+			</div>
+			<!-- Stats line -->
+			<div class="flex items-baseline gap-2 mb-3">
+				<span class="text-display text-lg font-bold text-base-content tabular-nums">
+					{ fmt.Sprintf("%d", era.ItemCount) }
+				</span>
+				<span class="text-xs text-base-content/40">items</span>
+			</div>
+			<!-- Tags — the taste fingerprint -->
+			if len(era.Tags) > 0 {
+				<div class="flex flex-wrap gap-1 mb-3">
+					for _, tag := range eraTopTags(era.Tags, 5) {
+						<span class={ "text-xs px-1.5 py-0.5 rounded-sm", eraTagStyle(tag) }>
+							{ tag.TagName }
+						</span>
+					}
+				</div>
+			}
+			<!-- Actions — confirm/rename/dismiss -->
+			if era.Status == "suggested" {
+				<div class="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+					<!-- Confirm with suggested title -->
+					if era.SuggestedTitle != nil {
+						<button
+							class="btn btn-ghost btn-xs text-success/70 hover:text-success min-h-[32px]"
+							hx-post={ fmt.Sprintf("/api/v1/eras/%s/confirm", era.ID.String()) }
+							hx-target={ fmt.Sprintf("#era-%s", era.ID.String()) }
+							hx-swap="outerHTML"
+							hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
+							title="Confirm this era"
+						>
+							Confirm
+						</button>
+					}
+					<!-- Rename -->
+					<button
+						class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content min-h-[32px]"
+						onclick={ showRenameInput(era.ID.String()) }
+						title="Name this era"
+					>
+						Rename
+					</button>
+					<!-- Dismiss -->
+					<button
+						class="btn btn-ghost btn-xs text-error/40 hover:text-error min-h-[32px]"
+						hx-delete={ fmt.Sprintf("/api/v1/eras/%s", era.ID.String()) }
+						hx-target={ fmt.Sprintf("#era-%s", era.ID.String()) }
+						hx-swap="outerHTML"
+						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, csrfToken) }
+						hx-confirm="Dismiss this era? It won't be suggested again."
+						title="Dismiss this era"
+					>
+						Dismiss
+					</button>
+				</div>
+				<!-- Inline rename form (hidden by default) -->
+				<form
+					id={ fmt.Sprintf("rename-%s", era.ID.String()) }
+					class="hidden mt-2"
+					hx-put={ fmt.Sprintf("/api/v1/eras/%s/title", era.ID.String()) }
+					hx-target={ fmt.Sprintf("#era-%s", era.ID.String()) }
+					hx-swap="outerHTML"
+				>
+					<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+					<div class="flex gap-1">
+						<input
+							type="text"
+							name="title"
+							placeholder={ eraRenamePlaceholder(era) }
+							class="input input-xs bg-base-100 border-base-300 flex-1 min-h-[32px]"
+							required
+							minlength="1"
+							maxlength="100"
+						/>
+						<button type="submit" class="btn btn-ghost btn-xs text-primary min-h-[32px]">Save</button>
+						<button type="button" class="btn btn-ghost btn-xs text-base-content/30 min-h-[32px]" onclick={ hideRenameInput(era.ID.String()) }>
+							Cancel
+						</button>
+					</div>
+				</form>
+			} else if era.Status == "confirmed" {
+				<div class="flex items-center gap-1 mt-2">
+					<span class="text-xs text-success/50">Confirmed</span>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// erasEmpty renders the empty state for the eras tab.
+templ erasEmpty() {
+	<div class="py-16 text-center">
+		<p class="text-display text-2xl font-semibold text-base-content/30 mb-2">No eras detected yet</p>
+		<p class="text-sm text-base-content/40 max-w-md mx-auto">
+			Eras emerge from your listening and viewing patterns over time.
+			Keep consuming and Specto will find the chapters in your media story.
+		</p>
+	</div>
+}
+
+// EraSegmentPartial renders a single era segment for HTMX swap responses.
+templ EraSegmentPartial(era core.Era, csrfToken string) {
+	@eraSegment(era, 0, 1, csrfToken)
+}
+
+// --- Era helper functions ---
+
+func eraDateRange(era core.Era) string {
+	start := era.StartedAt.Format("Jan 2006")
+	if era.EndedAt == nil {
+		return start + " — now"
+	}
+	end := era.EndedAt.Format("Jan 2006")
+	if start == end {
+		return start
+	}
+	return start + " — " + end
+}
+
+func eraNodeColor(era core.Era, index int) string {
+	if era.Status == "confirmed" {
+		return "bg-primary"
+	}
+	// Cycle through accent colors for suggested eras
+	switch index % 3 {
+	case 0:
+		return "bg-primary/60"
+	case 1:
+		return "bg-secondary/60"
+	default:
+		return "bg-accent/60"
+	}
+}
+
+func eraCardStyle(era core.Era) string {
+	if era.Status == "confirmed" {
+		return "bg-neutral border-primary/20"
+	}
+	return "bg-neutral/50 border-base-300 hover:border-base-content/20"
+}
+
+func eraTopTags(tags []core.EraTag, n int) []core.EraTag {
+	if len(tags) <= n {
+		return tags
+	}
+	return tags[:n]
+}
+
+func eraTagStyle(tag core.EraTag) string {
+	// Intensity based on weight — higher weight tags get more visual presence
+	if tag.Weight > 0.7 {
+		return "bg-primary/15 text-primary/80"
+	}
+	if tag.Weight > 0.4 {
+		return "bg-base-300 text-base-content/60"
+	}
+	return "bg-base-300/50 text-base-content/40"
+}
+
+func eraRenamePlaceholder(era core.Era) string {
+	if era.SuggestedTitle != nil {
+		return *era.SuggestedTitle
+	}
+	return "Name this era..."
+}
+
+// showRenameInput toggles the rename form visibility.
+script showRenameInput(eraID string) {
+	document.getElementById("rename-" + eraID).classList.remove("hidden");
+}
+
+// hideRenameInput hides the rename form.
+script hideRenameInput(eraID string) {
+	document.getElementById("rename-" + eraID).classList.add("hidden");
 }

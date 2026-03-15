@@ -252,6 +252,10 @@ func (m *mockQuerier) MarkUserOnboarded(_ context.Context, _ pgtype.UUID) error 
 	return nil
 }
 
+func (m *mockQuerier) ListUserIDsWithEnrichedItems(_ context.Context) ([]pgtype.UUID, error) {
+	return nil, nil
+}
+
 func (m *mockQuerier) GetOrCreateTag(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error) {
 	if m.getOrCreateTagFn != nil {
 		return m.getOrCreateTagFn(ctx, arg)
@@ -411,4 +415,39 @@ func (m *mockQuerier) TopicSpikes(ctx context.Context, arg database.TopicSpikesP
 		return m.topicSpikesFn(ctx, arg)
 	}
 	return nil, nil
+}
+
+// Era query stubs — not tested in store unit tests (tested via integration).
+func (m *mockQuerier) TagVectorByWindow(_ context.Context, _ database.TagVectorByWindowParams) ([]database.TagVectorByWindowRow, error) {
+	return nil, nil
+}
+func (m *mockQuerier) CreateEra(_ context.Context, _ database.CreateEraParams) (database.Era, error) {
+	return database.Era{}, nil
+}
+func (m *mockQuerier) UpsertEraTag(_ context.Context, _ database.UpsertEraTagParams) error {
+	return nil
+}
+func (m *mockQuerier) ListEras(_ context.Context, _ database.ListErasParams) ([]database.Era, error) {
+	return nil, nil
+}
+func (m *mockQuerier) GetEra(_ context.Context, _ database.GetEraParams) (database.Era, error) {
+	return database.Era{}, nil
+}
+func (m *mockQuerier) GetEraTags(_ context.Context, _ pgtype.UUID) ([]database.GetEraTagsRow, error) {
+	return nil, nil
+}
+func (m *mockQuerier) UpdateEraTitle(_ context.Context, _ database.UpdateEraTitleParams) (database.Era, error) {
+	return database.Era{}, nil
+}
+func (m *mockQuerier) UpdateEraSuggestedTitle(_ context.Context, _ database.UpdateEraSuggestedTitleParams) (database.Era, error) {
+	return database.Era{}, nil
+}
+func (m *mockQuerier) DismissEra(_ context.Context, _ database.DismissEraParams) error {
+	return nil
+}
+func (m *mockQuerier) DeleteErasByUserAndType(_ context.Context, _ database.DeleteErasByUserAndTypeParams) error {
+	return nil
+}
+func (m *mockQuerier) CountItemsInRange(_ context.Context, _ database.CountItemsInRangeParams) (int64, error) {
+	return 0, nil
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 
 	"github.com/justestif/specto/components"
 	"github.com/justestif/specto/internal/auth"
@@ -14,7 +15,7 @@ import (
 // validTimelineTab returns the tab if valid, defaulting to "overview".
 func validTimelineTab(tab string) components.TimelineTab {
 	switch components.TimelineTab(tab) {
-	case components.TimelineTabOverview, components.TimelineTabActivity:
+	case components.TimelineTabOverview, components.TimelineTabActivity, components.TimelineTabEras:
 		return components.TimelineTab(tab)
 	default:
 		return components.TimelineTabOverview
@@ -78,6 +79,9 @@ func (h *Handler) buildTimelinePageData(r *http.Request, user *core.UserInfo, ta
 		data.Items = items
 		data.Filters = filters
 		data.HasMore = hasMore
+
+	case components.TimelineTabEras:
+		data.Eras = h.fetchErasData(r, user)
 
 	default: // overview
 		data.Scorecard = h.fetchScorecardData(r, user)
@@ -194,5 +198,52 @@ func parseTimelineFilters(r *http.Request) components.TimelineFilters {
 		Search:   q.Get("search"),
 		Offset:   parseIntParam(q.Get("offset"), 0, 0, 10000),
 		Limit:    parseIntParam(q.Get("limit"), 30, 1, 100),
+	}
+}
+
+// fetchErasData loads detected eras for the eras tab, grouped by media type.
+func (h *Handler) fetchErasData(r *http.Request, user *core.UserInfo) *components.ErasData {
+	ctx := r.Context()
+	addContext(r, "handler", "timeline_eras")
+
+	musicType := string(core.MediaMusic)
+	videoType := string(core.MediaVideo)
+
+	musicEras, err := h.App.Eras.List(ctx, user.ID, &musicType)
+	if err != nil {
+		addContext(r, "eras_music_error", err.Error())
+	}
+
+	videoEras, err := h.App.Eras.List(ctx, user.ID, &videoType)
+	if err != nil {
+		addContext(r, "eras_video_error", err.Error())
+	}
+
+	// Load tags for each era.
+	for i := range musicEras {
+		tags, err := h.App.Eras.GetTags(ctx, musicEras[i].ID)
+		if err != nil {
+			addContext(r, "eras_tags_error", err.Error())
+			continue
+		}
+		musicEras[i].Tags = tags
+	}
+	for i := range videoEras {
+		tags, err := h.App.Eras.GetTags(ctx, videoEras[i].ID)
+		if err != nil {
+			addContext(r, "eras_tags_error", err.Error())
+			continue
+		}
+		videoEras[i].Tags = tags
+	}
+
+	if len(musicEras) == 0 && len(videoEras) == 0 {
+		return nil
+	}
+
+	return &components.ErasData{
+		MusicEras: musicEras,
+		VideoEras: videoEras,
+		CSRFToken: csrf.Token(r),
 	}
 }

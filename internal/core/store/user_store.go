@@ -113,3 +113,16 @@ func (s *PgUserStore) UpdateProfile(ctx context.Context, id uuid.UUID, displayNa
 func (s *PgUserStore) MarkOnboarded(ctx context.Context, id uuid.UUID) error {
 	return s.q.MarkUserOnboarded(ctx, uuidToPgx(id))
 }
+
+func (s *PgUserStore) ListUserIDsWithEnrichedItems(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := s.q.ListUserIDsWithEnrichedItems(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing user IDs with enriched items: %w", err)
+	}
+
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = pgxToUUID(row)
+	}
+	return ids, nil
+}

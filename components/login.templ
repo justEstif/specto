@@ -56,6 +56,19 @@ templ LoginCard(csrfToken string, errMsg string) {
 				</button>
 			</fieldset>
 		</form>
+		<div class="divider text-base-content/40 text-xs my-6">or</div>
+		<form
+			hx-post="/login"
+			hx-target="#login-card"
+			hx-swap="outerHTML"
+		>
+			<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+			<input type="hidden" name="email" value="test@email.com"/>
+			<input type="hidden" name="password" value="password123"/>
+			<button type="submit" class="btn btn-outline btn-secondary w-full min-h-[44px]">
+				Try Demo
+			</button>
+		</form>
 		<p class="text-center text-sm text-base-content/50 mt-6">
 			Don't have an account?
 			<a href="/register" class="text-primary hover:text-primary/80 transition-colors">Register</a>

@@ -57,16 +57,36 @@ type ClassifyTagScore struct {
 	Confidence float64 `json:"confidence"`
 }
 
-// GenkitEnricher implements core.Enricher using Firebase Genkit with Dotprompt.
-type GenkitEnricher struct {
-	g         *genkit.Genkit
-	prompt    *ai.DataPrompt[ClassifyInput, *ClassifyOutput]
-	modelName string // fully qualified model name (e.g. "googleai/gemini-2.5-flash", "openai/gpt-4o-mini")
-	logger    *slog.Logger
+// EraNamingInput is the input schema for the era naming prompt.
+type EraNamingInput struct {
+	MediaType string         `json:"mediaType"`
+	Tags      []EraNamingTag `json:"tags"`
 }
 
-// Compile-time interface check.
+// EraNamingTag is a tag entry for era naming.
+type EraNamingTag struct {
+	Name     string  `json:"name"`
+	Category string  `json:"category"`
+	Weight   float64 `json:"weight"`
+}
+
+// EraNamingOutput is the output schema for the era naming prompt.
+type EraNamingOutput struct {
+	Title string `json:"title"`
+}
+
+// GenkitEnricher implements core.Enricher and core.EraNamer using Firebase Genkit with Dotprompt.
+type GenkitEnricher struct {
+	g             *genkit.Genkit
+	prompt        *ai.DataPrompt[ClassifyInput, *ClassifyOutput]
+	eraNamePrompt *ai.DataPrompt[EraNamingInput, *EraNamingOutput]
+	modelName     string // fully qualified model name (e.g. "googleai/gemini-2.5-flash", "openai/gpt-4o-mini")
+	logger        *slog.Logger
+}
+
+// Compile-time interface checks.
 var _ core.Enricher = (*GenkitEnricher)(nil)
+var _ core.EraNamer = (*GenkitEnricher)(nil)
 
 // New creates and initializes a GenkitEnricher. It initializes the Genkit
 // runtime with the configured provider plugin and loads the classify prompt.
@@ -111,10 +131,17 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*GenkitEnricher,
 	// Register schemas so the prompt can reference them
 	genkit.DefineSchemaFor[ClassifyInput](g)
 	genkit.DefineSchemaFor[ClassifyOutput](g)
+	genkit.DefineSchemaFor[EraNamingInput](g)
+	genkit.DefineSchemaFor[EraNamingOutput](g)
 
 	prompt := genkit.LookupDataPrompt[ClassifyInput, *ClassifyOutput](g, "classify")
 	if prompt == nil {
 		return nil, fmt.Errorf("enrichment: classify prompt not found (check prompts/classify.prompt)")
+	}
+
+	eraNamePrompt := genkit.LookupDataPrompt[EraNamingInput, *EraNamingOutput](g, "era_name")
+	if eraNamePrompt == nil {
+		return nil, fmt.Errorf("enrichment: era_name prompt not found (check prompts/era_name.prompt)")
 	}
 
 	logger.Info("genkit enricher initialized",
@@ -123,10 +150,11 @@ func New(ctx context.Context, cfg Config, logger *slog.Logger) (*GenkitEnricher,
 	)
 
 	return &GenkitEnricher{
-		g:         g,
-		prompt:    prompt,
-		modelName: modelName,
-		logger:    logger,
+		g:             g,
+		prompt:        prompt,
+		eraNamePrompt: eraNamePrompt,
+		modelName:     modelName,
+		logger:        logger,
 	}, nil
 }
 
@@ -166,6 +194,37 @@ func (e *GenkitEnricher) Enrich(ctx context.Context, item core.MediaItem, existi
 	}
 
 	return result, nil
+}
+
+// NameEra generates a short, evocative title for a detected era based on its
+// characterizing tags. Returns empty string if the LLM fails to generate.
+func (e *GenkitEnricher) NameEra(ctx context.Context, mediaType string, tags []core.EraTag) (string, error) {
+	if len(tags) == 0 {
+		return "", nil
+	}
+
+	inputTags := make([]EraNamingTag, len(tags))
+	for i, t := range tags {
+		inputTags[i] = EraNamingTag{
+			Name:     t.TagName,
+			Category: t.Category,
+			Weight:   float64(t.Weight),
+		}
+	}
+
+	output, _, err := e.eraNamePrompt.Execute(ctx, EraNamingInput{
+		MediaType: mediaType,
+		Tags:      inputTags,
+	}, ai.WithModelName(e.modelName))
+	if err != nil {
+		return "", fmt.Errorf("enrichment: era naming failed: %w", err)
+	}
+
+	if output == nil || output.Title == "" {
+		return "", nil
+	}
+
+	return output.Title, nil
 }
 
 // convertTagScores converts ClassifyTagScore slices to core.TagScore slices.

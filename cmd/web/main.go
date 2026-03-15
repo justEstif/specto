@@ -268,6 +268,11 @@ func main() {
 				r.Get("/preview", h.SharePreview)
 			})
 
+			// Eras
+			r.Post("/eras/{id}/confirm", h.ConfirmEra)
+			r.Put("/eras/{id}/title", h.UpdateEraTitle)
+			r.Delete("/eras/{id}", h.DismissEra)
+
 			// Item privacy
 			r.Post("/items/{id}/privacy", h.ToggleItemPrivate)
 		})
@@ -278,10 +283,11 @@ func main() {
 		log.Info("registered plugin", "plugin", name)
 	}
 
-	// Start enrichment worker in background
+	// Start background workers
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	go application.Worker.Start(workerCtx)
+	go application.EraWorker.Start(workerCtx)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -309,7 +315,7 @@ func main() {
 	<-quit
 	log.Info("shutting down")
 
-	// Stop enrichment worker
+	// Stop background workers
 	workerCancel()
 
 	// Graceful HTTP shutdown with timeout

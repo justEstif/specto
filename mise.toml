@@ -80,6 +80,10 @@ description = "Run httpyac API tests against local server"
 run = "httpyac send *.http --all -e local"
 dir = "http"
 
+[tasks.seed]
+description = "Seed database with test user (test@email.com / password123)"
+run = "go run cmd/seed/main.go"
+
 [tasks.pre-commit]
 description = "Pre-commit checks (vet, test, build)"
 run = """

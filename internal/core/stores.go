@@ -170,6 +170,10 @@ type UserStore interface {
 
 	// MarkOnboarded sets the user's onboarded flag to true.
 	MarkOnboarded(ctx context.Context, id uuid.UUID) error
+
+	// ListUserIDsWithEnrichedItems returns user IDs that have at least one
+	// enriched media item. Used by the era worker to know which users to scan.
+	ListUserIDsWithEnrichedItems(ctx context.Context) ([]uuid.UUID, error)
 }
 
 // InsightsFilter holds optional filters for insights queries.

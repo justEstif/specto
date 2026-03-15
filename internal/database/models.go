@@ -8,6 +8,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Era struct {
+	ID              pgtype.UUID        `json:"id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	MediaType       pgtype.Text        `json:"media_type"`
+	Title           pgtype.Text        `json:"title"`
+	SuggestedTitle  pgtype.Text        `json:"suggested_title"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	EndedAt         pgtype.Timestamptz `json:"ended_at"`
+	ItemCount       int32              `json:"item_count"`
+	Distinctiveness float32            `json:"distinctiveness"`
+	Status          string             `json:"status"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type EraTag struct {
+	EraID  pgtype.UUID `json:"era_id"`
+	TagID  pgtype.UUID `json:"tag_id"`
+	Weight float32     `json:"weight"`
+}
+
 type MediaItem struct {
 	ID                pgtype.UUID        `json:"id"`
 	UserID            pgtype.UUID        `json:"user_id"`

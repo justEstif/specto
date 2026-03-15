@@ -255,6 +255,81 @@ func (q *Queries) ConsumptionHeatmap(ctx context.Context, arg ConsumptionHeatmap
 	return items, nil
 }
 
+const countItemsInRange = `-- name: CountItemsInRange :one
+SELECT COUNT(*) AS count
+FROM media_items
+WHERE user_id = $1
+    AND type = $2
+    AND consumed_at >= $3
+    AND consumed_at <= $4
+`
+
+type CountItemsInRangeParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	Type         string             `json:"type"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+}
+
+// Count media items in a time range for a user/type. Used for era item_count.
+func (q *Queries) CountItemsInRange(ctx context.Context, arg CountItemsInRangeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countItemsInRange,
+		arg.UserID,
+		arg.Type,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createEra = `-- name: CreateEra :one
+INSERT INTO eras (user_id, media_type, suggested_title, started_at, ended_at, item_count, distinctiveness, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, user_id, media_type, title, suggested_title, started_at, ended_at, item_count, distinctiveness, status, created_at, updated_at
+`
+
+type CreateEraParams struct {
+	UserID          pgtype.UUID        `json:"user_id"`
+	MediaType       pgtype.Text        `json:"media_type"`
+	SuggestedTitle  pgtype.Text        `json:"suggested_title"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	EndedAt         pgtype.Timestamptz `json:"ended_at"`
+	ItemCount       int32              `json:"item_count"`
+	Distinctiveness float32            `json:"distinctiveness"`
+	Status          string             `json:"status"`
+}
+
+func (q *Queries) CreateEra(ctx context.Context, arg CreateEraParams) (Era, error) {
+	row := q.db.QueryRow(ctx, createEra,
+		arg.UserID,
+		arg.MediaType,
+		arg.SuggestedTitle,
+		arg.StartedAt,
+		arg.EndedAt,
+		arg.ItemCount,
+		arg.Distinctiveness,
+		arg.Status,
+	)
+	var i Era
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MediaType,
+		&i.Title,
+		&i.SuggestedTitle,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.ItemCount,
+		&i.Distinctiveness,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createMediaItem = `-- name: CreateMediaItem :one
 INSERT INTO media_items (user_id, platform, type, title, creator, consumed_at, duration, time_spent, url, external_id, raw_metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -519,6 +594,25 @@ func (q *Queries) CrossPlatformCrossover(ctx context.Context, arg CrossPlatformC
 	return items, nil
 }
 
+const deleteErasByUserAndType = `-- name: DeleteErasByUserAndType :exec
+DELETE FROM eras
+WHERE user_id = $1
+    AND media_type = $2
+    AND status = 'suggested'
+`
+
+type DeleteErasByUserAndTypeParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	MediaType pgtype.Text `json:"media_type"`
+}
+
+// Used to clear and recompute eras for a user/media_type combination.
+// Only deletes suggested eras; confirmed/dismissed are preserved.
+func (q *Queries) DeleteErasByUserAndType(ctx context.Context, arg DeleteErasByUserAndTypeParams) error {
+	_, err := q.db.Exec(ctx, deleteErasByUserAndType, arg.UserID, arg.MediaType)
+	return err
+}
+
 const deleteMediaItemsByPlatform = `-- name: DeleteMediaItemsByPlatform :execrows
 DELETE FROM media_items WHERE user_id = $1 AND platform = $2
 `
@@ -564,6 +658,21 @@ func (q *Queries) DeleteSyncLogsByPlugin(ctx context.Context, arg DeleteSyncLogs
 	return err
 }
 
+const dismissEra = `-- name: DismissEra :exec
+UPDATE eras SET status = 'dismissed', updated_at = now()
+WHERE id = $1 AND user_id = $2
+`
+
+type DismissEraParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) DismissEra(ctx context.Context, arg DismissEraParams) error {
+	_, err := q.db.Exec(ctx, dismissEra, arg.ID, arg.UserID)
+	return err
+}
+
 const enrichmentStats = `-- name: EnrichmentStats :one
 SELECT
     count(*) FILTER (WHERE enrichment_status = 'pending') AS pending,
@@ -591,6 +700,99 @@ func (q *Queries) EnrichmentStats(ctx context.Context, userID pgtype.UUID) (Enri
 		&i.Failed,
 	)
 	return i, err
+}
+
+const getEra = `-- name: GetEra :one
+SELECT id, user_id, media_type, title, suggested_title, started_at, ended_at, item_count, distinctiveness, status, created_at, updated_at FROM eras WHERE id = $1 AND user_id = $2
+`
+
+type GetEraParams struct {
+	ID     pgtype.UUID `json:"id"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetEra(ctx context.Context, arg GetEraParams) (Era, error) {
+	row := q.db.QueryRow(ctx, getEra, arg.ID, arg.UserID)
+	var i Era
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MediaType,
+		&i.Title,
+		&i.SuggestedTitle,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.ItemCount,
+		&i.Distinctiveness,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEraByID = `-- name: GetEraByID :one
+SELECT id, user_id, media_type, title, suggested_title, started_at, ended_at, item_count, distinctiveness, status, created_at, updated_at FROM eras WHERE id = $1
+`
+
+func (q *Queries) GetEraByID(ctx context.Context, id pgtype.UUID) (Era, error) {
+	row := q.db.QueryRow(ctx, getEraByID, id)
+	var i Era
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MediaType,
+		&i.Title,
+		&i.SuggestedTitle,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.ItemCount,
+		&i.Distinctiveness,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEraTags = `-- name: GetEraTags :many
+SELECT et.weight, t.id AS tag_id, t.name AS tag_name, t.category AS tag_category
+FROM era_tags et
+JOIN tags t ON et.tag_id = t.id
+WHERE et.era_id = $1
+ORDER BY et.weight DESC
+`
+
+type GetEraTagsRow struct {
+	Weight      float32     `json:"weight"`
+	TagID       pgtype.UUID `json:"tag_id"`
+	TagName     string      `json:"tag_name"`
+	TagCategory pgtype.Text `json:"tag_category"`
+}
+
+func (q *Queries) GetEraTags(ctx context.Context, eraID pgtype.UUID) ([]GetEraTagsRow, error) {
+	rows, err := q.db.Query(ctx, getEraTags, eraID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetEraTagsRow{}
+	for rows.Next() {
+		var i GetEraTagsRow
+		if err := rows.Scan(
+			&i.Weight,
+			&i.TagID,
+			&i.TagName,
+			&i.TagCategory,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getMediaItemByExternalID = `-- name: GetMediaItemByExternalID :one
@@ -1166,6 +1368,52 @@ func (q *Queries) GetUserByProfileSlug(ctx context.Context, profileSlug pgtype.T
 	return i, err
 }
 
+const listEras = `-- name: ListEras :many
+SELECT id, user_id, media_type, title, suggested_title, started_at, ended_at, item_count, distinctiveness, status, created_at, updated_at FROM eras
+WHERE user_id = $1
+    AND ($2::TEXT IS NULL OR media_type = $2)
+    AND status != 'dismissed'
+ORDER BY started_at DESC
+`
+
+type ListErasParams struct {
+	UserID    pgtype.UUID `json:"user_id"`
+	MediaType pgtype.Text `json:"media_type"`
+}
+
+func (q *Queries) ListEras(ctx context.Context, arg ListErasParams) ([]Era, error) {
+	rows, err := q.db.Query(ctx, listEras, arg.UserID, arg.MediaType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Era{}
+	for rows.Next() {
+		var i Era
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MediaType,
+			&i.Title,
+			&i.SuggestedTitle,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.ItemCount,
+			&i.Distinctiveness,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMediaItemTags = `-- name: ListMediaItemTags :many
 SELECT t.name, t.category, mit.source, mit.confidence
 FROM media_item_tags mit
@@ -1458,6 +1706,31 @@ func (q *Queries) ListSyncLogs(ctx context.Context, arg ListSyncLogsParams) ([]S
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserIDsWithEnrichedItems = `-- name: ListUserIDsWithEnrichedItems :many
+SELECT DISTINCT user_id FROM media_items
+WHERE enrichment_status = 'enriched'
+`
+
+func (q *Queries) ListUserIDsWithEnrichedItems(ctx context.Context) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listUserIDsWithEnrichedItems)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var user_id pgtype.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1875,6 +2148,90 @@ func (q *Queries) TagDistributionFiltered(ctx context.Context, arg TagDistributi
 	return items, nil
 }
 
+const tagVectorByWindow = `-- name: TagVectorByWindow :many
+
+SELECT
+    window_start,
+    tag_id,
+    tag_name,
+    tag_category,
+    tag_count,
+    SUM(tag_count) OVER (PARTITION BY window_start) AS window_total
+FROM (
+    SELECT
+        to_timestamp(FLOOR(EXTRACT(EPOCH FROM mi.consumed_at) / 1209600) * 1209600)::TIMESTAMPTZ AS window_start,
+        t.id AS tag_id,
+        t.name AS tag_name,
+        t.category AS tag_category,
+        COUNT(*) AS tag_count
+    FROM media_item_tags mit
+    JOIN tags t ON mit.tag_id = t.id
+    JOIN media_items mi ON mit.media_item_id = mi.id
+    WHERE mi.user_id = $1
+        AND mi.consumed_at >= $2
+        AND mi.consumed_at <= $3
+        AND mi.type = $4
+        AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    GROUP BY window_start, t.id, t.name, t.category
+) sub
+ORDER BY window_start, tag_count DESC
+`
+
+type TagVectorByWindowParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	ConsumedAt   pgtype.Timestamptz `json:"consumed_at"`
+	ConsumedAt_2 pgtype.Timestamptz `json:"consumed_at_2"`
+	Type         string             `json:"type"`
+}
+
+type TagVectorByWindowRow struct {
+	WindowStart pgtype.Timestamptz `json:"window_start"`
+	TagID       pgtype.UUID        `json:"tag_id"`
+	TagName     string             `json:"tag_name"`
+	TagCategory pgtype.Text        `json:"tag_category"`
+	TagCount    int64              `json:"tag_count"`
+	WindowTotal int64              `json:"window_total"`
+}
+
+// ============================================================
+// Era detection queries
+// ============================================================
+// Returns tag frequency vectors for biweekly windows, used to compute
+// cosine similarity for era boundary detection. Each row is one tag
+// in one window with its count and the total items in that window.
+// Windows are aligned to 2-week periods from epoch.
+func (q *Queries) TagVectorByWindow(ctx context.Context, arg TagVectorByWindowParams) ([]TagVectorByWindowRow, error) {
+	rows, err := q.db.Query(ctx, tagVectorByWindow,
+		arg.UserID,
+		arg.ConsumedAt,
+		arg.ConsumedAt_2,
+		arg.Type,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TagVectorByWindowRow{}
+	for rows.Next() {
+		var i TagVectorByWindowRow
+		if err := rows.Scan(
+			&i.WindowStart,
+			&i.TagID,
+			&i.TagName,
+			&i.TagCategory,
+			&i.TagCount,
+			&i.WindowTotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const topicSpikes = `-- name: TopicSpikes :many
 SELECT t.name, t.category,
     COUNT(*) FILTER (WHERE mi.consumed_at >= $5::TIMESTAMPTZ) AS recent_count,
@@ -2051,6 +2408,68 @@ func (q *Queries) UpdateEnrichmentStatusWithRetries(ctx context.Context, arg Upd
 	return err
 }
 
+const updateEraSuggestedTitle = `-- name: UpdateEraSuggestedTitle :one
+UPDATE eras SET suggested_title = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, user_id, media_type, title, suggested_title, started_at, ended_at, item_count, distinctiveness, status, created_at, updated_at
+`
+
+type UpdateEraSuggestedTitleParams struct {
+	ID             pgtype.UUID `json:"id"`
+	SuggestedTitle pgtype.Text `json:"suggested_title"`
+}
+
+func (q *Queries) UpdateEraSuggestedTitle(ctx context.Context, arg UpdateEraSuggestedTitleParams) (Era, error) {
+	row := q.db.QueryRow(ctx, updateEraSuggestedTitle, arg.ID, arg.SuggestedTitle)
+	var i Era
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MediaType,
+		&i.Title,
+		&i.SuggestedTitle,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.ItemCount,
+		&i.Distinctiveness,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateEraTitle = `-- name: UpdateEraTitle :one
+UPDATE eras SET title = $2, status = 'confirmed', updated_at = now()
+WHERE id = $1
+RETURNING id, user_id, media_type, title, suggested_title, started_at, ended_at, item_count, distinctiveness, status, created_at, updated_at
+`
+
+type UpdateEraTitleParams struct {
+	ID    pgtype.UUID `json:"id"`
+	Title pgtype.Text `json:"title"`
+}
+
+func (q *Queries) UpdateEraTitle(ctx context.Context, arg UpdateEraTitleParams) (Era, error) {
+	row := q.db.QueryRow(ctx, updateEraTitle, arg.ID, arg.Title)
+	var i Era
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MediaType,
+		&i.Title,
+		&i.SuggestedTitle,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.ItemCount,
+		&i.Distinctiveness,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updatePluginStateStatus = `-- name: UpdatePluginStateStatus :one
 UPDATE plugin_states SET status = $3, error_message = $4, updated_at = now()
 WHERE user_id = $1 AND plugin = $2
@@ -2157,6 +2576,23 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Onboarded,
 	)
 	return i, err
+}
+
+const upsertEraTag = `-- name: UpsertEraTag :exec
+INSERT INTO era_tags (era_id, tag_id, weight)
+VALUES ($1, $2, $3)
+ON CONFLICT (era_id, tag_id) DO UPDATE SET weight = EXCLUDED.weight
+`
+
+type UpsertEraTagParams struct {
+	EraID  pgtype.UUID `json:"era_id"`
+	TagID  pgtype.UUID `json:"tag_id"`
+	Weight float32     `json:"weight"`
+}
+
+func (q *Queries) UpsertEraTag(ctx context.Context, arg UpsertEraTagParams) error {
+	_, err := q.db.Exec(ctx, upsertEraTag, arg.EraID, arg.TagID, arg.Weight)
+	return err
 }
 
 const upsertPluginCredentials = `-- name: UpsertPluginCredentials :one

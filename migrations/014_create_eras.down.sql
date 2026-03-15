@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS era_tags;
+DROP TABLE IF EXISTS eras;

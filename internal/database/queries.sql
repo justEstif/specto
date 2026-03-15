@@ -29,6 +29,10 @@ RETURNING *;
 UPDATE users SET onboarded = true, updated_at = now()
 WHERE id = $1;
 
+-- name: ListUserIDsWithEnrichedItems :many
+SELECT DISTINCT user_id FROM media_items
+WHERE enrichment_status = 'enriched';
+
 -- name: GetPluginState :one
 SELECT * FROM plugin_states WHERE user_id = $1 AND plugin = $2;
 
@@ -473,3 +477,99 @@ WHERE mi.user_id = $1
     AND NOT (mi.platform = ANY($4::TEXT[]))
 GROUP BY mi.platform
 ORDER BY count DESC;
+
+-- ============================================================
+-- Era detection queries
+-- ============================================================
+
+-- name: TagVectorByWindow :many
+-- Returns tag frequency vectors for biweekly windows, used to compute
+-- cosine similarity for era boundary detection. Each row is one tag
+-- in one window with its count and the total items in that window.
+-- Windows are aligned to 2-week periods from epoch.
+SELECT
+    window_start,
+    tag_id,
+    tag_name,
+    tag_category,
+    tag_count,
+    SUM(tag_count) OVER (PARTITION BY window_start) AS window_total
+FROM (
+    SELECT
+        to_timestamp(FLOOR(EXTRACT(EPOCH FROM mi.consumed_at) / 1209600) * 1209600)::TIMESTAMPTZ AS window_start,
+        t.id AS tag_id,
+        t.name AS tag_name,
+        t.category AS tag_category,
+        COUNT(*) AS tag_count
+    FROM media_item_tags mit
+    JOIN tags t ON mit.tag_id = t.id
+    JOIN media_items mi ON mit.media_item_id = mi.id
+    WHERE mi.user_id = $1
+        AND mi.consumed_at >= $2
+        AND mi.consumed_at <= $3
+        AND mi.type = $4
+        AND (mit.confidence IS NULL OR mit.confidence >= 0.7)
+    GROUP BY window_start, t.id, t.name, t.category
+) sub
+ORDER BY window_start, tag_count DESC;
+
+-- name: CreateEra :one
+INSERT INTO eras (user_id, media_type, suggested_title, started_at, ended_at, item_count, distinctiveness, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING *;
+
+-- name: UpsertEraTag :exec
+INSERT INTO era_tags (era_id, tag_id, weight)
+VALUES ($1, $2, $3)
+ON CONFLICT (era_id, tag_id) DO UPDATE SET weight = EXCLUDED.weight;
+
+-- name: ListEras :many
+SELECT * FROM eras
+WHERE user_id = $1
+    AND (sqlc.narg('media_type')::TEXT IS NULL OR media_type = sqlc.narg('media_type'))
+    AND status != 'dismissed'
+ORDER BY started_at DESC;
+
+-- name: GetEra :one
+SELECT * FROM eras WHERE id = $1 AND user_id = $2;
+
+-- name: GetEraByID :one
+SELECT * FROM eras WHERE id = $1;
+
+-- name: GetEraTags :many
+SELECT et.weight, t.id AS tag_id, t.name AS tag_name, t.category AS tag_category
+FROM era_tags et
+JOIN tags t ON et.tag_id = t.id
+WHERE et.era_id = $1
+ORDER BY et.weight DESC;
+
+-- name: UpdateEraTitle :one
+UPDATE eras SET title = $2, status = 'confirmed', updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateEraSuggestedTitle :one
+UPDATE eras SET suggested_title = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: DismissEra :exec
+UPDATE eras SET status = 'dismissed', updated_at = now()
+WHERE id = $1 AND user_id = $2;
+
+-- name: DeleteErasByUserAndType :exec
+-- Used to clear and recompute eras for a user/media_type combination.
+-- Only deletes suggested eras; confirmed/dismissed are preserved.
+DELETE FROM eras
+WHERE user_id = $1
+    AND media_type = $2
+    AND status = 'suggested';
+
+-- name: CountItemsInRange :one
+-- Count media items in a time range for a user/type. Used for era item_count.
+SELECT COUNT(*) AS count
+FROM media_items
+WHERE user_id = $1
+    AND type = $2
+    AND consumed_at >= $3
+    AND consumed_at <= $4;

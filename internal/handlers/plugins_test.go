@@ -112,6 +112,9 @@ func (noopUserStore) UpdateProfile(_ context.Context, _ uuid.UUID, _ string, _, 
 	return nil, nil
 }
 func (noopUserStore) MarkOnboarded(_ context.Context, _ uuid.UUID) error { return nil }
+func (noopUserStore) ListUserIDsWithEnrichedItems(_ context.Context) ([]uuid.UUID, error) {
+	return nil, nil
+}
 
 var _ core.UserStore = noopUserStore{}
 

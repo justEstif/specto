@@ -44,6 +44,7 @@ type App struct {
 	Insights    *core.InsightsService
 	Coordinator *core.EnrichmentCoordinator
 	Worker      *core.EnrichmentWorker
+	EraWorker   *core.EraWorker
 
 	// Logger is the application-wide structured logger.
 	Logger *slog.Logger
@@ -56,6 +57,7 @@ type App struct {
 	SyncLogs      core.SyncLogStore
 	Tags          core.TagStore
 	ShareProfiles core.ShareProfileStore
+	Eras          core.EraStore
 }
 
 // New initializes all core components and returns a fully wired App.
@@ -113,6 +115,14 @@ func New(db *database.Queries, cfg Config) *App {
 
 	insights := core.NewInsightsService(insightsStore)
 
+	// Build era detection — wire LLM namer if available.
+	eraStore := store.NewEraStore(querier)
+	var eraNamer core.EraNamer
+	if namer, ok := cfg.LLMEnricher.(core.EraNamer); ok {
+		eraNamer = namer
+	}
+	eraWorker := core.NewEraWorker(eraStore, userStore, eraNamer, log, core.EraWorkerConfig{})
+
 	// Build auth service
 	sessions := auth.NewSessionManager(cfg.SessionSecret)
 	authSvc := auth.NewService(userStore, sessions)
@@ -146,5 +156,7 @@ func New(db *database.Queries, cfg Config) *App {
 		SyncLogs:      syncLogStore,
 		Tags:          tagStore,
 		ShareProfiles: shareProfileStore,
+		Eras:          eraStore,
+		EraWorker:     eraWorker,
 	}
 }

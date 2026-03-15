@@ -52,6 +52,7 @@ type Querier interface {
 	CreateUserWithPassword(ctx context.Context, arg database.CreateUserWithPasswordParams) (database.User, error)
 	UpdateUserProfile(ctx context.Context, arg database.UpdateUserProfileParams) (database.User, error)
 	MarkUserOnboarded(ctx context.Context, id pgtype.UUID) error
+	ListUserIDsWithEnrichedItems(ctx context.Context) ([]pgtype.UUID, error)
 
 	// Tags
 	GetOrCreateTag(ctx context.Context, arg database.GetOrCreateTagParams) (database.Tag, error)
@@ -74,6 +75,19 @@ type Querier interface {
 	CrossPlatformCrossover(ctx context.Context, arg database.CrossPlatformCrossoverParams) ([]database.CrossPlatformCrossoverRow, error)
 	TopicTimeSeries(ctx context.Context, arg database.TopicTimeSeriesParams) ([]database.TopicTimeSeriesRow, error)
 	TopicSpikes(ctx context.Context, arg database.TopicSpikesParams) ([]database.TopicSpikesRow, error)
+
+	// Eras
+	TagVectorByWindow(ctx context.Context, arg database.TagVectorByWindowParams) ([]database.TagVectorByWindowRow, error)
+	CreateEra(ctx context.Context, arg database.CreateEraParams) (database.Era, error)
+	UpsertEraTag(ctx context.Context, arg database.UpsertEraTagParams) error
+	ListEras(ctx context.Context, arg database.ListErasParams) ([]database.Era, error)
+	GetEra(ctx context.Context, arg database.GetEraParams) (database.Era, error)
+	GetEraTags(ctx context.Context, eraID pgtype.UUID) ([]database.GetEraTagsRow, error)
+	UpdateEraTitle(ctx context.Context, arg database.UpdateEraTitleParams) (database.Era, error)
+	UpdateEraSuggestedTitle(ctx context.Context, arg database.UpdateEraSuggestedTitleParams) (database.Era, error)
+	DismissEra(ctx context.Context, arg database.DismissEraParams) error
+	DeleteErasByUserAndType(ctx context.Context, arg database.DeleteErasByUserAndTypeParams) error
+	CountItemsInRange(ctx context.Context, arg database.CountItemsInRangeParams) (int64, error)
 
 	// Share profiles
 	GetShareProfile(ctx context.Context, userID pgtype.UUID) (database.ShareProfile, error)
