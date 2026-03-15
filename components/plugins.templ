@@ -356,6 +356,35 @@ templ importGuideSteps(name string) {
 			<div class="alert alert-warning text-xs mt-2">
 				<span>The default export format is HTML, which won't work here. Make sure you change it to JSON in step 3 or the file won't be accepted.</span>
 			</div>
+		case strings.Contains(strings.ToLower(name), "netflix"):
+			<ol class="list-decimal list-inside space-y-2">
+				<li>Go to your <a href="https://www.netflix.com/account/getmyinfo" target="_blank" rel="noopener" class="link link-primary">Netflix Account</a> page.</li>
+				<li>Scroll to <strong>"Profile & Parental Controls"</strong> and expand your profile.</li>
+				<li>Click <strong>"Viewing activity"</strong> and then <strong>"Download all"</strong> at the bottom to get a CSV file.</li>
+			</ol>
+			<div class="alert alert-info text-xs mt-2">
+				<span>Both the simple 2-column CSV (Title, Date) and the full GDPR export with duration and device info are supported. Short views under 2 minutes are filtered out automatically.</span>
+			</div>
+		case strings.Contains(strings.ToLower(name), "tiktok"):
+			<ol class="list-decimal list-inside space-y-2">
+				<li>Open TikTok and go to <strong>Settings &rarr; Account &rarr; Download your data</strong>.</li>
+				<li>Select <strong>"Request data"</strong>. Choose <strong>JSON</strong> as the file format (not TXT).</li>
+				<li>Wait for TikTok to prepare your export (usually a few days). You'll get a notification when it's ready.</li>
+				<li>Download the ZIP and extract it. Upload the JSON file — it contains your browsing history, likes, and favorites.</li>
+			</ol>
+			<div class="alert alert-warning text-xs mt-2">
+				<span>Make sure to select JSON format, not TXT. The export includes your video browsing history, liked videos, and favorites.</span>
+			</div>
+		case strings.Contains(strings.ToLower(name), "goodreads"):
+			<ol class="list-decimal list-inside space-y-2">
+				<li>Go to <a href="https://www.goodreads.com/review/import" target="_blank" rel="noopener" class="link link-primary">My Books</a> on Goodreads.</li>
+				<li>Click <strong>"Import and export"</strong> in the left sidebar (or go directly to the export page).</li>
+				<li>Click <strong>"Export Library"</strong> at the top of the page.</li>
+				<li>Wait for the export to generate, then click the download link to save the CSV file.</li>
+			</ol>
+			<div class="alert alert-info text-xs mt-2">
+				<span>The export includes your shelves, ratings, dates read, and reviews. Books are matched by title and author.</span>
+			</div>
 		default:
 			<p>Export your data from this platform and upload the file above. Check the platform's settings or privacy page for a data export option.</p>
 	}
@@ -452,6 +481,12 @@ func pluginDescription(name string) string {
 		return "Recent watches, auto-synced"
 	case lower == "youtube":
 		return "Full watch history via Google Takeout"
+	case lower == "netflix":
+		return "Viewing history via CSV export"
+	case lower == "tiktok":
+		return "Browsing history, likes, and favorites"
+	case lower == "goodreads":
+		return "Library, shelves, and reading history"
 	default:
 		return ""
 	}
@@ -467,6 +502,12 @@ func pluginTimeEstimate(name string) string {
 		return "~5 min setup, data arrives in 1–30 days"
 	case strings.Contains(lower, "youtube"):
 		return "~5 min via Google Takeout"
+	case strings.Contains(lower, "netflix"):
+		return "~2 min"
+	case strings.Contains(lower, "tiktok"):
+		return "~2 min setup, data arrives in a few days"
+	case strings.Contains(lower, "goodreads"):
+		return "~1 min"
 	default:
 		return "A few minutes"
 	}
