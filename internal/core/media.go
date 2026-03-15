@@ -27,6 +27,7 @@ const (
 	MediaVideo   MediaType = "video"
 	MediaArticle MediaType = "article"
 	MediaPodcast MediaType = "podcast"
+	MediaBook    MediaType = "book"
 )
 
 // ValidMediaTypes contains all recognized media types.
@@ -35,6 +36,7 @@ var ValidMediaTypes = map[MediaType]bool{
 	MediaVideo:   true,
 	MediaArticle: true,
 	MediaPodcast: true,
+	MediaBook:    true,
 }
 
 // Valid returns true if the media type is one of the recognized values.

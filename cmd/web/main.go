@@ -20,7 +20,11 @@ import (
 	"github.com/justestif/specto/internal/handlers"
 	"github.com/justestif/specto/internal/logger"
 	customMiddleware "github.com/justestif/specto/internal/middleware"
+	"github.com/justestif/specto/internal/plugins/anilist"
+	"github.com/justestif/specto/internal/plugins/goodreads"
+	"github.com/justestif/specto/internal/plugins/netflix"
 	"github.com/justestif/specto/internal/plugins/spotify"
+	"github.com/justestif/specto/internal/plugins/tiktok"
 	"github.com/justestif/specto/internal/plugins/youtube"
 )
 
@@ -133,6 +137,22 @@ func main() {
 	}
 	if err := application.Registry.Register(youtube.NewAPI()); err != nil {
 		log.Error("failed to register plugin", "plugin", "youtube-api", "error", err)
+		os.Exit(1)
+	}
+	if err := application.Registry.Register(netflix.New()); err != nil {
+		log.Error("failed to register plugin", "plugin", "netflix", "error", err)
+		os.Exit(1)
+	}
+	if err := application.Registry.Register(tiktok.New()); err != nil {
+		log.Error("failed to register plugin", "plugin", "tiktok", "error", err)
+		os.Exit(1)
+	}
+	if err := application.Registry.Register(goodreads.New()); err != nil {
+		log.Error("failed to register plugin", "plugin", "goodreads", "error", err)
+		os.Exit(1)
+	}
+	if err := application.Registry.Register(anilist.NewAPI()); err != nil {
+		log.Error("failed to register plugin", "plugin", "anilist-api", "error", err)
 		os.Exit(1)
 	}
 

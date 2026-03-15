@@ -1,11 +1,11 @@
 ---
 # project-media-consumption-analysis-oyb5
 title: Era detection / life chapters
-status: in-progress
+status: completed
 type: feature
 priority: low
 created_at: 2026-03-14T21:04:53Z
-updated_at: 2026-03-15T00:16:00Z
+updated_at: 2026-03-15T01:12:10Z
 parent: project-media-consumption-analysis-doqg
 ---
 
