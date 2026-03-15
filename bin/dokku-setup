@@ -8,7 +8,8 @@ DOKKU_HOST="${DOKKU_HOST:-192.168.0.29}"
 APP_NAME="specto"
 DB_NAME="specto-db"
 DOMAIN="specto.estifanos.cc"
-ENV_FILE="${1:-.env.production}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="${1:-${SCRIPT_DIR}/.env.production}"
 
 dokku_cmd() {
   ssh "dokku@${DOKKU_HOST}" "$@"
