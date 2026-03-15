@@ -253,9 +253,8 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 			</form>
 			<!-- Right: export guide (shown when platform selected) -->
 			<div id="import-guide-container" class="hidden flex-1 min-w-0 p-4 rounded-lg bg-base-300/30 border border-base-300/50 md:border-l md:border-t-0">
-				<div class="flex items-center gap-2 mb-3">
+				<div class="mb-3">
 					<span class="text-sm font-medium text-base-content/70">How to export your data</span>
-					<span id="import-guide-estimate" class="badge badge-xs badge-ghost text-base-content/40"></span>
 				</div>
 				for _, p := range available {
 					if p.AuthType == core.AuthFileImport {
