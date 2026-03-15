@@ -47,11 +47,12 @@ templ PluginsPage(data PluginsPageData) {
 		<div class="mb-10">
 			<h2 class="text-display text-xl font-semibold mb-4">Connected</h2>
 			if len(data.Connected) == 0 {
-				<div class="bg-neutral border border-base-300 rounded-box p-8 text-center text-base-content/40">
-					No plugins connected yet. Connect one below to start tracking.
-				</div>
+			<div class="bg-neutral border border-base-300 border-dashed rounded-box p-8 text-center">
+				<div class="text-base-content/30 text-sm">No plugins connected yet</div>
+				<div class="text-base-content/50 text-xs mt-1">Connect a source below to start building your media timeline</div>
+			</div>
 			} else {
-			<div class="space-y-4">
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 				for _, p := range data.Connected {
 					@PluginCard(p, data.CSRFToken)
 					@disconnectModal(p, data.CSRFToken)
@@ -63,8 +64,8 @@ templ PluginsPage(data PluginsPageData) {
 		if len(data.Available) > 0 {
 			<div>
 				<h2 class="text-display text-xl font-semibold mb-4">Available</h2>
-				<div class="space-y-4">
-					if hasOAuthPlugins(data.Available) {
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+				if hasOAuthPlugins(data.Available) {
 						for _, p := range data.Available {
 							if p.AuthType == core.AuthOAuth {
 								@PluginCard(p, data.CSRFToken)
@@ -82,34 +83,35 @@ templ PluginsPage(data PluginsPageData) {
 
 // PluginCard renders a single plugin card (used for both connected and available).
 templ PluginCard(p PluginViewData, csrfToken string) {
-	<div id={ "plugin-" + p.Name } class="card bg-neutral border border-base-300 p-5 sm:p-6">
-		<div class="flex items-start justify-between gap-4">
-			<div class="flex items-center gap-3">
-				<!-- Platform icon -->
-				<div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
-					@pluginLogo(p.Name)
+	<div id={ "plugin-" + p.Name } class={ "card bg-neutral border p-5 sm:p-6", templ.KV("border-error/30", p.ErrorMsg != ""), templ.KV("border-base-300", p.ErrorMsg == "") }>
+		<div class="flex items-start gap-3">
+			<!-- Platform icon -->
+			<div class="w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-lg bg-base-300/50 p-1.5">
+				@pluginLogo(p.Name)
+			</div>
+			<div class="min-w-0">
+				<div class="flex items-center gap-2">
+					<span class="font-semibold text-base-content truncate">{ p.DisplayName }</span>
+					if p.Connected {
+						<span class="status status-success" title="Connected"></span>
+					} else {
+						<span class="status status-neutral" title="Not connected"></span>
+					}
 				</div>
-				<div>
-					<div class="flex items-center gap-2">
-						<span class="font-semibold text-base-content">{ p.DisplayName }</span>
-						if p.Connected {
-							<span class="status status-success" title="Connected"></span>
-						} else {
-							<span class="status status-neutral" title="Not connected"></span>
-						}
-					</div>
 				<div class="text-xs text-base-content/50 mt-0.5">
 					{ authTypeLabel(p.AuthType) }
 					if p.LastSynced != "" {
-						{ " · Last synced " + p.LastSynced }
-					}
-					if !p.Connected {
-						if desc := pluginDescription(p.Name); desc != "" {
-							{ " · " + desc }
-						}
+						{ " · " + p.LastSynced }
 					}
 				</div>
-				</div>
+				if !p.Connected {
+					if desc := pluginDescription(p.Name); desc != "" {
+						<div class="text-xs text-base-content/40 mt-1">{ desc }</div>
+					}
+				}
+				if p.Connected && p.ItemCount != "" {
+					<div class="text-sm font-medium text-primary mt-2">{ p.ItemCount } items</div>
+				}
 			</div>
 		</div>
 		if p.ErrorMsg != "" {
@@ -118,7 +120,7 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 			</div>
 		}
 		<!-- Actions -->
-		<div class="flex flex-wrap gap-2 mt-4">
+		<div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-base-300/50">
 		if p.Connected {
 			if p.AuthType != core.AuthFileImport {
 				<!-- Sync now (only for non-file-import plugins) -->
@@ -146,7 +148,7 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 						type="file"
 						name="file"
 						accept=".csv,.json,.txt"
-						class="file-input file-input-sm bg-base-100 border-base-300 min-h-[44px]"
+						class="file-input file-input-sm bg-base-300 border-base-content/20 min-h-[44px]"
 					/>
 					<button type="submit" class="btn btn-sm btn-outline border-base-300 min-h-[44px]">
 						Re-upload
@@ -183,7 +185,7 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 						type="file"
 						name="file"
 						accept=".csv,.json,.txt"
-						class="file-input file-input-sm bg-base-100 border-base-300 min-h-[44px]"
+						class="file-input file-input-sm bg-base-300 border-base-content/20 min-h-[44px]"
 					/>
 					<button type="submit" class="btn btn-sm btn-primary min-h-[44px]">
 						Upload
@@ -196,7 +198,7 @@ templ PluginCard(p PluginViewData, csrfToken string) {
 
 // FileImportCard renders a unified upload card for all file-import plugins.
 templ FileImportCard(available []PluginViewData, csrfToken string) {
-	<div id="file-import-card" class="card bg-neutral border border-base-300 p-5 sm:p-6">
+	<div id="file-import-card" class="card bg-neutral border border-base-300 p-5 sm:p-6 sm:col-span-2 lg:col-span-3">
 		<div class="flex items-center gap-3 mb-1">
 			<div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
 				<svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -220,7 +222,7 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 			<label class="label text-base-content/70 text-sm">Platform</label>
 			<select
 				name="plugin"
-				class="select bg-base-100 border-base-300 w-full max-w-xs"
+				class="select bg-base-300 border-base-content/20 w-full max-w-xs"
 				required
 				onchange="updateImportAction(this)"
 			>
@@ -240,45 +242,49 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 				name="file"
 				accept=".csv,.json,.txt"
 				required
-				class="file-input file-input-sm bg-base-100 border-base-300 min-h-[44px] w-full max-w-xs"
+				class="file-input file-input-sm bg-base-300 border-base-content/20 min-h-[44px] w-full max-w-xs"
 			/>
 		</fieldset>
 			<button type="submit" class="btn btn-sm btn-primary min-h-[44px]" disabled id="import-submit-btn">
 				Upload
 			</button>
 		</form>
-		<!-- Accepted formats & export guides (inline) -->
-		for _, p := range available {
-			if p.AuthType == core.AuthFileImport {
-				<div class="collapse collapse-arrow bg-base-100/50 border border-base-300 mt-4">
-					<input type="checkbox"/>
-				<div class="collapse-title text-sm font-medium text-base-content/60">
-					<div class="flex items-center gap-2">
-						<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-							@pluginLogo(p.Name)
-						</div>
-						<span>{ p.DisplayName } — How to export</span>
-						<span class="badge badge-xs badge-ghost text-base-content/40">{ pluginTimeEstimate(p.Name) }</span>
-					</div>
-				</div>
-					<div class="collapse-content text-sm text-base-content/80 space-y-3">
+		<!-- Export guide — shown inline for selected platform -->
+		<div id="import-guide-container" class="hidden mt-4 p-4 rounded-lg bg-base-300/30 border border-base-300/50">
+			<div class="flex items-center gap-2 mb-3">
+				<span class="text-sm font-medium text-base-content/70">How to export</span>
+				<span id="import-guide-estimate" class="badge badge-xs badge-ghost text-base-content/40"></span>
+			</div>
+			for _, p := range available {
+				if p.AuthType == core.AuthFileImport {
+					<div id={ "guide-" + p.Name } class="hidden text-sm text-base-content/80 space-y-3">
 						@importGuideSteps(p.Name)
 					</div>
-				</div>
+				}
 			}
-		}
-		<!-- Script to update form action based on selected plugin -->
+		</div>
+		<!-- Script to update form action and show guide based on selected plugin -->
 		<script>
 			function updateImportAction(select) {
 				const form = document.getElementById('file-import-form');
 				const btn = document.getElementById('import-submit-btn');
+				const guideContainer = document.getElementById('import-guide-container');
+				// Hide all guides
+				guideContainer.querySelectorAll('[id^="guide-"]').forEach(el => el.classList.add('hidden'));
 				if (select.value) {
 					form.setAttribute('hx-post', '/api/v1/plugins/' + select.value + '/import');
 					form.setAttribute('hx-target', '#file-import-card');
 					btn.disabled = false;
 					htmx.process(form);
+					// Show relevant guide
+					const guide = document.getElementById('guide-' + select.value);
+					if (guide) {
+						guide.classList.remove('hidden');
+						guideContainer.classList.remove('hidden');
+					}
 				} else {
 					btn.disabled = true;
+					guideContainer.classList.add('hidden');
 				}
 			}
 		</script>
