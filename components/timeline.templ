@@ -501,21 +501,15 @@ templ erasContent(data ErasData) {
 	</div>
 }
 
-// erasLane renders a horizontal sequence of eras for a single media type.
-// Each era is a segment in a continuous timeline, connected by thin lines.
+// erasLane renders a responsive grid of eras for a single media type.
 templ erasLane(label string, eras []core.Era, csrfToken string) {
 	<div class="animate-fade-in-up">
 		<h3 class="text-xs text-base-content/40 uppercase tracking-wider mb-4">{ label } eras</h3>
-		<!-- Horizontal era lane — a connected sequence of variable-width segments -->
-		<div class="relative">
-			<!-- The connecting spine -->
-			<div class="absolute top-5 left-0 right-0 h-px bg-base-300"></div>
-			<!-- Era segments -->
-			<div class="relative flex gap-0">
-				for i, era := range eras {
-					@eraSegment(era, i, len(eras), csrfToken)
-				}
-			</div>
+		<!-- Responsive era grid -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+			for i, era := range eras {
+				@eraSegment(era, i, len(eras), csrfToken)
+			}
 		</div>
 	</div>
 }
@@ -524,7 +518,7 @@ templ erasLane(label string, eras []core.Era, csrfToken string) {
 templ eraSegment(era core.Era, index int, total int, csrfToken string) {
 	<div
 		id={ fmt.Sprintf("era-%s", era.ID.String()) }
-		class="flex-1 min-w-0 group relative"
+		class="group relative"
 		style={ fmt.Sprintf("animation-delay: %dms", index*60) }
 	>
 		<!-- Timeline node -->
