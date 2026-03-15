@@ -210,58 +210,61 @@ templ FileImportCard(available []PluginViewData, csrfToken string) {
 				<div class="text-xs text-base-content/50 mt-0.5">Your complete history — years of data, not just recent plays</div>
 			</div>
 		</div>
-		<form
-			id="file-import-form"
-			hx-swap="outerHTML"
-			hx-encoding="multipart/form-data"
-			class="mt-4 space-y-3"
-		>
-			<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
-		<!-- Platform selector -->
-		<fieldset class="fieldset w-full max-w-xs">
-			<label class="label text-base-content/70 text-sm">Platform</label>
-			<select
-				name="plugin"
-				class="select bg-base-300 border-base-content/20 w-full max-w-xs"
-				required
-				onchange="updateImportAction(this)"
+		<div class="mt-4 flex flex-col md:flex-row gap-6">
+			<!-- Left: upload form -->
+			<form
+				id="file-import-form"
+				hx-swap="outerHTML"
+				hx-encoding="multipart/form-data"
+				class="space-y-3 md:w-80 flex-shrink-0"
 			>
-				<option disabled selected value="">Choose a platform…</option>
+				<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+				<!-- Platform selector -->
+				<fieldset class="fieldset w-full">
+					<label class="label text-base-content/70 text-sm">Platform</label>
+					<select
+						name="plugin"
+						class="select bg-base-300 border-base-content/20 w-full"
+						required
+						onchange="updateImportAction(this)"
+					>
+						<option disabled selected value="">Choose a platform…</option>
+						for _, p := range available {
+							if p.AuthType == core.AuthFileImport {
+								<option value={ p.Name }>{ p.DisplayName }</option>
+							}
+						}
+					</select>
+				</fieldset>
+				<!-- File input -->
+				<fieldset class="fieldset w-full">
+					<label class="label text-base-content/70 text-sm">Export file</label>
+					<input
+						type="file"
+						name="file"
+						accept=".csv,.json,.txt"
+						required
+						class="file-input file-input-sm bg-base-300 border-base-content/20 min-h-[44px] w-full"
+					/>
+				</fieldset>
+				<button type="submit" class="btn btn-sm btn-primary min-h-[44px]" disabled id="import-submit-btn">
+					Upload
+				</button>
+			</form>
+			<!-- Right: export guide (shown when platform selected) -->
+			<div id="import-guide-container" class="hidden flex-1 min-w-0 p-4 rounded-lg bg-base-300/30 border border-base-300/50 md:border-l md:border-t-0">
+				<div class="flex items-center gap-2 mb-3">
+					<span class="text-sm font-medium text-base-content/70">How to export your data</span>
+					<span id="import-guide-estimate" class="badge badge-xs badge-ghost text-base-content/40"></span>
+				</div>
 				for _, p := range available {
 					if p.AuthType == core.AuthFileImport {
-						<option value={ p.Name }>{ p.DisplayName }</option>
+						<div id={ "guide-" + p.Name } class="hidden text-sm text-base-content/80 space-y-3">
+							@importGuideSteps(p.Name)
+						</div>
 					}
 				}
-			</select>
-		</fieldset>
-		<!-- File input -->
-		<fieldset class="fieldset w-full max-w-xs">
-			<label class="label text-base-content/70 text-sm">Export file</label>
-			<input
-				type="file"
-				name="file"
-				accept=".csv,.json,.txt"
-				required
-				class="file-input file-input-sm bg-base-300 border-base-content/20 min-h-[44px] w-full max-w-xs"
-			/>
-		</fieldset>
-			<button type="submit" class="btn btn-sm btn-primary min-h-[44px]" disabled id="import-submit-btn">
-				Upload
-			</button>
-		</form>
-		<!-- Export guide — shown inline for selected platform -->
-		<div id="import-guide-container" class="hidden mt-4 p-4 rounded-lg bg-base-300/30 border border-base-300/50">
-			<div class="flex items-center gap-2 mb-3">
-				<span class="text-sm font-medium text-base-content/70">How to export</span>
-				<span id="import-guide-estimate" class="badge badge-xs badge-ghost text-base-content/40"></span>
 			</div>
-			for _, p := range available {
-				if p.AuthType == core.AuthFileImport {
-					<div id={ "guide-" + p.Name } class="hidden text-sm text-base-content/80 space-y-3">
-						@importGuideSteps(p.Name)
-					</div>
-				}
-			}
 		</div>
 		<!-- Script to update form action and show guide based on selected plugin -->
 		<script>
