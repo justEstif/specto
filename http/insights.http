@@ -1,6 +1,8 @@
 ###########################################################
 # Insights endpoint integration tests
-# Tests: summary, platform-breakdown, tags, timeline
+# Tests: summary, platform-breakdown, tags, timeline,
+#        on-this-day, attention-by-type, tags-by-category,
+#        heatmap, crossover, topic-timeline, topic-spikes
 ###########################################################
 
 ### Setup: Register user and import some data
@@ -36,16 +38,19 @@ Content-Type: application/json
 ?? status == 200
 ?? body data.items_added == 3
 
-### Get insights summary (returns 500 when items exist — known issue with DB query)
+### Get insights summary
 # @ref insightsUser
 GET {{baseUrl}}/api/v1/insights/summary?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
 
+?? status == 200
 ?? header content-type includes json
+?? body data.total_items == 3
 
-### Get platform breakdown (returns 500 when items exist — known issue with DB query)
+### Get platform breakdown
 # @ref insightsUser
 GET {{baseUrl}}/api/v1/insights/platform-breakdown?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
 
+?? status == 200
 ?? header content-type includes json
 
 ### Get tag distribution
@@ -72,6 +77,55 @@ GET {{baseUrl}}/api/v1/insights/timeline?bucket=week&from=2026-01-01T00:00:00Z&t
 ### Get insights timeline (monthly buckets)
 # @ref insightsUser
 GET {{baseUrl}}/api/v1/insights/timeline?bucket=month&from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Get on-this-day
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/on-this-day
+
+?? status == 200
+?? header content-type includes json
+
+### Get attention by type
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/attention-by-type?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Get tags by category
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/tags-by-category?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z&category=genre
+
+?? status == 200
+?? header content-type includes json
+
+### Get heatmap
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/heatmap?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Get crossover insights
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/crossover?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Get topic timeline
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/topic-timeline?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
+
+?? status == 200
+?? header content-type includes json
+
+### Get topic spikes
+# @ref insightsUser
+GET {{baseUrl}}/api/v1/insights/topic-spikes?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z
 
 ?? status == 200
 ?? header content-type includes json

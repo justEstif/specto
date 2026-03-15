@@ -1,0 +1,63 @@
+###########################################################
+# Share profile integration tests
+# Tests: get, update, preview
+###########################################################
+
+### Setup: Register a fresh user
+# @name shareUser
+{{
+  const timestamp = Date.now();
+  exports.shareEmail = `share_${timestamp}@example.com`;
+  exports.sharePassword = "password123";
+}}
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{shareEmail}}",
+  "display_name": "Share Tester",
+  "password": "{{sharePassword}}"
+}
+
+?? status == 201
+
+### Get share profile (default state)
+# @ref shareUser
+GET {{baseUrl}}/api/v1/share-profile
+
+?? status == 200
+?? header content-type includes json
+
+### Update share profile (enable sharing)
+# @ref shareUser
+PUT {{baseUrl}}/api/v1/share-profile
+Content-Type: application/json
+
+{
+  "enabled": true,
+  "show_stats": true,
+  "show_recent": true,
+  "show_platforms": true
+}
+
+?? status == 200
+?? header content-type includes json
+
+### Get share profile preview
+# @ref shareUser
+GET {{baseUrl}}/api/v1/share-profile/preview
+
+?? status == 200
+?? header content-type includes json
+
+### Update share profile (disable sharing)
+# @ref shareUser
+PUT {{baseUrl}}/api/v1/share-profile
+Content-Type: application/json
+
+{
+  "enabled": false
+}
+
+?? status == 200
+?? header content-type includes json

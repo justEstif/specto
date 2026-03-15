@@ -86,3 +86,103 @@ GET {{baseUrl}}/api/v1/insights/timeline
 
 ?? status == 401
 ?? body error.code == unauthorized
+
+### Insights on-this-day (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/on-this-day
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights attention-by-type (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/attention-by-type
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights tags-by-category (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/tags-by-category
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights heatmap (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/heatmap
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights crossover (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/crossover
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights topic-timeline (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/topic-timeline
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Insights topic-spikes (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/insights/topic-spikes
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Delete plugin data (unauthenticated - expect 401)
+DELETE {{baseUrl}}/api/v1/plugins/spotify/data
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Share profile (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/share-profile
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Update share profile (unauthenticated - expect 401)
+PUT {{baseUrl}}/api/v1/share-profile
+Content-Type: application/json
+
+{
+  "enabled": true
+}
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Share profile preview (unauthenticated - expect 401)
+GET {{baseUrl}}/api/v1/share-profile/preview
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Confirm era (unauthenticated - expect 401)
+POST {{baseUrl}}/api/v1/eras/fake-id/confirm
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Update era title (unauthenticated - expect 401)
+PUT {{baseUrl}}/api/v1/eras/fake-id/title
+Content-Type: application/json
+
+{
+  "title": "test"
+}
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Dismiss era (unauthenticated - expect 401)
+DELETE {{baseUrl}}/api/v1/eras/fake-id
+
+?? status == 401
+?? body error.code == unauthorized
+
+### Toggle item privacy (unauthenticated - expect 401)
+POST {{baseUrl}}/api/v1/items/fake-id/privacy
+
+?? status == 401
+?? body error.code == unauthorized

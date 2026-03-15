@@ -62,6 +62,13 @@ GET {{baseUrl}}/api/v1/plugins/spotify/sync-history?limit=5
 ?? status == 200
 ?? header content-type includes json
 
+### Delete Spotify plugin data (removes items but stays connected)
+# @ref spotifyUser
+DELETE {{baseUrl}}/api/v1/plugins/spotify/data
+
+?? status == 200
+?? header content-type includes json
+
 ### Disconnect Spotify plugin
 # @ref spotifyUser
 DELETE {{baseUrl}}/api/v1/plugins/spotify/disconnect
